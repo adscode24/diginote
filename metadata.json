@@ -1,0 +1,8 @@
+{
+  "name": "Diginote",
+  "description": "Diginote atau Digital Note adalah Aplikasi pencatatan keuangan modern dengan pengelolaan sumber dana, ringkasan arus kas, hutang-piutang, kalender progres, dan enkripsi data privasi.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

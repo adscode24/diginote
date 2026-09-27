@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Download, Smartphone, X, CheckCircle2 } from 'lucide-react';
 import { usePWAInstall } from '../hooks/usePWAInstall';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 interface PWAInstallButtonProps {
   compact?: boolean;
@@ -10,6 +11,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ compact = fa
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
   const [installSuccess, setInstallSuccess] = useState(false);
+  useBodyScrollLock(showIOSGuide);
 
   // If already running as an installed standalone PWA, show gentle indicator or null
   if (isInstalled) {

@@ -16,6 +16,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { formatDateIndo } from '../utils/formatters';
 
 interface CloudSyncModalProps {
@@ -39,6 +40,7 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose 
   const [targetVaultId, setTargetVaultId] = useState(syncSettings.vaultId);
   const [copied, setCopied] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  useBodyScrollLock(isOpen);
 
   if (!isOpen) return null;
 

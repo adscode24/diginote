@@ -23,6 +23,7 @@ import { formatRupiah, formatDateIndo, calculateDueDateStatus, getNextDueDate } 
 import { AddDebtModal } from './AddDebtModal';
 import { PayDebtModal } from './PayDebtModal';
 import { ReceiptViewerModal } from './ReceiptViewerModal';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 export const DebtsView: React.FC = () => {
   const { debts, deleteDebt, deleteDebtPayment } = useFinance();
@@ -37,6 +38,7 @@ export const DebtsView: React.FC = () => {
   const [selectedReceipt, setSelectedReceipt] = useState<{ url: string; title: string } | null>(null);
   const [expandedDebtId, setExpandedDebtId] = useState<string | null>(null);
   const [selectedPaymentDetail, setSelectedPaymentDetail] = useState<{ debt: Debt; payment: DebtPayment } | null>(null);
+  useBodyScrollLock(isAddModalOpen || selectedDebtForPay !== null || selectedReceipt !== null || selectedPaymentDetail !== null);
 
   const handleOpenAdd = () => {
     setDebtToEdit(null);

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, CheckCircle2, Upload, Trash2, ArrowUpRight, AlertCircle, Calendar, Wallet, Percent } from 'lucide-react';
 import { Debt } from '../types';
 import { useFinance } from '../context/FinanceContext';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { formatRupiah, getTodayString, getActiveTierRate, calculateTieredPayment } from '../utils/formatters';
 
 interface PayDebtModalProps {
@@ -26,6 +27,7 @@ export const PayDebtModal: React.FC<PayDebtModalProps> = ({ isOpen, onClose, deb
     principalPortion?: number;
     annualRate?: number;
   } | null>(null);
+  useBodyScrollLock(isOpen);
 
   React.useEffect(() => {
     if (debt && isOpen) {

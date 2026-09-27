@@ -13,8 +13,12 @@ import {
   BellRing,
   X,
   Tag,
+  Plus,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import {
   formatRupiah,
   formatDateIndo,
@@ -26,17 +30,22 @@ import {
 import { CategoryIcon } from './CategoryIcon';
 import { TransactionModal } from './TransactionModal';
 import { PayDebtModal } from './PayDebtModal';
-import { Debt, ActiveTab, Transaction, TransactionType } from '../types';
+import { BillModal } from './BillModal';
+import { BillPayModal } from './BillPayModal';
+import { Debt, ActiveTab, Transaction, TransactionType, Bill } from '../types';
 
 interface DashboardViewProps {
   onNavigateTab: (tab: ActiveTab) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) => {
-  const { summary, transactions, debts, accounts, categories, reminderSettings } = useFinance();
+  const { summary, transactions, debts, accounts, categories, reminderSettings, bills, billPayments, deleteBill } = useFinance();
 
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
   const [selectedDebtToPay, setSelectedDebtToPay] = useState<Debt | null>(null);
+  const [isBillModalOpen, setIsBillModalOpen] = useState(false);
+  const [billToEdit, setBillToEdit] = useState<Bill | null>(null);
+  const [billToPay, setBillToPay] = useState<Bill | null>(null);
 
   // Month filter state
   const today = getTodayString();
@@ -45,6 +54,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
 
   // Bottom Sheet for Pemasukan / Pengeluaran breakdown
   const [breakdownType, setBreakdownType] = useState<TransactionType | null>(null);
+
+  // Kunci scroll halaman belakang saat bottom sheet / modal terbuka
+  useBodyScrollLock(breakdownType !== null || isTxModalOpen || selectedDebtToPay !== null || isBillModalOpen || billToPay !== null);
 
   const selectedMonthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
   const selectedMonthLabel = formatMonthYearIndo(selectedYear, selectedMonth);
@@ -95,9 +107,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
       .slice(0, 3);
   }, [debts]);
 
-  // Hitung total saldo sumber dana khusus jenis "rekening", "uang tunai", dan "dompet digital"
+  // Hitung total saldo semua sumber dana (kartu kredit = sumber dana biasa)
   const liquidAccounts = useMemo(() => {
-    return accounts.filter(a => a.type === 'bank' || a.type === 'cash' || a.type === 'ewallet');
+    return accounts.filter(a => a.type === 'bank' || a.type === 'cash' || a.type === 'ewallet' || a.type === 'credit_card');
   }, [accounts]);
 
   const totalLiquidAccountsBalance = useMemo(() => {
@@ -114,6 +126,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
       })
       .slice(0, 5);
   }, [transactions]);
+
+  // Tagihan rutin bulan berjalan: status lunas / jatuh tempo
+  const currentMonthKey = today.substring(0, 7);
+  const billCards = useMemo(() => {
+    const [cy, cm] = currentMonthKey.split('-').map(Number);
+    const daysInMonth = new Date(cy, cm, 0).getDate();
+    return bills
+      .filter(b => b.isActive !== false)
+      .map(b => {
+        const paid = billPayments.some(p => p.billId === b.id && p.monthKey === currentMonthKey);
+        const dueDay = Math.min(Math.max(1, b.dueDayOfMonth || 1), daysInMonth);
+        const dueDateStr = `${currentMonthKey}-${String(dueDay).padStart(2, '0')}`;
+        const statusInfo = calculateDueDateStatus(dueDateStr);
+        return { ...b, paid, dueDateStr, statusInfo };
+      })
+      .sort((a, b) => {
+        if (a.paid !== b.paid) return a.paid ? 1 : -1;
+        return a.statusInfo.daysRemaining - b.statusInfo.daysRemaining;
+      });
+  }, [bills, billPayments, currentMonthKey]);
 
   return (
     <div className="space-y-6 pb-6">
@@ -282,11 +314,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
             </div>
           </div>
           <div className="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
-            <span>
-              {summary.totalCreditCardDebt > 0
-                ? `Termasuk CC: ${formatRupiah(summary.totalCreditCardDebt)}`
-                : `Piutang: ${formatRupiah(summary.totalReceivableDebt)}`}
-            </span>
+            <span>Piutang: {formatRupiah(summary.totalReceivableDebt)}</span>
             <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition" />
           </div>
         </div>
@@ -311,8 +339,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          {accounts.length === 0 && (
+            <button
+              onClick={() => onNavigateTab('accounts')}
+              className="col-span-2 sm:col-span-4 p-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 hover:border-emerald-500 hover:text-emerald-600 transition"
+            >
+              Belum ada sumber dana. Klik untuk buat sumber dana pertama Anda.
+            </button>
+          )}
           {accounts.map(acc => {
-            const isCC = acc.type === 'credit_card';
             return (
               <div
                 key={acc.id}
@@ -329,25 +364,112 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                   <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
                     {acc.name}
                   </span>
-                  {isCC && (
-                    <span className="text-[9px] px-1 py-0.2 rounded font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-                      Hutang
-                    </span>
-                  )}
                 </div>
-                <div
-                  className={`text-xs font-bold tabular-nums truncate ${
-                    isCC && acc.balance < 0
-                      ? 'text-red-600 dark:text-red-400'
-                      : 'text-slate-900 dark:text-white'
-                  }`}
-                >
+                <div className="text-xs font-bold tabular-nums truncate text-slate-900 dark:text-white">
                   {formatRupiah(acc.balance)}
                 </div>
               </div>
             );
           })}
         </div>
+      </div>
+
+      {/* Tagihan Rutin */}
+      <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <BellRing className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+              Tagihan Rutin
+            </h3>
+          </div>
+          <button
+            onClick={() => {
+              setBillToEdit(null);
+              setIsBillModalOpen(true);
+            }}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Tambah Tagihan</span>
+          </button>
+        </div>
+
+        {billCards.length === 0 ? (
+          <p className="text-xs text-slate-400 text-center py-4">
+            Belum ada tagihan rutin. Tambahkan tagihan seperti WiFi, listrik, atau air agar diingatkan tiap bulan.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {billCards.map(bill => (
+              <div
+                key={bill.id}
+                className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800 flex items-center justify-between gap-3"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                      {bill.name}
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                        bill.paid
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300'
+                          : bill.statusInfo.isOverdue
+                          ? 'bg-red-100 text-red-700 dark:bg-red-950/80 dark:text-red-300'
+                          : bill.statusInfo.isDueSoon
+                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300'
+                          : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      {bill.paid ? 'Lunas' : bill.statusInfo.label}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                    <strong className="tabular-nums">{formatRupiah(bill.amount)}</strong>
+                    <span className="text-[11px] text-slate-400"> · Tgl {bill.dueDayOfMonth} tiap bulan</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    Jatuh tempo: {formatDateIndo(bill.dueDateStr)}
+                    {bill.categoryName && ` · ${bill.categoryName}`}
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  {!bill.paid && (
+                    <button
+                      onClick={() => setBillToPay(bill)}
+                      className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-xs"
+                    >
+                      Bayar
+                    </button>
+                  )}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        setBillToEdit(bill);
+                        setIsBillModalOpen(true);
+                      }}
+                      className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                      title="Edit tagihan"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm(`Hapus tagihan rutin "${bill.name}"?`)) deleteBill(bill.id);
+                      }}
+                      className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 transition"
+                      title="Hapus tagihan"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Two Column Layout: Urgent Debts on Left, Recent Transactions on Right */}
@@ -667,6 +789,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
         isOpen={!!selectedDebtToPay}
         onClose={() => setSelectedDebtToPay(null)}
         debt={selectedDebtToPay}
+      />
+
+      {/* Bill Modal (Create / Edit Tagihan Rutin) */}
+      <BillModal
+        isOpen={isBillModalOpen}
+        onClose={() => {
+          setIsBillModalOpen(false);
+          setBillToEdit(null);
+        }}
+        billToEdit={billToEdit}
+      />
+
+      {/* Bill Pay Modal */}
+      <BillPayModal
+        isOpen={!!billToPay}
+        onClose={() => setBillToPay(null)}
+        bill={billToPay}
       />
     </div>
   );

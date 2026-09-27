@@ -1,58 +1,7 @@
 import { Category, PaymentMethod, Account } from '../types';
 
-export const DEFAULT_ACCOUNTS: Account[] = [
-  {
-    id: 'acc_bca',
-    name: 'Rekening BCA',
-    type: 'bank',
-    balance: 5500000,
-    initialBalance: 5500000,
-    accountNumber: '8492019482',
-    color: '#005EAD', // BCA Blue
-    icon: 'Building2',
-    isDefault: true,
-    createdAt: Date.now() - 30 * 86400000,
-    updatedAt: Date.now() - 30 * 86400000,
-  },
-  {
-    id: 'acc_cash',
-    name: 'Uang Tunai (Cash)',
-    type: 'cash',
-    balance: 450000,
-    initialBalance: 450000,
-    color: '#059669', // Emerald
-    icon: 'Banknote',
-    isDefault: true,
-    createdAt: Date.now() - 30 * 86400000,
-    updatedAt: Date.now() - 30 * 86400000,
-  },
-  {
-    id: 'acc_gopay',
-    name: 'E-Wallet GoPay / OVO',
-    type: 'ewallet',
-    balance: 850000,
-    initialBalance: 850000,
-    accountNumber: '08129849201',
-    color: '#00AED6', // GoPay Cyan
-    icon: 'Smartphone',
-    isDefault: false,
-    createdAt: Date.now() - 30 * 86400000,
-    updatedAt: Date.now() - 30 * 86400000,
-  },
-  {
-    id: 'acc_credit',
-    name: 'Kartu Kredit Mandiri',
-    type: 'credit_card',
-    balance: 0,
-    initialBalance: 0,
-    accountNumber: '**** 4182',
-    color: '#D97706', // Amber
-    icon: 'CreditCard',
-    isDefault: false,
-    createdAt: Date.now() - 30 * 86400000,
-    updatedAt: Date.now() - 30 * 86400000,
-  },
-];
+// Tidak ada sumber dana bawaan: pengguna membuat sendiri lewat halaman Dana.
+export const DEFAULT_ACCOUNTS: Account[] = [];
 
 export const ACCOUNT_TYPES: { id: Account['type']; label: string; icon: string }[] = [
   { id: 'bank', label: 'Rekening Bank', icon: 'Building2' },

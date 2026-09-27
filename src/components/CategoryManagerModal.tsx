@@ -4,6 +4,7 @@ import { Category, TransactionType } from '../types';
 import { useFinance } from '../context/FinanceContext';
 import { CATEGORY_ICON_OPTIONS, COLOR_PALETTE } from '../utils/constants';
 import { CategoryIcon } from './CategoryIcon';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 interface CategoryManagerModalProps {
   isOpen: boolean;
@@ -25,6 +26,8 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   const [selectedIcon, setSelectedIcon] = useState('Tag');
   const [selectedColor, setSelectedColor] = useState(COLOR_PALETTE[0]);
   const [error, setError] = useState('');
+
+  useBodyScrollLock(isOpen);
 
   if (!isOpen) return null;
 

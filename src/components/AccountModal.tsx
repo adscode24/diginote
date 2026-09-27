@@ -4,6 +4,7 @@ import { Account, AccountType } from '../types';
 import { useFinance } from '../context/FinanceContext';
 import { ACCOUNT_TYPES, COLOR_PALETTE } from '../utils/constants';
 import { CategoryIcon } from './CategoryIcon';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { formatRupiah } from '../utils/formatters';
 
 interface AccountModalProps {
@@ -31,6 +32,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   const [selectedColor, setSelectedColor] = useState(COLOR_PALETTE[0]);
   const [selectedIcon, setSelectedIcon] = useState('Building2');
   const [error, setError] = useState('');
+  useBodyScrollLock(isOpen);
 
   const getDefaultIconForType = (t: AccountType) => {
     if (t === 'bank') return 'Building2';
@@ -162,7 +164,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
             <div className="space-y-4">
               <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800">
                 <div className="text-xs text-slate-500 dark:text-slate-400">
-                  {accountToEdit.type === 'credit_card' ? 'Beban Hutang Tagihan Saat Ini:' : 'Saldo Tercatat Sekarang:'}
+                  Saldo Tercatat Sekarang:
                 </div>
                 <div
                   className={`text-lg font-bold tabular-nums ${
@@ -173,18 +175,11 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 >
                   {formatRupiah(accountToEdit.balance)}
                 </div>
-                {accountToEdit.type === 'credit_card' && accountToEdit.balance < 0 && (
-                  <div className="text-[11px] text-amber-600 dark:text-amber-400 font-medium mt-0.5">
-                    Total tagihan yang harus dibayar: {formatRupiah(Math.abs(accountToEdit.balance))}
-                  </div>
-                )}
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  {accountToEdit.type === 'credit_card'
-                    ? 'Beban Hutang Baru yang Disesuaikan (Rupiah) *'
-                    : 'Saldo Baru yang Disesuaikan (Rupiah) *'}
+                  Saldo Baru yang Disesuaikan (Rupiah) *
                 </label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
@@ -204,9 +199,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   />
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  {accountToEdit.type === 'credit_card'
-                    ? 'Nominal tagihan hutang akan disimpan sebagai saldo minus (misal Rp 500.000 menjadi -Rp 500.000). Jika kartu lunas, masukkan 0.'
-                    : 'Saldo akan langsung diperbarui ke nominal ini tanpa merusak riwayat transaksi Anda.'}
+                  Saldo akan langsung diperbarui ke nominal ini tanpa merusak riwayat transaksi Anda.
                 </p>
               </div>
             </div>
@@ -234,28 +227,12 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                         <CategoryIcon name={t.icon} className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                         <div className="min-w-0 flex-1 truncate">
                           <span>{t.label}</span>
-                          {t.id === 'credit_card' && (
-                            <span className="ml-1 text-[9px] px-1 py-0.2 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-bold">
-                              Hutang
-                            </span>
-                          )}
                         </div>
                       </button>
                     );
                   })}
                 </div>
               </div>
-
-              {/* Informational Callout for Credit Card */}
-              {type === 'credit_card' && (
-                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5">
-                  <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                  <div className="text-[11px] leading-relaxed">
-                    <strong className="block font-bold">Sumber Dana Jenis Hutang (Kartu Kredit)</strong>
-                    Saldo kartu kredit adalah <strong>beban hutang</strong>. Transaksi keluar akan menambah tagihan (saldo menjadi minus). Transaksi masuk (pembayaran tagihan) akan mengurangi hutang (saldo bertambah menuju plus).
-                  </div>
-                </div>
-              )}
 
               {/* Account Name */}
               <div>
@@ -289,7 +266,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               {!accountToEdit && (
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    {type === 'credit_card' ? 'Beban Hutang Tagihan Awal (Rupiah)' : 'Saldo Awal (Rupiah) *'}
+                    Saldo Awal (Rupiah) *
                   </label>
                   <div className="relative">
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
@@ -309,9 +286,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                     />
                   </div>
                   <p className="text-[11px] text-slate-400 mt-1">
-                    {type === 'credit_card'
-                      ? 'Jika kartu kredit sudah memiliki tagihan berjalan, masukkan nominalnya di sini (otomatis tercatat sebagai saldo minus / hutang).'
-                      : 'Saldo ini dapat diedit atau disesuaikan secara manual kapan saja nanti.'}
+                    Saldo ini dapat diedit atau disesuaikan secara manual kapan saja nanti.
                   </p>
                 </div>
               )}

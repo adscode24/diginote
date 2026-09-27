@@ -17,6 +17,7 @@ import { ThemeMode } from '../types';
 import { requestNotificationPermission, sendDailyReminderNotification, isNotificationSupported } from '../services/notifications';
 import { PWAInstallButton } from './PWAInstallButton';
 import { CloudSyncModal } from './CloudSyncModal';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 export const SettingsView: React.FC = () => {
   const {
@@ -33,6 +34,7 @@ export const SettingsView: React.FC = () => {
   const [notificationTestMessage, setNotificationTestMessage] = useState<string | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  useBodyScrollLock(showClearConfirm || isSyncModalOpen);
 
   const handleToggleReminder = async (enabled: boolean) => {
     if (enabled && isNotificationSupported()) {
@@ -56,9 +58,9 @@ export const SettingsView: React.FC = () => {
   };
 
   const handleResetData = () => {
-    if (confirm('Apakah Anda yakin ingin memulihkan data demonstrasi? Data saat ini akan diganti dengan data contoh.')) {
+    if (confirm('Mulai dari awal? Semua data (transaksi, hutang, tagihan, sumber dana) akan dikosongkan. Kategori bawaan tetap dipertahankan.')) {
       resetToDefaultData();
-      setFeedbackMessage('Data berhasil dipulihkan ke data demonstrasi bawaan.');
+      setFeedbackMessage('Data berhasil dikosongkan. Silakan buat sumber dana baru di halaman Dana.');
       setTimeout(() => setFeedbackMessage(null), 3500);
     }
   };

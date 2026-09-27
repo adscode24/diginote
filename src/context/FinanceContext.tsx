@@ -6,12 +6,14 @@ import {
   Debt,
   DebtStatus,
   DebtPayment,
+  Bill,
+  BillPayment,
   FinanceSummary,
   ReminderSettings,
   SyncSettings,
   ThemeMode,
 } from '../types';
-import { ALL_DEFAULT_CATEGORIES, DEFAULT_ACCOUNTS } from '../utils/constants';
+import { ALL_DEFAULT_CATEGORIES } from '../utils/constants';
 import { getTodayString, calculatePayoffDate, getNextDueDate, getActiveTierRate, calculateTieredPayment, TieredPaymentResult } from '../utils/formatters';
 import { generateVaultId, hashPassphrase } from '../services/crypto';
 import { pushToCloudVault, pullFromCloudVault, exportEncryptedBackup, importEncryptedBackup, SyncPayload } from '../services/sync';
@@ -21,6 +23,8 @@ interface FinanceContextType {
   categories: Category[];
   accounts: Account[];
   debts: Debt[];
+  bills: Bill[];
+  billPayments: BillPayment[];
   summary: FinanceSummary;
   reminderSettings: ReminderSettings;
   syncSettings: SyncSettings;
@@ -57,6 +61,13 @@ interface FinanceContextType {
     accountId?: string
   ) => { payment: DebtPayment; transaction: Transaction; breakdown?: TieredPaymentResult & { annualRate: number } };
   deleteDebtPayment: (debtId: string, paymentId: string) => void;
+
+  // Tagihan Rutin
+  addBill: (bill: Omit<Bill, 'id' | 'createdAt' | 'updatedAt'>) => Bill;
+  updateBill: (id: string, bill: Partial<Bill>) => void;
+  deleteBill: (id: string) => void;
+  payBill: (billId: string, payment: { monthKey: string; amount: number; accountId?: string; categoryId: string; paymentDate: string }) => BillPayment;
+  deleteBillPayment: (paymentId: string) => void;
 
   // Settings & Theme
   setThemeMode: (mode: ThemeMode) => void;
@@ -96,15 +107,18 @@ const LEGACY_STORAGE_KEYS = {
   THEME: 'notaku_theme_v2',
 };
 
-function readStoredKey(newKey: string, legacyKey: string): string | null {
+function readStoredKey(newKey: string, ...legacyKeys: string[]): string | null {
   try {
     const current = localStorage.getItem(newKey);
     if (current) return current;
-    const legacy = localStorage.getItem(legacyKey);
-    if (legacy) {
-      localStorage.setItem(newKey, legacy);
-      localStorage.removeItem(legacyKey);
-      return legacy;
+    for (const legacyKey of legacyKeys) {
+      if (!legacyKey) continue;
+      const legacy = localStorage.getItem(legacyKey);
+      if (legacy) {
+        localStorage.setItem(newKey, legacy);
+        localStorage.removeItem(legacyKey);
+        return legacy;
+      }
     }
   } catch (e) {
     console.error(e);
@@ -112,238 +126,84 @@ function readStoredKey(newKey: string, legacyKey: string): string | null {
   return null;
 }
 
-// Initial sample data
-function getInitialSampleData() {
-  const sampleCategories = [...ALL_DEFAULT_CATEGORIES];
-  const sampleAccounts = DEFAULT_ACCOUNTS.map(a =>
-    a.id === 'acc_credit' ? { ...a, balance: -650000, initialBalance: 0 } : a
-  );
-  const today = getTodayString();
-  const [year, month] = today.split('-');
-
-  const sampleTransactions: Transaction[] = [
-    {
-      id: 'tx_sample_1',
-      type: 'income',
-      amount: 9500000,
-      categoryId: 'cat_salary',
-      categoryName: 'Gaji Bulanan',
-      accountId: 'acc_bca',
-      accountName: 'Rekening BCA',
-      date: `${year}-${month}-01`,
-      description: 'Gaji Bulanan Kantor',
-      paymentMethod: 'transfer',
-      createdAt: Date.now() - 20 * 86400000,
-      updatedAt: Date.now() - 20 * 86400000,
-    },
-    {
-      id: 'tx_sample_2',
-      type: 'income',
-      amount: 2200000,
-      categoryId: 'cat_freelance',
-      categoryName: 'Freelance & Side Job',
-      accountId: 'acc_bca',
-      accountName: 'Rekening BCA',
-      date: `${year}-${month}-12`,
-      description: 'Proyek Desain Web Klien',
-      paymentMethod: 'transfer',
-      createdAt: Date.now() - 12 * 86400000,
-      updatedAt: Date.now() - 12 * 86400000,
-    },
-    {
-      id: 'tx_sample_3',
-      type: 'expense',
-      amount: 1450000,
-      categoryId: 'cat_housing',
-      categoryName: 'Tempat Tinggal / Sewa',
-      accountId: 'acc_bca',
-      accountName: 'Rekening BCA',
-      date: `${year}-${month}-03`,
-      description: 'Sewa Kos & Uang Kas',
-      paymentMethod: 'transfer',
-      createdAt: Date.now() - 18 * 86400000,
-      updatedAt: Date.now() - 18 * 86400000,
-    },
-    {
-      id: 'tx_sample_4',
-      type: 'expense',
-      amount: 850000,
-      categoryId: 'cat_food',
-      categoryName: 'Makanan & Minuman',
-      accountId: 'acc_gopay',
-      accountName: 'E-Wallet GoPay / OVO',
-      date: `${year}-${month}-08`,
-      description: 'Belanja Mingguan Supermarket',
-      paymentMethod: 'ewallet',
-      createdAt: Date.now() - 14 * 86400000,
-      updatedAt: Date.now() - 14 * 86400000,
-    },
-    {
-      id: 'tx_sample_5',
-      type: 'expense',
-      amount: 475000,
-      categoryId: 'cat_bills',
-      categoryName: 'Tagihan & Utilitas',
-      accountId: 'acc_bca',
-      accountName: 'Rekening BCA',
-      date: `${year}-${month}-15`,
-      description: 'Token Listrik PLN & Tagihan Wifi',
-      paymentMethod: 'transfer',
-      createdAt: Date.now() - 10 * 86400000,
-      updatedAt: Date.now() - 10 * 86400000,
-    },
-    {
-      id: 'tx_sample_6',
-      type: 'expense',
-      amount: 120000,
-      categoryId: 'cat_food',
-      categoryName: 'Makanan & Minuman',
-      accountId: 'acc_cash',
-      accountName: 'Uang Tunai (Cash)',
-      date: `${year}-${month}-18`,
-      description: 'Makan Siang & Kopi Santai',
-      paymentMethod: 'cash',
-      createdAt: Date.now() - 7 * 86400000,
-      updatedAt: Date.now() - 7 * 86400000,
-    },
-    {
-      id: 'tx_sample_7',
-      type: 'expense',
-      amount: 650000,
-      categoryId: 'cat_shopping',
-      categoryName: 'Belanja Harian',
-      accountId: 'acc_credit',
-      accountName: 'Kartu Kredit Mandiri',
-      date: `${year}-${month}-19`,
-      description: 'Belanja Elektronik & Gadget (Kartu Kredit)',
-      paymentMethod: 'credit_card',
-      createdAt: Date.now() - 6 * 86400000,
-      updatedAt: Date.now() - 6 * 86400000,
-    },
-  ];
-
-  const sampleDebts: Debt[] = [
-    {
-      id: 'debt_sample_1',
-      type: 'payable',
-      counterparty: 'BCA (Cicilan Laptop)',
-      totalAmount: 9000000,
-      remainingAmount: 3000000,
-      startDate: `${year}-${month}-01`,
-      dueDate: `${year}-${month}-28`,
-      dueDayOfMonth: 28,
-      notes: 'Cicilan per bulan Rp 1.500.000',
-      status: 'partial',
-      payments: [
-        {
-          id: 'pay_sample_1',
-          debtId: 'debt_sample_1',
-          amount: 6000000,
-          accountId: 'acc_bca',
-          accountName: 'Rekening BCA',
-          paymentDate: `${year}-${month}-02`,
-          notes: 'Pembayaran bulan 1 s/d 4',
-          createdAt: Date.now() - 15 * 86400000,
-        },
-      ],
-      createdAt: Date.now() - 25 * 86400000,
-      updatedAt: Date.now() - 15 * 86400000,
-    },
-    {
-      id: 'debt_sample_2',
-      type: 'payable',
-      counterparty: 'Budi Santoso',
-      totalAmount: 1500000,
-      remainingAmount: 1500000,
-      startDate: `${year}-${month}-10`,
-      dueDate: `${year}-${month}-30`,
-      dueDayOfMonth: 30,
-      notes: 'Pinjaman dana servis motor',
-      status: 'unpaid',
-      payments: [],
-      createdAt: Date.now() - 14 * 86400000,
-      updatedAt: Date.now() - 14 * 86400000,
-    },
-    {
-      id: 'debt_sample_3',
-      type: 'receivable',
-      counterparty: 'Rina (Proyek Katering)',
-      totalAmount: 3500000,
-      remainingAmount: 1500000,
-      startDate: `${year}-${month}-05`,
-      dueDate: `${year}-${month}-27`,
-      dueDayOfMonth: 27,
-      notes: 'Sisa pembayaran pesanan katering nasi box',
-      status: 'partial',
-      payments: [
-        {
-          id: 'pay_sample_2',
-          debtId: 'debt_sample_3',
-          amount: 2000000,
-          accountId: 'acc_bca',
-          accountName: 'Rekening BCA',
-          paymentDate: `${year}-${month}-16`,
-          notes: 'DP Katering 60%',
-          createdAt: Date.now() - 9 * 86400000,
-        },
-      ],
-      createdAt: Date.now() - 20 * 86400000,
-      updatedAt: Date.now() - 9 * 86400000,
-    },
-  ];
-
-  return { sampleCategories, sampleAccounts, sampleTransactions, sampleDebts };
+// Kunci penyimpanan per pengguna (isolasi data tiap akun login).
+// Untuk kompatibilitas, baca juga kunci global lama lalu migrasikan.
+function buildStorageKeys(userId: string) {
+  const prefix = 'diginote_' + userId;
+  return {
+    TRANSACTIONS: prefix + '_transactions_v2',
+    CATEGORIES: prefix + '_categories_v2',
+    ACCOUNTS: prefix + '_accounts_v2',
+    DEBTS: prefix + '_debts_v2',
+    BILLS: prefix + '_bills_v2',
+    BILL_PAYMENTS: prefix + '_bill_payments_v2',
+    REMINDERS: prefix + '_reminders_v2',
+    SYNC: prefix + '_sync_v2',
+    // Tema adalah preferensi perangkat (tidak per pengguna)
+    THEME: 'diginote_theme_v2',
+  };
 }
 
-export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // 1. Accounts / Sumber Dana State
+// Kunci global era sebelum login multi-akun (dimigrasikan otomatis).
+const LEGACY_GLOBAL_KEYS: Record<string, string> = {
+  TRANSACTIONS: 'diginote_transactions_v2',
+  CATEGORIES: 'diginote_categories_v2',
+  ACCOUNTS: 'diginote_accounts_v2',
+  DEBTS: 'diginote_debts_v2',
+  REMINDERS: 'diginote_reminders_v2',
+  SYNC: 'diginote_sync_v2',
+};
+
+export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: string }> = ({ children, userId }) => {
+  const STORAGE_KEYS = buildStorageKeys(userId);
+  // 1. Accounts / Sumber Dana State (kosong secara default, pengguna buat sendiri)
   const [accounts, setAccounts] = useState<Account[]>(() => {
     try {
-      const stored = readStoredKey(STORAGE_KEYS.ACCOUNTS, LEGACY_STORAGE_KEYS.ACCOUNTS);
+      const stored = readStoredKey(STORAGE_KEYS.ACCOUNTS, LEGACY_GLOBAL_KEYS.ACCOUNTS, LEGACY_STORAGE_KEYS.ACCOUNTS);
       if (stored) return JSON.parse(stored);
     } catch (e) {
       console.error(e);
     }
-    return getInitialSampleData().sampleAccounts;
+    return [];
   });
 
-  // 2. Transactions State
+  // 2. Transactions State (tanpa data contoh)
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     try {
-      const stored = readStoredKey(STORAGE_KEYS.TRANSACTIONS, LEGACY_STORAGE_KEYS.TRANSACTIONS);
+      const stored = readStoredKey(STORAGE_KEYS.TRANSACTIONS, LEGACY_GLOBAL_KEYS.TRANSACTIONS, LEGACY_STORAGE_KEYS.TRANSACTIONS);
       if (stored) return JSON.parse(stored);
     } catch (e) {
       console.error(e);
     }
-    return getInitialSampleData().sampleTransactions;
+    return [];
   });
 
-  // 3. Categories State
+  // 3. Categories State (kategori bawaan tetap ada sebagai master)
   const [categories, setCategories] = useState<Category[]>(() => {
     try {
-      const stored = readStoredKey(STORAGE_KEYS.CATEGORIES, LEGACY_STORAGE_KEYS.CATEGORIES);
+      const stored = readStoredKey(STORAGE_KEYS.CATEGORIES, LEGACY_GLOBAL_KEYS.CATEGORIES, LEGACY_STORAGE_KEYS.CATEGORIES);
       if (stored) return JSON.parse(stored);
     } catch (e) {
       console.error(e);
     }
-    return getInitialSampleData().sampleCategories;
+    return [...ALL_DEFAULT_CATEGORIES];
   });
 
-  // 4. Debts State
+  // 4. Debts State (tanpa data contoh)
   const [debts, setDebts] = useState<Debt[]>(() => {
     try {
-      const stored = readStoredKey(STORAGE_KEYS.DEBTS, LEGACY_STORAGE_KEYS.DEBTS);
+      const stored = readStoredKey(STORAGE_KEYS.DEBTS, LEGACY_GLOBAL_KEYS.DEBTS, LEGACY_STORAGE_KEYS.DEBTS);
       if (stored) return JSON.parse(stored);
     } catch (e) {
       console.error(e);
     }
-    return getInitialSampleData().sampleDebts;
+    return [];
   });
 
   // 5. Reminder Settings
   const [reminderSettings, setReminderSettings] = useState<ReminderSettings>(() => {
     try {
-      const stored = readStoredKey(STORAGE_KEYS.REMINDERS, LEGACY_STORAGE_KEYS.REMINDERS);
+      const stored = readStoredKey(STORAGE_KEYS.REMINDERS, LEGACY_GLOBAL_KEYS.REMINDERS, LEGACY_STORAGE_KEYS.REMINDERS);
       if (stored) return JSON.parse(stored);
     } catch (e) {
       console.error(e);
@@ -354,7 +214,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // 6. Sync Settings
   const [syncSettings, setSyncSettings] = useState<SyncSettings>(() => {
     try {
-      const stored = readStoredKey(STORAGE_KEYS.SYNC, LEGACY_STORAGE_KEYS.SYNC);
+      const stored = readStoredKey(STORAGE_KEYS.SYNC, LEGACY_GLOBAL_KEYS.SYNC, LEGACY_STORAGE_KEYS.SYNC);
       if (stored) return JSON.parse(stored);
     } catch (e) {
       console.error(e);
@@ -364,6 +224,28 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       isEncrypted: true,
       autoSync: false,
     };
+  });
+
+  // 8. Tagihan Rutin (Recurring Bills)
+  const [bills, setBills] = useState<Bill[]>(() => {
+    try {
+      const stored = readStoredKey(STORAGE_KEYS.BILLS);
+      if (stored) return JSON.parse(stored);
+    } catch (e) {
+      console.error(e);
+    }
+    return [];
+  });
+
+  // 9. Riwayat Pembayaran Tagihan Rutin
+  const [billPayments, setBillPayments] = useState<BillPayment[]>(() => {
+    try {
+      const stored = readStoredKey(STORAGE_KEYS.BILL_PAYMENTS);
+      if (stored) return JSON.parse(stored);
+    } catch (e) {
+      console.error(e);
+    }
+    return [];
   });
 
   // 7. Theme State
@@ -412,6 +294,22 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       console.error(e);
     }
   }, [debts]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.BILLS, JSON.stringify(bills));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [bills]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.BILL_PAYMENTS, JSON.stringify(billPayments));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [billPayments]);
 
   useEffect(() => {
     try {
@@ -499,14 +397,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const monthlyBalance = monthlyIncome - monthlyExpense;
     const savingsRate = monthlyIncome > 0 ? Math.max(0, (monthlyBalance / monthlyIncome) * 100) : 0;
 
-    // Total balance of all active accounts (Aset dikurangi beban kartu kredit)
+    // Total saldo seluruh sumber dana (kartu kredit diperlakukan sama seperti bank)
     const totalAccountBalance = accounts.reduce((sum, a) => sum + (a.balance || 0), 0);
-    const totalAssetBalance = accounts
-      .filter(a => a.type !== 'credit_card')
-      .reduce((sum, a) => sum + Math.max(0, a.balance || 0), 0);
-    const totalCreditCardDebt = accounts
-      .filter(a => a.type === 'credit_card' && a.balance < 0)
-      .reduce((sum, a) => sum + Math.abs(a.balance), 0);
+    const totalAssetBalance = accounts.reduce((sum, a) => sum + (a.balance || 0), 0);
 
     let totalDirectDebt = 0;
     let totalReceivableDebt = 0;
@@ -521,8 +414,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     });
 
-    // Total payable debt includes unpaid loan notes plus current credit card debt burden
-    const totalPayableDebt = totalDirectDebt + totalCreditCardDebt;
+    // Total hutang hanya dari catatan hutang (kartu kredit bukan hutang)
+    const totalPayableDebt = totalDirectDebt;
 
     return {
       totalIncome,
@@ -530,7 +423,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       netBalance,
       totalAccountBalance,
       totalAssetBalance,
-      totalCreditCardDebt,
       totalPayableDebt,
       totalReceivableDebt,
       monthlyIncome,
@@ -542,11 +434,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Account / Sumber Dana mutations
   const addAccount = (data: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>) => {
-    // For credit card, balance is a debt burden (minus)
-    let initialBal = data.initialBalance || 0;
-    if (data.type === 'credit_card' && initialBal > 0) {
-      initialBal = -initialBal;
-    }
+    // Semua jenis akun (termasuk kartu kredit) diperlakukan sama seperti rekening bank
+    const initialBal = data.initialBalance || 0;
 
     const newAcc: Account = {
       ...data,
@@ -570,11 +459,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setAccounts(prev =>
       prev.map(a => {
         if (a.id !== id) return a;
-        // If credit card and user entered positive number for debt, store as negative balance
-        const finalBal = a.type === 'credit_card' && newBalance > 0 ? -newBalance : newBalance;
         return {
           ...a,
-          balance: finalBal,
+          balance: newBalance,
           updatedAt: Date.now(),
         };
       })
@@ -982,6 +869,118 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setThemeModeState(mode);
   };
 
+  // Tagihan Rutin (Recurring Bills) mutations
+  const addBill = (data: Omit<Bill, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const newBill: Bill = {
+      ...data,
+      id: `bill_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    setBills(prev => [...prev, newBill]);
+    return newBill;
+  };
+
+  const updateBill = (id: string, data: Partial<Bill>) => {
+    setBills(prev => prev.map(b => (b.id === id ? { ...b, ...data, updatedAt: Date.now() } : b)));
+  };
+
+  const deleteBill = (id: string) => {
+    setBills(prev => prev.filter(b => b.id !== id));
+    // Riwayat pembayaran tagihan yang dihapus ikut dibersihkan,
+    // transaksi pengeluaran yang sudah tercatat tetap tersimpan.
+    setBillPayments(prev => prev.filter(p => p.billId !== id));
+  };
+
+  /**
+   * Bayar tagihan rutin: tercatat sebagai transaksi keluar (pengeluaran)
+   * dengan kategori pilihan + menandai periode bulan tersebut lunas.
+   */
+  const payBill = (
+    billId: string,
+    payment: { monthKey: string; amount: number; accountId?: string; categoryId: string; paymentDate: string }
+  ) => {
+    const targetBill = bills.find(b => b.id === billId);
+    if (!targetBill) throw new Error('Tagihan tidak ditemukan');
+    if (!payment.amount || payment.amount <= 0) throw new Error('Nominal pembayaran harus lebih dari 0');
+
+    const category = categories.find(c => c.id === payment.categoryId);
+    if (!category) throw new Error('Kategori pengeluaran tidak valid');
+
+    const targetAccount = accounts.find(a => a.id === payment.accountId);
+
+    const newTx: Transaction = {
+      id: `tx_bill_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      type: 'expense',
+      amount: payment.amount,
+      categoryId: category.id,
+      categoryName: category.name,
+      accountId: targetAccount?.id,
+      accountName: targetAccount?.name,
+      date: payment.paymentDate || getTodayString(),
+      description: `Bayar Tagihan: ${targetBill.name}`,
+      paymentMethod: targetAccount
+        ? targetAccount.type === 'cash'
+          ? 'cash'
+          : targetAccount.type === 'ewallet'
+          ? 'ewallet'
+          : targetAccount.type === 'credit_card'
+          ? 'credit_card'
+          : 'transfer'
+        : 'transfer',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    const newBillPayment: BillPayment = {
+      id: `billpay_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      billId: targetBill.id,
+      monthKey: payment.monthKey,
+      amount: payment.amount,
+      accountId: targetAccount?.id,
+      accountName: targetAccount?.name,
+      categoryId: category.id,
+      categoryName: category.name,
+      paymentDate: payment.paymentDate || getTodayString(),
+      transactionId: newTx.id,
+      createdAt: Date.now(),
+    };
+
+    // Kurangi saldo sumber dana yang dipilih
+    if (targetAccount) {
+      setAccounts(prev =>
+        prev.map(acc => {
+          if (acc.id !== targetAccount.id) return acc;
+          return { ...acc, balance: acc.balance - payment.amount, updatedAt: Date.now() };
+        })
+      );
+    }
+
+    setBillPayments(prev => [...prev, newBillPayment]);
+    setTransactions(prev => [newTx, ...prev]);
+
+    return newBillPayment;
+  };
+
+  const deleteBillPayment = (paymentId: string) => {
+    const target = billPayments.find(p => p.id === paymentId);
+    if (!target) return;
+
+    // Kembalikan saldo sumber dana
+    if (target.accountId) {
+      setAccounts(prev =>
+        prev.map(acc => {
+          if (acc.id !== target.accountId) return acc;
+          return { ...acc, balance: acc.balance + target.amount, updatedAt: Date.now() };
+        })
+      );
+    }
+
+    // Hapus transaksi pengeluaran terkait
+    setTransactions(prev => prev.filter(tx => tx.id !== target.transactionId));
+    setBillPayments(prev => prev.filter(p => p.id !== paymentId));
+  };
+
   const updateReminderSettings = (settings: Partial<ReminderSettings>) => {
     setReminderSettings(prev => ({ ...prev, ...settings }));
   };
@@ -1089,33 +1088,30 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const resetToDefaultData = () => {
-    const initial = getInitialSampleData();
-    setCategories(initial.sampleCategories);
-    setAccounts(initial.sampleAccounts);
-    setTransactions(initial.sampleTransactions);
-    setDebts(initial.sampleDebts);
+    // Mulai dari awal: tanpa data contoh, tanpa sumber dana bawaan.
+    // Kategori bawaan tetap dipertahankan sebagai master.
+    setCategories([...ALL_DEFAULT_CATEGORIES]);
+    setAccounts([]);
+    setTransactions([]);
+    setDebts([]);
+    setBills([]);
+    setBillPayments([]);
   };
 
   const clearAllData = () => {
     setTransactions([]);
     setDebts([]);
+    setBills([]);
+    setBillPayments([]);
     setCategories(ALL_DEFAULT_CATEGORIES);
-    setAccounts(
-      DEFAULT_ACCOUNTS.map(a => ({
-        ...a,
-        balance: 0,
-        initialBalance: 0,
-      }))
-    );
+    setAccounts([]);
     try {
       localStorage.removeItem(STORAGE_KEYS.TRANSACTIONS);
       localStorage.removeItem(STORAGE_KEYS.DEBTS);
       localStorage.removeItem(STORAGE_KEYS.ACCOUNTS);
       localStorage.removeItem(STORAGE_KEYS.CATEGORIES);
-      localStorage.removeItem(LEGACY_STORAGE_KEYS.TRANSACTIONS);
-      localStorage.removeItem(LEGACY_STORAGE_KEYS.DEBTS);
-      localStorage.removeItem(LEGACY_STORAGE_KEYS.ACCOUNTS);
-      localStorage.removeItem(LEGACY_STORAGE_KEYS.CATEGORIES);
+      localStorage.removeItem(STORAGE_KEYS.BILLS);
+      localStorage.removeItem(STORAGE_KEYS.BILL_PAYMENTS);
     } catch (e) {
       console.error(e);
     }
@@ -1128,6 +1124,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         categories,
         accounts,
         debts,
+        bills,
+        billPayments,
         summary,
         reminderSettings,
         syncSettings,
@@ -1149,6 +1147,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         deleteDebt,
         payDebt,
         deleteDebtPayment,
+        addBill,
+        updateBill,
+        deleteBill,
+        payBill,
+        deleteBillPayment,
         setThemeMode,
         updateReminderSettings,
         updateSyncSettings,

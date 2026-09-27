@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Debt, DebtType, InstallmentCategory, TieredPeriod } from '../types';
 import { useFinance } from '../context/FinanceContext';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { formatRupiah, getTodayString, calculatePayoffDate, getNextDueDate } from '../utils/formatters';
 
 interface AddDebtModalProps {
@@ -44,6 +45,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
   const [notes, setNotes] = useState('');
   const [tieredPeriods, setTieredPeriods] = useState<TieredPeriod[]>([]);
   const [error, setError] = useState('');
+  useBodyScrollLock(isOpen);
 
   const isEditing = !!debtToEdit;
 

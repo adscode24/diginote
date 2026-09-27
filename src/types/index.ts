@@ -115,19 +115,46 @@ export interface SyncSettings {
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
-export type ActiveTab = 'dashboard' | 'transactions' | 'accounts' | 'debts' | 'calendar' | 'reports' | 'settings';
+export type ActiveTab = 'dashboard' | 'transactions' | 'accounts' | 'debts' | 'summary' | 'settings';
 
 export interface FinanceSummary {
   totalIncome: number;
   totalExpense: number;
   netBalance: number;
-  totalAccountBalance: number; // total saldo bersih dari semua sumber dana (Aset - Hutang Kartu Kredit)
-  totalAssetBalance: number; // total saldo kas, tabungan & rekening bank
-  totalCreditCardDebt: number; // total beban hutang dari kartu kredit
-  totalPayableDebt: number; // total hutang yang harus dibayar (termasuk tagihan kartu kredit)
+  totalAccountBalance: number; // total saldo bersih dari semua sumber dana
+  totalAssetBalance: number; // total saldo kas, tabungan, rekening & kartu kredit
+  totalPayableDebt: number; // total hutang yang harus dibayar (catatan hutang)
   totalReceivableDebt: number; // total piutang yang akan diterima
   monthlyIncome: number;
   monthlyExpense: number;
   monthlyBalance: number;
   savingsRate: number; // percentage
+}
+
+export interface Bill {
+  id: string;
+  name: string; // mis. "WiFi IndiHome", "Listrik PLN"
+  amount: number; // nominal tagihan per bulan (Rp)
+  dueDayOfMonth: number; // tanggal jatuh tempo tiap bulan (1-31)
+  categoryId?: string; // kategori pengeluaran default
+  categoryName?: string;
+  accountId?: string; // sumber dana default untuk bayar
+  notes: string;
+  isActive: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface BillPayment {
+  id: string;
+  billId: string;
+  monthKey: string; // periode tagihan "YYYY-MM" (dari tanggal bayar)
+  amount: number;
+  accountId?: string;
+  accountName?: string;
+  categoryId: string;
+  categoryName: string;
+  paymentDate: string; // YYYY-MM-DD
+  transactionId?: string; // id transaksi pengeluaran terkait
+  createdAt: number;
 }

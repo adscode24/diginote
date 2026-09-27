@@ -116,7 +116,7 @@ export const AccountsView: React.FC = () => {
     return sortedKeys.map(k => groups[k]);
   };
 
-  // Category Tabs metadata sorted alphabetically
+  // Category Tabs: hanya jenis yang memiliki data sumber dana
   const categoryTabs = useMemo(() => {
     const tabs = TYPE_CONFIGS.map(cfg => {
       const matchingAccounts = accounts.filter(a => a.type === cfg.type);
@@ -128,11 +128,20 @@ export const AccountsView: React.FC = () => {
         count: matchingAccounts.length,
         totalBalance,
       };
-    });
+    })
+      // Sembunyikan tab jenis yang belum punya data
+      .filter(t => t.count > 0);
 
     // Urutkan berdasarkan alfabet judul tab jenis sumber dana
     return tabs.sort((a, b) => a.label.localeCompare(b.label, 'id'));
   }, [accounts]);
+
+  // Jika tab aktif kehabisan data (mis. akun terakhir dihapus), kembali ke Semua
+  React.useEffect(() => {
+    if (activeCategoryTab !== 'all' && !accounts.some(a => a.type === activeCategoryTab)) {
+      setActiveCategoryTab('all');
+    }
+  }, [accounts, activeCategoryTab]);
 
   // Current active tab accounts sorted alphabetically
   const displayedAccounts = useMemo(() => {
@@ -233,19 +242,12 @@ export const AccountsView: React.FC = () => {
           {formatRupiah(summary.totalAccountBalance)}
         </div>
 
-        {/* Breakdown of Assets vs Credit Card Liabilities */}
+        {/* Breakdown of Assets */}
         <div className="flex flex-wrap items-center gap-3 pt-3 mt-3 border-t border-slate-700/80 text-xs">
           <div className="flex items-center gap-1.5 text-emerald-300 bg-emerald-950/60 border border-emerald-800/80 px-2.5 py-1 rounded-lg">
-            <span>Aset Kas & Rekening:</span>
+            <span>Total Semua Sumber Dana:</span>
             <strong className="font-bold tabular-nums">+{formatRupiah(summary.totalAssetBalance)}</strong>
           </div>
-
-          {summary.totalCreditCardDebt > 0 && (
-            <div className="flex items-center gap-1.5 text-amber-300 bg-amber-950/60 border border-amber-800/80 px-2.5 py-1 rounded-lg">
-              <span>Hutang Kartu Kredit:</span>
-              <strong className="font-bold tabular-nums">-{formatRupiah(summary.totalCreditCardDebt)}</strong>
-            </div>
-          )}
 
           <span className="text-slate-400 text-[11px] ml-auto">
             {accounts.length} Sumber Dana Aktif
@@ -383,14 +385,13 @@ export const AccountsView: React.FC = () => {
             className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition"
           >
             <Plus className="w-4 h-4" />
-            <span>Tambah {currentTabMeta.label}</span>
+            <span>{activeCategoryTab === 'all' ? 'Tambah Sumber Dana' : `Tambah ${currentTabMeta.label}`}</span>
           </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
           {displayedAccounts.map(acc => {
             const isSelected = activeAccountFilter === acc.id;
-            const isCreditCard = acc.type === 'credit_card';
 
             return (
               <div
@@ -416,11 +417,6 @@ export const AccountsView: React.FC = () => {
                           <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
                             {acc.name}
                           </h4>
-                          {isCreditCard && (
-                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
-                              Hutang
-                            </span>
-                          )}
                         </div>
                         <div className="text-[11px] text-slate-400 font-medium capitalize mt-0.5">
                           {acc.type === 'bank'
@@ -428,7 +424,7 @@ export const AccountsView: React.FC = () => {
                             : acc.type === 'ewallet'
                             ? 'Dompet Digital'
                             : acc.type === 'credit_card'
-                            ? 'Kartu Kredit (Liabilitas)'
+                            ? 'Kartu Kredit'
                             : acc.type === 'cash'
                             ? 'Uang Tunai'
                             : acc.type === 'investment'
@@ -462,17 +458,11 @@ export const AccountsView: React.FC = () => {
                   {/* Balance Display */}
                   <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80">
                     <div className="text-[11px] text-slate-400 font-medium">
-                      {isCreditCard ? 'Beban Hutang Tagihan' : 'Saldo Saat Ini'}
+                      Saldo Saat Ini
                     </div>
                     <div
                       className={`text-xl font-bold tabular-nums tracking-tight mt-0.5 ${
-                        isCreditCard
-                          ? acc.balance < 0
-                            ? 'text-red-600 dark:text-red-400'
-                            : acc.balance === 0
-                            ? 'text-slate-900 dark:text-white'
-                            : 'text-emerald-600 dark:text-emerald-400'
-                          : acc.balance >= 0
+                        acc.balance >= 0
                           ? 'text-slate-900 dark:text-white'
                           : 'text-red-600 dark:text-red-400'
                       }`}
@@ -480,30 +470,9 @@ export const AccountsView: React.FC = () => {
                       {formatRupiah(acc.balance)}
                     </div>
 
-                    {isCreditCard ? (
-                      <div className="mt-1">
-                        {acc.balance < 0 ? (
-                          <div className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
-                            Beban tagihan: {formatRupiah(Math.abs(acc.balance))}
-                          </div>
-                        ) : acc.balance === 0 ? (
-                          <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                            Lunas · Tidak ada tagihan hutang
-                          </div>
-                        ) : (
-                          <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                            +{formatRupiah(acc.balance)} kelebihan bayar
-                          </div>
-                        )}
-                        <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-xl border border-slate-100 dark:border-slate-800 leading-snug">
-                          Transaksi keluar menambah hutang (saldo minus) · Transaksi masuk melunasi tagihan (saldo plus).
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-[10px] text-slate-400 mt-1">
-                        Saldo Awal: {formatRupiah(acc.initialBalance)}
-                      </div>
-                    )}
+                    <div className="text-[10px] text-slate-400 mt-1">
+                      Saldo Awal: {formatRupiah(acc.initialBalance)}
+                    </div>
                   </div>
                 </div>
 

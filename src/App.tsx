@@ -4,21 +4,23 @@ import {
   Receipt,
   Wallet,
   CreditCard,
-  Calendar,
-  BarChart3,
+  CalendarDays,
   Settings,
+  LogOut,
 } from 'lucide-react';
 import { FinanceProvider } from './context/FinanceContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ActiveTab } from './types';
 import { DashboardView } from './components/DashboardView';
 import { TransactionsView } from './components/TransactionsView';
 import { AccountsView } from './components/AccountsView';
 import { DebtsView } from './components/DebtsView';
-import { CalendarView } from './components/CalendarView';
-import { ReportView } from './components/ReportView';
+import { SummaryView } from './components/SummaryView';
 import { SettingsView } from './components/SettingsView';
+import { AuthView } from './components/AuthView';
 
 function MainApp() {
+  const { currentUser, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
 
   const navItems: { id: ActiveTab; label: string; shortLabel: string; icon: React.FC<{ className?: string }> }[] = [
@@ -26,9 +28,16 @@ function MainApp() {
     { id: 'transactions', label: 'Transaksi', shortLabel: 'Transaksi', icon: Receipt },
     { id: 'accounts', label: 'Sumber Dana', shortLabel: 'Dana', icon: Wallet },
     { id: 'debts', label: 'Hutang Piutang', shortLabel: 'Hutang', icon: CreditCard },
-    { id: 'reports', label: 'Laporan', shortLabel: 'Laporan', icon: BarChart3 },
+    { id: 'summary', label: 'Summary', shortLabel: 'Summary', icon: CalendarDays },
     { id: 'settings', label: 'Pengaturan', shortLabel: 'Setelan', icon: Settings },
   ];
+
+  const handleLogout = () => {
+    if (confirm(`Keluar dari akun "${currentUser?.name}"?`)) {
+      logout();
+      setActiveTab('dashboard');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col antialiased selection:bg-emerald-500/20 selection:text-emerald-600">
@@ -40,25 +49,44 @@ function MainApp() {
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center font-bold shadow-xs">
               <Wallet className="w-4 h-4" />
             </div>
-            <span className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white">
-              DigiNote
-            </span>
+            <div className="leading-tight">
+              <span className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white block">
+                DigiNote
+              </span>
+              {currentUser && (
+                <span className="text-[10px] text-slate-400 block -mt-0.5 truncate max-w-[140px]">
+                  {currentUser.name}
+                </span>
+              )}
+            </div>
           </div>
 
-          {/* Calendar Icon Button in Top Right Header */}
-          <button
-            onClick={() => setActiveTab('calendar')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
-              activeTab === 'calendar'
-                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-            }`}
-            title="Buka Kalender Transaksi"
-            aria-label="Kalender"
-          >
-            <Calendar className={`w-4 h-4 ${activeTab === 'calendar' ? 'text-white' : 'text-emerald-600 dark:text-emerald-400'}`} />
-            <span>Kalender</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Summary Button in Top Right Header */}
+            <button
+              onClick={() => setActiveTab('summary')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+                activeTab === 'summary'
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+              }`}
+              title="Buka Summary (Kalender & Laporan)"
+              aria-label="Summary"
+            >
+              <CalendarDays className={`w-4 h-4 ${activeTab === 'summary' ? 'text-white' : 'text-emerald-600 dark:text-emerald-400'}`} />
+              <span>Summary</span>
+            </button>
+
+            {/* Logout */}
+            <button
+              onClick={handleLogout}
+              className="flex items-center justify-center w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:border-red-300 transition"
+              title="Keluar dari akun"
+              aria-label="Keluar"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -68,8 +96,7 @@ function MainApp() {
         {activeTab === 'transactions' && <TransactionsView />}
         {activeTab === 'accounts' && <AccountsView />}
         {activeTab === 'debts' && <DebtsView />}
-        {activeTab === 'calendar' && <CalendarView />}
-        {activeTab === 'reports' && <ReportView />}
+        {activeTab === 'summary' && <SummaryView />}
         {activeTab === 'settings' && <SettingsView />}
       </main>
 
@@ -117,10 +144,26 @@ function MainApp() {
   );
 }
 
-export default function App() {
+function GatedApp() {
+  const { currentUser } = useAuth();
+
+  // Belum login -> halaman login/pendaftaran
+  if (!currentUser) {
+    return <AuthView />;
+  }
+
+  // Data terisolasi per pengguna login
   return (
-    <FinanceProvider>
+    <FinanceProvider userId={currentUser.id}>
       <MainApp />
     </FinanceProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <GatedApp />
+    </AuthProvider>
   );
 }

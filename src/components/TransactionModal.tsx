@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Settings2, Upload, Trash2, Wallet, Plus, ChevronDown, CreditCard } from 'lucide-react';
+import { X, Calendar, Settings2, Upload, Trash2, Wallet, Plus, ChevronDown } from 'lucide-react';
 import { Transaction, TransactionType, PaymentMethod } from '../types';
 import { useFinance } from '../context/FinanceContext';
 import { PAYMENT_METHODS } from '../utils/constants';
@@ -7,6 +7,7 @@ import { getTodayString, formatRupiah } from '../utils/formatters';
 import { CategoryIcon } from './CategoryIcon';
 import { CategoryManagerModal } from './CategoryManagerModal';
 import { AccountModal } from './AccountModal';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -36,6 +37,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [error, setError] = useState('');
+  useBodyScrollLock(isOpen || isCategoryModalOpen || isAccountModalOpen);
 
   // Synchronize when opening for edit or new
   useEffect(() => {
@@ -62,7 +64,6 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   // Dynamically filter categories matching the selected transaction type
   const availableCategories = categories.filter(c => c.type === type);
-  const selectedAccount = accounts.find(a => a.id === accountId);
   useEffect(() => {
     if (!categoryId || !availableCategories.some(c => c.id === categoryId)) {
       if (availableCategories.length > 0) {
@@ -251,9 +252,13 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               </div>
 
               <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto p-1 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-950/40">
+                {accounts.length === 0 && (
+                  <p className="col-span-2 text-center text-[11px] text-slate-400 py-3">
+                    Belum ada sumber dana. Buat dulu lewat tombol "Tambah Sumber Dana" di atas.
+                  </p>
+                )}
                 {accounts.map(acc => {
                   const isSelected = accountId === acc.id;
-                  const isCreditCard = acc.type === 'credit_card';
 
                   return (
                     <button
@@ -276,50 +281,22 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                         className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0 text-xs shadow-xs"
                         style={{ backgroundColor: acc.color }}
                       >
-                        {isCreditCard ? <CreditCard className="w-3.5 h-3.5" /> : <Wallet className="w-3.5 h-3.5" />}
+                        <CategoryIcon name={acc.icon} className="w-3.5 h-3.5" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1">
                           <span className="text-xs font-semibold text-slate-900 dark:text-white truncate">
                             {acc.name}
                           </span>
-                          {isCreditCard && (
-                            <span className="text-[9px] px-1 py-0.2 rounded font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-                              Hutang
-                            </span>
-                          )}
                         </div>
-                        <div
-                          className={`text-[10px] tabular-nums truncate ${
-                            isCreditCard && acc.balance < 0
-                              ? 'text-red-500 dark:text-red-400 font-semibold'
-                              : 'text-slate-500 dark:text-slate-400'
-                          }`}
-                        >
-                          {isCreditCard
-                            ? acc.balance < 0
-                              ? `Beban: ${formatRupiah(acc.balance)}`
-                              : `Tagihan: ${formatRupiah(acc.balance)}`
-                            : formatRupiah(acc.balance)}
+                        <div className="text-[10px] tabular-nums truncate text-slate-500 dark:text-slate-400">
+                          {formatRupiah(acc.balance)}
                         </div>
                       </div>
                     </button>
                   );
                 })}
               </div>
-
-              {/* Informative indicator when credit card is selected */}
-              {selectedAccount?.type === 'credit_card' && (
-                <div className="mt-2 p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 text-[11px] text-amber-900 dark:text-amber-200 flex items-start gap-2">
-                  <CreditCard className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                  <div className="leading-snug">
-                    <strong className="block font-semibold">Sumber Dana Kartu Kredit (Hutang)</strong>
-                    {type === 'expense'
-                      ? 'Transaksi Keluar akan menambah beban hutang (saldo kartu kredit akan menjadi lebih minus).'
-                      : 'Transaksi Masuk akan melunasi tagihan (saldo kartu kredit akan bertambah menuju plus).'}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Nominal Input */}

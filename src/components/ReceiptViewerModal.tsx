@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Download } from 'lucide-react';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 interface ReceiptViewerModalProps {
   isOpen: boolean;
@@ -14,6 +15,8 @@ export const ReceiptViewerModal: React.FC<ReceiptViewerModalProps> = ({
   imageUrl,
   title = 'Bukti Pembayaran',
 }) => {
+  useBodyScrollLock(isOpen && !!imageUrl);
+
   if (!isOpen || !imageUrl) return null;
 
   const handleDownload = () => {

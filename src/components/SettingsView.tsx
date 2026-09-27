@@ -6,7 +6,6 @@ import {
   Bell,
   Cloud,
   Shield,
-  Smartphone,
   Trash2,
   CheckCircle2,
   RotateCcw,
@@ -15,7 +14,6 @@ import {
 import { useFinance } from '../context/FinanceContext';
 import { ThemeMode } from '../types';
 import { requestNotificationPermission, sendDailyReminderNotification, isNotificationSupported } from '../services/notifications';
-import { PWAInstallButton } from './PWAInstallButton';
 import { CloudSyncModal } from './CloudSyncModal';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
@@ -225,44 +223,27 @@ export const SettingsView: React.FC = () => {
         </div>
       </div>
 
-      {/* 4. Android PWA Ready Installation */}
-      <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Smartphone className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <span>Instalasi DigiNote di HP / Android</span>
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Pasang ke layar beranda untuk pengalaman cepat, tanpa browser, dan berfungsi offline
-            </p>
-          </div>
-
-          <PWAInstallButton />
-        </div>
-      </div>
-
-      {/* 5. Data Management: Reset Demonstration & Delete All Data */}
+      {/* 4. Data Management: Reset & Delete All Data */}
       <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
         <div>
           <h3 className="text-sm font-bold text-slate-900 dark:text-white">
             Pengelolaan & Pembersihan Data
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Pulihkan data demonstrasi bawaan atau kosongkan seluruh catatan keuangan
+            Mulai dari awal atau kosongkan seluruh catatan keuangan
           </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-          {/* Reset to Sample Data */}
+          {/* Reset to Empty */}
           <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 flex flex-col justify-between space-y-3">
             <div>
               <div className="font-semibold text-xs text-slate-900 dark:text-white flex items-center gap-1.5">
                 <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
-                <span>Pulihkan Data Contoh</span>
+                <span>Mulai Dari Awal</span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                Isi ulang aplikasi dengan data demonstrasi bawaan untuk keperluan uji coba.
+                Kosongkan seluruh data dan mulai mencatat dari nol.
               </p>
             </div>
             <button
@@ -270,7 +251,7 @@ export const SettingsView: React.FC = () => {
               onClick={handleResetData}
               className="py-2 px-3 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition"
             >
-              Reset ke Data Contoh
+              Kosongkan & Mulai Baru
             </button>
           </div>
 

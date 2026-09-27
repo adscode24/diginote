@@ -126,6 +126,39 @@ function readStoredKey(newKey: string, ...legacyKeys: string[]): string | null {
   return null;
 }
 
+/**
+ * Menghitung ulang sisa pokok hutang cicilan berjangka dengan me-replay
+ * seluruh pembayaran kronologis memakai rumus sisa = a - (c - ((a*b)/12)).
+ * Dipakai setelah hapus/edit agar konsisten dengan logika bayar.
+ */
+function replayTieredRemaining(
+  totalAmount: number,
+  periods: Debt['tieredPeriods'],
+  payments: Pick<DebtPayment, 'amount' | 'paymentDate' | 'createdAt'>[],
+  totalTenor: number | undefined,
+  currentRemainingTenor: number | undefined
+): number {
+  const chronological = [...payments].sort((x, y) =>
+    x.paymentDate === y.paymentDate ? x.createdAt - y.createdAt : x.paymentDate < y.paymentDate ? -1 : 1
+  );
+  // Offset = cicilan yang sudah lunas sebelum periode terlacak:
+  // totalTenor - (sisa tenor saat ini + jumlah pembayaran tercatat)
+  const elapsedOffset =
+    typeof totalTenor === 'number' && typeof currentRemainingTenor === 'number'
+      ? Math.max(0, totalTenor - currentRemainingTenor - chronological.length)
+      : 0;
+  let balance = Math.max(0, Math.round(totalAmount));
+  chronological.forEach((p, i) => {
+    const rate = getActiveTierRate(periods, elapsedOffset + i);
+    if (rate !== undefined && rate > 0) {
+      balance = calculateTieredPayment(balance, rate, p.amount).remainingAfter;
+    } else {
+      balance = Math.max(0, balance - p.amount);
+    }
+  });
+  return balance;
+}
+
 // Kunci penyimpanan per pengguna (isolasi data tiap akun login).
 // Untuk kompatibilitas, baca juga kunci global lama lalu migrasikan.
 function buildStorageKeys(userId: string) {
@@ -617,7 +650,23 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
         }
 
         const totalPaid = (updated.payments || []).reduce((sum, p) => sum + p.amount, 0);
-        const remaining = Math.max(0, updated.totalAmount - totalPaid);
+        // Cicilan berjangka: replay amortisasi agar konsisten dengan logika bayar
+        const remaining =
+          updated.type === 'payable' &&
+          updated.installmentCategory === 'tiered_installment' &&
+          updated.tieredPeriods &&
+          updated.tieredPeriods.length > 0
+            ? replayTieredRemaining(
+                updated.totalAmount,
+                updated.tieredPeriods,
+                updated.payments || [],
+                updated.totalTenor,
+                // Sisa tenor saat ini sudah termasuk seluruh pembayaran tercatat
+                typeof updated.remainingTenor === 'number'
+                  ? updated.remainingTenor
+                  : undefined
+              )
+            : Math.max(0, updated.totalAmount - totalPaid);
         const status = remaining === 0 ? 'paid' : totalPaid > 0 ? 'partial' : 'unpaid';
         return {
           ...updated,
@@ -688,7 +737,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
       targetDebt.remainingTenor > 0
     ) {
       newRemainingTenor = Math.max(0, targetDebt.remainingTenor - 1);
-      if (newRemainingTenor === 0) {
+      // Jangan paksa lunas bila amortisasi menyisakan pokok (bunga belum tertutup)
+      if (newRemainingTenor === 0 && !breakdown) {
         newStatus = 'paid';
       }
       if (targetDebt.dueDayOfMonth) {
@@ -817,23 +867,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
         // agar konsisten dengan rumus sisa = a - (c - ((a*b)/12)).
         let newRemaining: number;
         if (d.type === 'payable' && d.installmentCategory === 'tiered_installment' && d.tieredPeriods && d.tieredPeriods.length > 0) {
-          const chronological = [...newPayments].sort((x, y) =>
-            x.paymentDate === y.paymentDate ? x.createdAt - y.createdAt : x.paymentDate < y.paymentDate ? -1 : 1
-          );
-          const elapsedOffset =
-            typeof d.totalTenor === 'number' && typeof d.remainingTenor === 'number'
-              ? Math.max(0, d.totalTenor - d.remainingTenor - newPayments.length - 1)
-              : 0;
-          let balance = d.totalAmount;
-          chronological.forEach((p, i) => {
-            const rate = getActiveTierRate(d.tieredPeriods, elapsedOffset + i);
-            if (rate !== undefined && rate > 0) {
-              balance = calculateTieredPayment(balance, rate, p.amount).remainingAfter;
-            } else {
-              balance = Math.max(0, balance - p.amount);
-            }
-          });
-          newRemaining = balance;
+          // Sisa tenor saat ini masih termasuk pembayaran yang dihapus -> kembalikan dulu
+          const tenorBeforeDelete = typeof d.remainingTenor === 'number' ? d.remainingTenor + 1 : undefined;
+          newRemaining = replayTieredRemaining(d.totalAmount, d.tieredPeriods, newPayments, d.totalTenor, tenorBeforeDelete);
         } else {
           newRemaining = Math.max(0, d.totalAmount - totalPaid);
         }

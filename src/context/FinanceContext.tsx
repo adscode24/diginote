@@ -16,7 +16,7 @@ import {
 import { ALL_DEFAULT_CATEGORIES } from '../utils/constants';
 import { getTodayString, calculatePayoffDate, getNextDueDate, getActiveTierRate, calculateTieredPayment, TieredPaymentResult } from '../utils/formatters';
 import { generateVaultId, hashPassphrase } from '../services/crypto';
-import { exportEncryptedBackup, importEncryptedBackup } from '../services/sync';
+import { exportEncryptedBackup, importEncryptedBackup, type SyncPayload } from '../services/sync';
 import { isCloudEnabled, isCloudCapableUid } from '../services/firebase';
 import { getActiveEmail } from './AuthContext';
 import {

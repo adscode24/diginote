@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
+import { getAuth, setPersistence, browserLocalPersistence, type Auth } from "firebase/auth";
 import { getFirestore, initializeFirestore, persistentLocalCache } from "firebase/firestore";
 import type { Firestore } from "firebase/firestore";
 // Konfigurasi klien publik (disengaja di-commit agar web + APK langsung cloud).
@@ -27,6 +27,11 @@ function readConfig(): FirebaseClientConfig {
 export const firebaseApp = !getApps().length ? initializeApp(readConfig()) : getApp();
 
 export const auth = getAuth(firebaseApp);
+
+/** Getter auth (kompatibilitas dengan pemanggil lama). */
+export function getFirebaseAuth(): Auth {
+  return auth;
+}
 
 // Persistensi auth eksplisit agar tahan restart di WebView Android/iOS.
 // Capacitor tetap memakai localStorage di dalam WebView, jadi ini kompatibel native.

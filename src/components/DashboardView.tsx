@@ -16,6 +16,7 @@ import {
   Plus,
   Pencil,
   Trash2,
+  Cloud,
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
@@ -39,7 +40,7 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) => {
-  const { summary, transactions, debts, accounts, categories, reminderSettings, bills, billPayments, deleteBill } = useFinance();
+  const { summary, transactions, debts, accounts, categories, reminderSettings, bills, billPayments, deleteBill, syncNotice, clearSyncNotice, syncStatus } = useFinance();
 
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
   const [selectedDebtToPay, setSelectedDebtToPay] = useState<Debt | null>(null);
@@ -149,6 +150,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
 
   return (
     <div className="space-y-6 pb-6">
+      {/* Cloud Sync Notice */}
+      {syncNotice && (
+        <div className="p-3.5 rounded-2xl bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800 text-xs text-orange-800 dark:text-orange-200 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Cloud className="w-4 h-4 shrink-0" />
+            <span>{syncNotice}</span>
+          </div>
+          <button
+            onClick={clearSyncNotice}
+            className="p-1 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/60 transition shrink-0"
+            title="Tutup"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Syncing Indicator */}
+      {syncStatus === 'syncing' && !syncNotice && (
+        <div className="text-[11px] text-slate-400 flex items-center gap-1.5 px-1">
+          <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+          <span>Menyinkronkan ke cloud…</span>
+        </div>
+      )}
+
       {/* Daily Reminder Banner if not recorded today */}
       {!hasLoggedToday && reminderSettings.enabled && (
         <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-600 to-amber-700 text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">

@@ -7,9 +7,13 @@ import {
   CalendarDays,
   Settings,
   LogOut,
+  Cloud,
+  CloudOff,
 } from 'lucide-react';
 import { FinanceProvider } from './context/FinanceContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { VaultKeyProvider, useVaultKey } from './context/VaultKeyContext';
+import { isCloudEnabled } from './services/firebase';
 import { ActiveTab } from './types';
 import { DashboardView } from './components/DashboardView';
 import { TransactionsView } from './components/TransactionsView';
@@ -18,9 +22,11 @@ import { DebtsView } from './components/DebtsView';
 import { SummaryView } from './components/SummaryView';
 import { SettingsView } from './components/SettingsView';
 import { AuthView } from './components/AuthView';
+import { VaultUnlockModal } from './components/VaultUnlockModal';
 
 function MainApp() {
   const { currentUser, logout } = useAuth();
+  const { lock } = useVaultKey();
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
 
   const navItems: { id: ActiveTab; label: string; shortLabel: string; icon: React.FC<{ className?: string }> }[] = [
@@ -34,6 +40,7 @@ function MainApp() {
 
   const handleLogout = () => {
     if (confirm(`Keluar dari akun "${currentUser?.name}"?`)) {
+      if (currentUser) lock(currentUser.id);
       logout();
       setActiveTab('dashboard');
     }
@@ -60,6 +67,19 @@ function MainApp() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Status Cloud */}
+            <span
+              className={`hidden sm:flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold ${
+                isCloudEnabled()
+                  ? 'bg-orange-50 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+              }`}
+              title={isCloudEnabled() ? 'Sinkronisasi cloud aktif' : 'Mode lokal perangkat'}
+            >
+              {isCloudEnabled() ? <Cloud className="w-3 h-3" /> : <CloudOff className="w-3 h-3" />}
+              <span>{isCloudEnabled() ? 'Cloud' : 'Lokal'}</span>
+            </span>
+
             {/* Summary Button in Top Right Header */}
             <button
               onClick={() => setActiveTab('summary')}
@@ -143,7 +163,7 @@ function MainApp() {
 }
 
 function GatedApp() {
-  const { currentUser } = useAuth();
+  const { currentUser, mode } = useAuth();
 
   // Belum login -> halaman login/pendaftaran
   if (!currentUser) {
@@ -154,6 +174,7 @@ function GatedApp() {
   return (
     <FinanceProvider userId={currentUser.id}>
       <MainApp />
+      {mode === 'online' && <VaultUnlockModal uid={currentUser.id} email={currentUser.email} />}
     </FinanceProvider>
   );
 }
@@ -161,7 +182,9 @@ function GatedApp() {
 export default function App() {
   return (
     <AuthProvider>
-      <GatedApp />
+      <VaultKeyProvider>
+        <GatedApp />
+      </VaultKeyProvider>
     </AuthProvider>
   );
 }

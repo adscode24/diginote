@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Wallet, Eye, EyeOff, LogIn, UserPlus, AlertCircle, Lock } from 'lucide-react';
+import { Wallet, Eye, EyeOff, LogIn, UserPlus, AlertCircle, Lock, Cloud, Smartphone } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { isCloudEnabled } from '../services/firebase';
 
 export const AuthView: React.FC = () => {
   const { login, register } = useAuth();
+  const online = isCloudEnabled();
 
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [name, setName] = useState('');
@@ -24,7 +26,7 @@ export const AuthView: React.FC = () => {
     e.preventDefault();
     if (isSubmitting) return;
     if (!name.trim()) {
-      setError('Nama pengguna wajib diisi');
+      setError(online ? 'Alamat email wajib diisi' : 'Nama pengguna wajib diisi');
       return;
     }
     if (mode === 'register' && password !== confirmPassword) {
@@ -105,14 +107,14 @@ export const AuthView: React.FC = () => {
 
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-                Nama Pengguna *
+                {online ? 'Alamat Email *' : 'Nama Pengguna *'}
               </label>
               <input
-                type="text"
+                type={online ? 'email' : 'text'}
                 value={name}
                 onChange={e => setName(e.target.value)}
-                placeholder="Contoh: Budi Santoso"
-                autoComplete="username"
+                placeholder={online ? 'Contoh: nama@email.com' : 'Contoh: Budi Santoso'}
+                autoComplete={online ? 'email' : 'username'}
                 className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
               />
             </div>
@@ -127,7 +129,7 @@ export const AuthView: React.FC = () => {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  placeholder={mode === 'register' ? 'Minimal 4 karakter' : 'Kata sandi Anda'}
+                  placeholder={mode === 'register' ? (online ? 'Minimal 6 karakter' : 'Minimal 4 karakter') : 'Kata sandi Anda'}
                   autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                   className="w-full pl-9 pr-10 py-2.5 text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 />
@@ -204,8 +206,18 @@ export const AuthView: React.FC = () => {
           </form>
         </div>
 
-        <p className="text-center text-[11px] text-slate-400 mt-4">
-          Data tersimpan aman di perangkat ini · Sesi berakhir saat tab ditutup
+        <p className="text-center text-[11px] text-slate-400 mt-4 flex items-center justify-center gap-1.5">
+          {online ? (
+            <>
+              <Cloud className="w-3.5 h-3.5 text-orange-500" />
+              <span>Akun cloud: data tersinkron di semua perangkat Anda</span>
+            </>
+          ) : (
+            <>
+              <Smartphone className="w-3.5 h-3.5" />
+              <span>Mode perangkat: data tersimpan aman di perangkat ini · Sesi berakhir saat tab ditutup</span>
+            </>
+          )}
         </p>
       </div>
     </div>

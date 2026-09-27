@@ -15,8 +15,12 @@ import {
 } from '../types';
 import { ALL_DEFAULT_CATEGORIES } from '../utils/constants';
 import { getTodayString, calculatePayoffDate, getNextDueDate, getActiveTierRate, calculateTieredPayment, TieredPaymentResult } from '../utils/formatters';
-import { generateVaultId, hashPassphrase } from '../services/crypto';
+import { generateVaultId, hashPassphrase, encryptData, decryptData } from '../services/crypto';
 import { pushToCloudVault, pullFromCloudVault, exportEncryptedBackup, importEncryptedBackup, SyncPayload } from '../services/sync';
+import { isCloudEnabled } from '../services/firebase';
+import { getVaultDoc, pushVaultDoc, subscribeVaultDoc, getUserProfile, getDeviceId, type VaultData } from '../services/onlineSync';
+import { getVaultPassphrase } from '../services/vaultSession';
+import { useVaultKey } from './VaultKeyContext';
 
 interface FinanceContextType {
   transactions: Transaction[];
@@ -61,6 +65,13 @@ interface FinanceContextType {
     accountId?: string
   ) => { payment: DebtPayment; transaction: Transaction; breakdown?: TieredPaymentResult & { annualRate: number } };
   deleteDebtPayment: (debtId: string, paymentId: string) => void;
+
+  // Sinkronisasi cloud
+  syncStatus: 'offline' | 'locked' | 'syncing' | 'synced' | 'error';
+  lastSyncedAt: number | null;
+  syncNotice: string | null;
+  clearSyncNotice: () => void;
+  cloudVaultId: string | null;
 
   // Tagihan Rutin
   addBill: (bill: Omit<Bill, 'id' | 'createdAt' | 'updatedAt'>) => Bill;
@@ -294,6 +305,241 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+
+  // ---- Sinkronisasi cloud lintas perangkat ----
+  const cloudEnabled = isCloudEnabled();
+  const { vaultKey } = useVaultKey();
+  const [syncStatus, setSyncStatus] = useState<'offline' | 'locked' | 'syncing' | 'synced' | 'error'>(
+    cloudEnabled ? 'locked' : 'offline'
+  );
+  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
+  const [cloudVaultId, setCloudVaultId] = useState<string | null>(null);
+  const vaultBaseRef = React.useRef(0); // updatedAt terakhir yang sudah selaras
+  const lastPushedRef = React.useRef(0); // updatedAt terakhir yang kita push
+  const suppressPushRef = React.useRef(false); // true setelah menerapkan data remote
+
+  const getStoredBase = () => {
+    try {
+      return Number(localStorage.getItem(`diginote_${userId}_vault_base`) || 0) || 0;
+    } catch {
+      return 0;
+    }
+  };
+  const persistBase = (v: number) => {
+    vaultBaseRef.current = v;
+    try {
+      localStorage.setItem(`diginote_${userId}_vault_base`, String(v));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const applyVaultData = (data: VaultData, baseUpdatedAt: number, silent: boolean) => {
+    suppressPushRef.current = true;
+    if (Array.isArray(data.transactions)) setTransactions(data.transactions as Transaction[]);
+    if (Array.isArray(data.categories) && data.categories.length > 0)
+      setCategories(data.categories as Category[]);
+    if (Array.isArray((data as { accounts?: unknown }).accounts))
+      setAccounts((data as unknown as { accounts: Account[] }).accounts as Account[]);
+    if (Array.isArray(data.debts)) setDebts(data.debts as Debt[]);
+    if (Array.isArray(data.bills)) setBills(data.bills as Bill[]);
+    if (Array.isArray(data.billPayments)) setBillPayments(data.billPayments as BillPayment[]);
+    if (data.reminderSettings) setReminderSettings(data.reminderSettings as ReminderSettings);
+    persistBase(baseUpdatedAt);
+    setLastSyncedAt(Date.now());
+    setSyncStatus('synced');
+    if (!silent) setSyncNotice('Data diperbarui dari perangkat lain.');
+  };
+
+  const pullAndApply = async (silent: boolean): Promise<boolean> => {
+    try {
+      const remote = await getVaultDoc(userId);
+      if (!remote) return false;
+      const key = getVaultPassphrase(userId);
+      if (!key) {
+        setSyncStatus('locked');
+        setSyncNotice('Data cloud tersedia. Masukkan frasa sandi vault untuk membuka.');
+        return false;
+      }
+      const data = await decryptData<VaultData>(remote.payload, key);
+      applyVaultData(data, remote.updatedAt, silent);
+      return true;
+    } catch (e) {
+      console.error(e);
+      setSyncStatus('error');
+      setSyncNotice('Gagal membuka data cloud. Periksa frasa sandi vault / koneksi.');
+      return false;
+    }
+  };
+
+  const readLegacyGlobalState = (): Partial<VaultData> | null => {
+    try {
+      const pick = (base: string) => {
+        for (const k of [`diginote_${base}`, `notaku_${base}`]) {
+          const raw = localStorage.getItem(k);
+          if (raw) return JSON.parse(raw);
+        }
+        return undefined;
+      };
+      const data: Partial<VaultData> = {
+        transactions: pick('transactions_v2'),
+        categories: pick('categories_v2'),
+        accounts: pick('accounts_v2'),
+        debts: pick('debts_v2'),
+        reminderSettings: pick('reminders_v2'),
+      };
+      const hasData = [data.transactions, data.accounts, data.debts].some(
+        v => Array.isArray(v) && v.length > 0
+      );
+      return hasData ? data : null;
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+  };
+
+  // Inisialisasi + rekonsiliasi awal saat pengguna / kunci berubah
+  useEffect(() => {
+    if (!cloudEnabled) return;
+    let cancelled = false;
+    setSyncStatus(vaultKey ? 'syncing' : 'locked');
+    (async () => {
+      try {
+        const profile = await getUserProfile(userId).catch(() => null);
+        if (cancelled) return;
+        if (profile?.vaultId) setCloudVaultId(profile.vaultId);
+
+        const remote = await getVaultDoc(userId).catch(() => null);
+        if (cancelled) return;
+
+        const localEmpty =
+          transactions.length === 0 &&
+          accounts.length === 0 &&
+          debts.length === 0 &&
+          bills.length === 0 &&
+          billPayments.length === 0;
+
+        if (!remote) {
+          // Vault belum ada: impor data lokal lama bila tersedia, lalu push otomatis
+          // (tanpa suppress agar push effect mengirim data impor ke cloud)
+          const legacy = localEmpty ? readLegacyGlobalState() : null;
+          if (legacy) {
+            if (Array.isArray(legacy.transactions)) setTransactions(legacy.transactions as Transaction[]);
+            if (Array.isArray(legacy.categories) && (legacy.categories as Category[]).length > 0)
+              setCategories(legacy.categories as Category[]);
+            if (Array.isArray(legacy.accounts)) setAccounts(legacy.accounts as Account[]);
+            if (Array.isArray(legacy.debts)) setDebts(legacy.debts as Debt[]);
+            if (legacy.reminderSettings) setReminderSettings(legacy.reminderSettings as ReminderSettings);
+            setSyncNotice('Data lama perangkat ini dimuat dan akan disinkronkan ke cloud.');
+          }
+          persistBase(0);
+          if (!vaultKey) {
+            setSyncStatus('locked');
+            setSyncNotice('Buat frasa sandi vault untuk mengaktifkan sinkronisasi cloud.');
+          }
+          return;
+        }
+
+        persistBase(getStoredBase());
+        if (localEmpty || remote.updatedAt > vaultBaseRef.current) {
+          await pullAndApply(true);
+        } else if (!vaultKey) {
+          setSyncStatus('locked');
+        }
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) setSyncStatus('error');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, vaultKey]);
+
+  // Langganan realtime: perubahan dari perangkat lain langsung diterapkan
+  useEffect(() => {
+    if (!cloudEnabled) return;
+    let unsub: (() => void) | null = null;
+    try {
+      unsub = subscribeVaultDoc(userId, remote => {
+        if (!remote) return;
+        if (remote.updatedAt <= vaultBaseRef.current || remote.updatedAt === lastPushedRef.current) return;
+        void pullAndApply(false);
+      });
+    } catch (e) {
+      console.error(e);
+    }
+    return () => {
+      if (unsub) unsub();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  // Push otomatis (debounce) setiap ada perubahan data
+  useEffect(() => {
+    if (!cloudEnabled || !vaultKey) return;
+    if (suppressPushRef.current) {
+      suppressPushRef.current = false;
+      return;
+    }
+    setSyncStatus('syncing');
+    const timer = setTimeout(() => {
+      (async () => {
+        try {
+          const key = getVaultPassphrase(userId);
+          if (!key) {
+            setSyncStatus('locked');
+            return;
+          }
+          // Cegah balapan: bila remote lebih baru, tarik dulu bukan menimpa
+          const remote = await getVaultDoc(userId).catch(() => null);
+          if (remote && remote.updatedAt > vaultBaseRef.current) {
+            await pullAndApply(false);
+            return;
+          }
+          const profile = cloudVaultId ? null : await getUserProfile(userId).catch(() => null);
+          const vid = cloudVaultId || profile?.vaultId;
+          if (!vid) {
+            setSyncStatus('error');
+            setSyncNotice('Profil cloud belum siap, coba lagi sesaat.');
+            return;
+          }
+          if (!cloudVaultId) setCloudVaultId(vid);
+          const data: VaultData = {
+            transactions,
+            categories,
+            accounts,
+            debts,
+            bills,
+            billPayments,
+            reminderSettings,
+            vaultUpdatedAt: Date.now(),
+          };
+          const payload = await encryptData(data, key);
+          const updatedAt = Date.now();
+          await pushVaultDoc(userId, {
+            vaultId: vid,
+            payload,
+            updatedAt,
+            updatedBy: getDeviceId(),
+          });
+          lastPushedRef.current = updatedAt;
+          persistBase(updatedAt);
+          setLastSyncedAt(updatedAt);
+          setSyncStatus('synced');
+        } catch (e) {
+          console.error(e);
+          setSyncStatus('error');
+        }
+      })();
+    }, 2500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions, accounts, debts, categories, bills, billPayments, reminderSettings, vaultKey, userId]);
+
+  const clearSyncNotice = () => setSyncNotice(null);
 
   // Sync to localStorage
   useEffect(() => {
@@ -1197,6 +1443,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
         importBackupFile,
         resetToDefaultData,
         clearAllData,
+        syncStatus,
+        lastSyncedAt,
+        syncNotice,
+        clearSyncNotice,
+        cloudVaultId,
       }}
     >
       {children}

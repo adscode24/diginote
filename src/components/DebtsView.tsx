@@ -103,7 +103,7 @@ export const DebtsView: React.FC = () => {
 
         <button
           onClick={handleOpenAdd}
-          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition"
+          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl bg-orange-600 hover:bg-orange-700 text-white shadow-sm transition"
         >
           <Plus className="w-4 h-4" />
           <span>Tambah Catatan Hutang</span>
@@ -134,11 +134,11 @@ export const DebtsView: React.FC = () => {
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
               Total Piutang Saya (Tagihan)
             </span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-orange-50 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 flex items-center justify-center">
               <ArrowDownLeft className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums mt-2">
+          <div className="text-xl font-bold text-orange-600 dark:text-orange-400 tabular-nums mt-2">
             {formatRupiah(totalReceivableRemaining)}
           </div>
           <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
@@ -154,7 +154,7 @@ export const DebtsView: React.FC = () => {
             <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
               overdueCount > 0
                 ? 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400'
-                : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400'
+                : 'bg-orange-50 text-orange-600 dark:bg-orange-950/60 dark:text-orange-400'
             }`}>
               {overdueCount > 0 ? <AlertCircle className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
             </div>
@@ -228,7 +228,7 @@ export const DebtsView: React.FC = () => {
             </p>
             <button
               onClick={handleOpenAdd}
-              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition"
+              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-orange-600 hover:bg-orange-700 text-white transition"
             >
               <Plus className="w-4 h-4" />
               <span>Tambah Catatan Sekarang</span>
@@ -267,7 +267,7 @@ export const DebtsView: React.FC = () => {
                           </span>
                         )}
                         {isPaid ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/60 px-2 py-0.5 rounded-md">
                             <CheckCircle2 className="w-3.5 h-3.5" /> Lunas
                           </span>
                         ) : dueStatus.isOverdue ? (
@@ -302,7 +302,7 @@ export const DebtsView: React.FC = () => {
                           {debt.estimatedPayoffDate && (
                             <>
                               <span className="text-slate-300 dark:text-slate-700">·</span>
-                              <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                              <span className="text-orange-600 dark:text-orange-400 font-medium flex items-center gap-1">
                                 <Sparkles className="w-3 h-3" />
                                 <span>Lunas: {debt.estimatedPayoffDate}</span>
                               </span>
@@ -321,7 +321,7 @@ export const DebtsView: React.FC = () => {
                         {debt.dueDayOfMonth && (
                           <>
                             <span>·</span>
-                            <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                            <span className="text-orange-600 dark:text-orange-400 font-medium">
                               Siklus tgl {debt.dueDayOfMonth} setiap bulan
                             </span>
                           </>
@@ -358,7 +358,7 @@ export const DebtsView: React.FC = () => {
                       {!isPaid && (
                         <button
                           onClick={() => setSelectedDebtForPay(debt)}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-orange-600 hover:bg-orange-700 text-white shadow-xs transition"
                         >
                           <ArrowUpRight className="w-4 h-4" />
                           <span>{activeType === 'payable' ? 'Bayar Hutang' : 'Terima Pembayaran'}</span>
@@ -367,7 +367,7 @@ export const DebtsView: React.FC = () => {
 
                       <button
                         onClick={() => handleOpenEdit(debt)}
-                        className="p-2 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                        className="p-2 text-slate-400 hover:text-orange-600 dark:hover:text-orange-400 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition"
                         title="Edit Catatan Hutang"
                       >
                         <Edit2 className="w-4 h-4" />
@@ -398,7 +398,7 @@ export const DebtsView: React.FC = () => {
                       </div>
                       <div>
                         <span className="text-slate-400 text-[11px]">Sudah Dibayar</span>
-                        <div className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                        <div className="font-semibold text-orange-600 dark:text-orange-400 tabular-nums">
                           {formatRupiah(paidAmount)} ({progressPercent}%)
                         </div>
                       </div>
@@ -413,7 +413,7 @@ export const DebtsView: React.FC = () => {
                     {/* Progress Bar */}
                     <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
                       <div
-                        className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                        className="bg-orange-500 h-full rounded-full transition-all duration-300"
                         style={{ width: `${progressPercent}%` }}
                       />
                     </div>
@@ -448,17 +448,17 @@ export const DebtsView: React.FC = () => {
                           <div
                             key={p.id || idx}
                             onClick={() => setSelectedPaymentDetail({ debt, payment: p })}
-                            className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 text-xs hover:border-emerald-400 dark:hover:border-emerald-600 transition cursor-pointer group"
+                            className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 text-xs hover:border-orange-400 dark:hover:border-orange-600 transition cursor-pointer group"
                             title="Klik untuk melihat detail atau menghapus pembayaran ini"
                           >
                             <div className="flex items-center gap-3">
-                              <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-[10px]">
+                              <div className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-950 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold text-[10px]">
                                 {debt.payments.length - idx}
                               </div>
                               <div>
                                 <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5 flex-wrap">
                                   <span>{formatRupiah(p.amount)}</span>
-                                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 opacity-0 group-hover:opacity-100 transition font-medium">
+                                  <span className="text-[10px] text-orange-600 dark:text-orange-400 opacity-0 group-hover:opacity-100 transition font-medium">
                                     · Klik untuk detail
                                   </span>
                                 </div>
@@ -486,7 +486,7 @@ export const DebtsView: React.FC = () => {
                                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-[11px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 transition"
                                   title="Lihat Bukti Foto"
                                 >
-                                  <ImageIcon className="w-3.5 h-3.5 text-emerald-500" />
+                                  <ImageIcon className="w-3.5 h-3.5 text-orange-500" />
                                   <span className="hidden sm:inline">Bukti</span>
                                 </button>
                               )}
@@ -521,7 +521,7 @@ export const DebtsView: React.FC = () => {
           <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 dark:border-slate-800 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-orange-100 dark:bg-orange-950 text-orange-600 dark:text-orange-400 flex items-center justify-center">
                   <Receipt className="w-4 h-4" />
                 </div>
                 <div>
@@ -552,7 +552,7 @@ export const DebtsView: React.FC = () => {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-500 dark:text-slate-400">Nominal Dibayar</span>
-                <span className="font-extrabold text-emerald-600 dark:text-emerald-400 tabular-nums text-sm">
+                <span className="font-extrabold text-orange-600 dark:text-orange-400 tabular-nums text-sm">
                   {formatRupiah(selectedPaymentDetail.payment.amount)}
                 </span>
               </div>

@@ -265,7 +265,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
           <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <Layers className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <Layers className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                 <span>Jenis Skema Hutang *</span>
               </span>
               <span className="text-[11px] font-normal text-slate-400">Pilih skema pencatatan</span>
@@ -273,7 +273,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
             <select
               value={installmentCategory}
               onChange={e => setInstallmentCategory(e.target.value as InstallmentCategory)}
-              className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+              className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
             >
               <option value="non_installment">Bukan Cicilan (Hutang Sekali Lunas / Tempo Bebas)</option>
               <option value="fixed_installment">Cicilan Tetap (Angsuran Flat Tiap Bulan: Motor, Pinjol, dll)</option>
@@ -299,7 +299,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
               onClick={() => setType('receivable')}
               className={`py-2 text-xs font-semibold rounded-lg transition ${
                 type === 'receivable'
-                  ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                  ? 'bg-white dark:bg-slate-900 text-orange-600 dark:text-orange-400 shadow-xs'
                   : 'text-slate-600 dark:text-slate-400'
               }`}
             >
@@ -329,7 +329,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                 }
                 value={counterparty}
                 onChange={e => setCounterparty(e.target.value)}
-                className="w-full pl-9 pr-3.5 py-2.5 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                className="w-full pl-9 pr-3.5 py-2.5 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
               />
             </div>
           </div>
@@ -351,7 +351,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                 placeholder="0"
                 value={totalAmountStr ? new Intl.NumberFormat('id-ID').format(Number(totalAmountStr)) : ''}
                 onChange={handleTotalAmountChange}
-                className="w-full pl-10 pr-3.5 py-2.5 text-sm font-bold tabular-nums rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                className="w-full pl-10 pr-3.5 py-2.5 text-sm font-bold tabular-nums rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
               />
             </div>
             {isEditing && debtToEdit && debtToEdit.payments && debtToEdit.payments.length > 0 && (
@@ -372,7 +372,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                   type="date"
                   value={startDate}
                   onChange={e => setStartDate(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 />
               </div>
               <div>
@@ -383,7 +383,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                   type="date"
                   value={dueDate}
                   onChange={e => setDueDate(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 />
               </div>
             </div>
@@ -396,14 +396,14 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
-                    <Banknote className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <Banknote className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                     <span>
                       {installmentCategory === 'tiered_installment'
                         ? 'Cicilan per Bulan Saat Ini (Rupiah) *'
                         : 'Cicilan per Bulan (Rupiah) *'}
                     </span>
                   </span>
-                  <span className="text-[10px] text-emerald-600 font-medium">Muncul di Beranda & Isi Bayar</span>
+                  <span className="text-[10px] text-orange-600 font-medium">Muncul di Beranda & Isi Bayar</span>
                 </label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
@@ -415,7 +415,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                     placeholder="0"
                     value={monthlyInstallmentStr ? new Intl.NumberFormat('id-ID').format(Number(monthlyInstallmentStr)) : ''}
                     onChange={handleMonthlyInstallmentChange}
-                    className="w-full pl-10 pr-3.5 py-2.5 text-sm font-bold tabular-nums rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50/30 dark:bg-emerald-950/20 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                    className="w-full pl-10 pr-3.5 py-2.5 text-sm font-bold tabular-nums rounded-xl border border-orange-300 dark:border-orange-800 bg-orange-50/30 dark:bg-orange-950/20 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                   />
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1">
@@ -434,7 +434,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                     <select
                       value={dueDayOfMonth}
                       onChange={e => setDueDayOfMonth(Number(e.target.value))}
-                      className="w-full pl-9 pr-3.5 py-2 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                      className="w-full pl-9 pr-3.5 py-2 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                     >
                       {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
                         <option key={day} value={day}>
@@ -460,7 +460,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                       placeholder="Contoh: 12 atau 60"
                       value={remainingTenorStr}
                       onChange={handleNumericTenorChange(setRemainingTenorStr)}
-                      className="w-full pl-9 pr-3.5 py-2 text-xs font-bold tabular-nums rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                      className="w-full pl-9 pr-3.5 py-2 text-xs font-bold tabular-nums rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                     />
                   </div>
                   <p className="text-[10px] text-slate-400 mt-1">
@@ -471,14 +471,14 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
 
               {/* Keterangan Estimasi Cicilan Lunas */}
               {payoffEstimation && (
-                <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs">
-                  <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold">
-                    <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <div className="p-3.5 rounded-xl bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800 text-xs">
+                  <div className="flex items-center gap-2 text-orange-800 dark:text-orange-300 font-bold">
+                    <Sparkles className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                     <span>Estimasi Cicilan Lunas:</span>
                   </div>
                   <div className="mt-1 text-slate-700 dark:text-slate-300 text-[11px] leading-relaxed">
-                    Dengan sisa <strong className="text-emerald-700 dark:text-emerald-300">{remainingTenorNum} kali</strong> cicilan setiap tanggal {dueDayOfMonth}, pinjaman ini diperkirakan akan lunas pada:{' '}
-                    <strong className="text-emerald-700 dark:text-emerald-300 text-xs block mt-0.5 font-bold">
+                    Dengan sisa <strong className="text-orange-700 dark:text-orange-300">{remainingTenorNum} kali</strong> cicilan setiap tanggal {dueDayOfMonth}, pinjaman ini diperkirakan akan lunas pada:{' '}
+                    <strong className="text-orange-700 dark:text-orange-300 text-xs block mt-0.5 font-bold">
                       📅 {payoffEstimation.formatted}
                     </strong>
                   </div>
@@ -496,7 +496,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                   placeholder="Contoh: 24, 36, 120 bulan"
                   value={totalTenorStr}
                   onChange={handleNumericTenorChange(setTotalTenorStr)}
-                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 />
               </div>
 
@@ -506,7 +506,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                        <Layers className="w-3.5 h-3.5 text-emerald-600" />
+                        <Layers className="w-3.5 h-3.5 text-orange-600" />
                         <span>Skema Tahapan Periode KPR (Bunga Fix & Floating)</span>
                       </h4>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400">
@@ -516,7 +516,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                     <button
                       type="button"
                       onClick={addTierPeriod}
-                      className="text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800 transition flex items-center gap-1"
+                      className="text-[11px] font-semibold text-orange-600 hover:text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/60 px-2.5 py-1 rounded-lg border border-orange-200 dark:border-orange-800 transition flex items-center gap-1"
                     >
                       <Plus className="w-3 h-3" />
                       <span>Tambah Periode</span>
@@ -536,14 +536,14 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                               value={period.name}
                               onChange={e => updateTierPeriod(idx, 'name', e.target.value)}
                               placeholder="Nama Periode (e.g. Tahun 1-3 Fix)"
-                              className="font-bold text-xs bg-transparent border-b border-transparent hover:border-slate-300 focus:border-emerald-500 focus:outline-hidden text-slate-900 dark:text-white flex-1"
+                              className="font-bold text-xs bg-transparent border-b border-transparent hover:border-slate-300 focus:border-orange-500 focus:outline-hidden text-slate-900 dark:text-white flex-1"
                             />
                             <div className="flex items-center gap-2">
                               <span
                                 className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
                                   period.isFloating
                                     ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300'
-                                    : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300'
+                                    : 'bg-orange-100 text-orange-800 dark:bg-orange-950/80 dark:text-orange-300'
                                 }`}
                               >
                                 {period.isFloating ? 'Floating' : 'Fixed'}
@@ -597,7 +597,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                       <button
                         type="button"
                         onClick={addTierPeriod}
-                        className="w-full py-2 text-xs font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 border border-dashed border-emerald-300 dark:border-emerald-800 rounded-xl hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition flex items-center justify-center gap-1.5"
+                        className="w-full py-2 text-xs font-semibold text-orange-600 hover:text-orange-700 dark:text-orange-400 border border-dashed border-orange-300 dark:border-orange-800 rounded-xl hover:bg-orange-50/50 dark:hover:bg-orange-950/20 transition flex items-center justify-center gap-1.5"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Tambah Periode Bunga KPR</span>
@@ -612,7 +612,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                       <button
                         type="button"
                         onClick={addTierPeriod}
-                        className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 rounded-xl transition"
+                        className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 px-3.5 py-2 rounded-xl transition"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Tambah Periode Bunga KPR</span>
@@ -634,7 +634,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
               placeholder="Contoh: No. Akad KPR, nomor rekening autodebet, kontak marketing, dll"
               value={notes}
               onChange={e => setNotes(e.target.value)}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
             />
           </div>
 
@@ -655,7 +655,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
             </button>
             <button
               type="submit"
-              className="py-2.5 px-5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition"
+              className="py-2.5 px-5 rounded-xl text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white shadow-xs transition"
             >
               {isEditing ? 'Simpan Perubahan' : 'Simpan Catatan'}
             </button>

@@ -15,7 +15,7 @@ export const SummaryView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-            <LayoutGrid className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+            <LayoutGrid className="w-5 h-5 text-orange-600 dark:text-orange-400" />
             <span>Summary</span>
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -30,7 +30,7 @@ export const SummaryView: React.FC = () => {
             onClick={() => setInnerTab('calendar')}
             className={`py-2 px-4 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 ${
               innerTab === 'calendar'
-                ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                ? 'bg-white dark:bg-slate-900 text-orange-600 dark:text-orange-400 shadow-xs'
                 : 'text-slate-500 dark:text-slate-400'
             }`}
           >
@@ -42,7 +42,7 @@ export const SummaryView: React.FC = () => {
             onClick={() => setInnerTab('reports')}
             className={`py-2 px-4 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 ${
               innerTab === 'reports'
-                ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                ? 'bg-white dark:bg-slate-900 text-orange-600 dark:text-orange-400 shadow-xs'
                 : 'text-slate-500 dark:text-slate-400'
             }`}
           >

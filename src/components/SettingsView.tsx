@@ -84,7 +84,7 @@ export const SettingsView: React.FC = () => {
       </div>
 
       {feedbackMessage && (
-        <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
+        <div className="p-3.5 rounded-xl bg-orange-50 dark:bg-orange-950/60 border border-orange-200 dark:border-orange-800 text-xs font-semibold text-orange-700 dark:text-orange-300 flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           <span>{feedbackMessage}</span>
         </div>
@@ -116,7 +116,7 @@ export const SettingsView: React.FC = () => {
                 onClick={() => setThemeMode(item.id as ThemeMode)}
                 className={`p-3.5 rounded-xl border text-center transition flex flex-col items-center gap-2 ${
                   isSelected
-                    ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 ring-2 ring-emerald-500/20 font-bold shadow-xs'
+                    ? 'border-orange-500 bg-orange-50/60 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 ring-2 ring-orange-500/20 font-bold shadow-xs'
                     : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium'
                 }`}
               >
@@ -133,7 +133,7 @@ export const SettingsView: React.FC = () => {
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Bell className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <Bell className="w-4 h-4 text-orange-600 dark:text-orange-400" />
               <span>Sistem Pengingat Catat Harian</span>
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -148,7 +148,7 @@ export const SettingsView: React.FC = () => {
               onChange={e => handleToggleReminder(e.target.checked)}
               className="sr-only peer"
             />
-            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-hidden rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-hidden rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
           </label>
         </div>
 
@@ -181,7 +181,7 @@ export const SettingsView: React.FC = () => {
                 Uji Coba Notifikasi Sekarang
               </button>
               {notificationTestMessage && (
-                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">
                   {notificationTestMessage}
                 </span>
               )}
@@ -195,7 +195,7 @@ export const SettingsView: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Cloud className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+              <Cloud className="w-4 h-4 text-amber-600 dark:text-amber-400" />
               <span>Sinkronisasi Cloud & Enkripsi Data</span>
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -205,7 +205,7 @@ export const SettingsView: React.FC = () => {
 
           <button
             onClick={() => setIsSyncModalOpen(true)}
-            className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-xs self-start sm:self-auto"
+            className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-orange-600 hover:bg-orange-700 text-white transition shadow-xs self-start sm:self-auto"
           >
             Buka Pengaturan Cloud
           </button>
@@ -218,7 +218,7 @@ export const SettingsView: React.FC = () => {
               {syncSettings.vaultId}
             </strong>
           </div>
-          <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
+          <div className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400 font-semibold text-[11px]">
             <Shield className="w-3.5 h-3.5" />
             <span>Terenkripsi Lokal</span>
           </div>

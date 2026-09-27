@@ -195,7 +195,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                         : ''
                     }
                     onChange={e => setAdjustedBalanceStr(e.target.value.replace(/[^0-9-]/g, ''))}
-                    className="w-full pl-10 pr-3.5 py-2.5 text-base font-bold tabular-nums rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                    className="w-full pl-10 pr-3.5 py-2.5 text-base font-bold tabular-nums rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                   />
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1">
@@ -220,11 +220,11 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                         onClick={() => handleTypeChange(t.id)}
                         className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition text-xs ${
                           isSelected
-                            ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-semibold shadow-xs'
+                            ? 'border-orange-500 bg-orange-50/50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 font-semibold shadow-xs'
                             : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
                         }`}
                       >
-                        <CategoryIcon name={t.icon} className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                        <CategoryIcon name={t.icon} className="w-4 h-4 shrink-0 text-orange-600 dark:text-orange-400" />
                         <div className="min-w-0 flex-1 truncate">
                           <span>{t.label}</span>
                         </div>
@@ -244,7 +244,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   placeholder="Contoh: BCA Gaji, GoPay, Kartu Kredit BCA"
                   value={name}
                   onChange={e => setName(e.target.value)}
-                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 />
               </div>
 
@@ -258,7 +258,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   placeholder="Contoh: 8492019482 atau 0812345678"
                   value={accountNumber}
                   onChange={e => setAccountNumber(e.target.value)}
-                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 />
               </div>
 
@@ -282,7 +282,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                           : ''
                       }
                       onChange={e => setInitialBalanceStr(e.target.value.replace(/[^0-9-]/g, ''))}
-                      className="w-full pl-10 pr-3.5 py-2 text-sm font-bold tabular-nums rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                      className="w-full pl-10 pr-3.5 py-2 text-sm font-bold tabular-nums rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                     />
                   </div>
                   <p className="text-[11px] text-slate-400 mt-1">
@@ -330,7 +330,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
             </button>
             <button
               type="submit"
-              className="py-2.5 px-5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition"
+              className="py-2.5 px-5 rounded-xl text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white shadow-xs transition"
             >
               {mode === 'adjust_balance'
                 ? 'Simpan Saldo Baru'

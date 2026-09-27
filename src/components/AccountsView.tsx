@@ -211,7 +211,7 @@ export const AccountsView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-            <Wallet className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+            <Wallet className="w-5 h-5 text-orange-600 dark:text-orange-400" />
             <span>Sumber Dana & Rekening</span>
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -221,7 +221,7 @@ export const AccountsView: React.FC = () => {
 
         <button
           onClick={() => handleOpenCreate(activeCategoryTab !== 'all' ? (activeCategoryTab as AccountType) : undefined)}
-          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition"
+          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl bg-orange-600 hover:bg-orange-700 text-white shadow-xs transition"
         >
           <Plus className="w-4 h-4" />
           <span>Tambah Sumber Dana</span>
@@ -234,7 +234,7 @@ export const AccountsView: React.FC = () => {
           <span className="font-semibold uppercase tracking-wider text-[11px] text-slate-400">
             Total Saldo Bersih Seluruh Sumber Dana
           </span>
-          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
+          <span className="px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-300 text-[10px] font-bold border border-orange-500/30">
             Real-time
           </span>
         </div>
@@ -244,7 +244,7 @@ export const AccountsView: React.FC = () => {
 
         {/* Breakdown of Assets */}
         <div className="flex flex-wrap items-center gap-3 pt-3 mt-3 border-t border-slate-700/80 text-xs">
-          <div className="flex items-center gap-1.5 text-emerald-300 bg-emerald-950/60 border border-emerald-800/80 px-2.5 py-1 rounded-lg">
+          <div className="flex items-center gap-1.5 text-orange-300 bg-orange-950/60 border border-orange-800/80 px-2.5 py-1 rounded-lg">
             <span>Total Semua Sumber Dana:</span>
             <strong className="font-bold tabular-nums">+{formatRupiah(summary.totalAssetBalance)}</strong>
           </div>
@@ -273,7 +273,7 @@ export const AccountsView: React.FC = () => {
             onClick={() => setActiveCategoryTab('all')}
             className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-left shrink-0 transition ${
               activeCategoryTab === 'all'
-                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs ring-2 ring-emerald-500/20'
+                ? 'bg-orange-600 text-white border-orange-600 shadow-xs ring-2 ring-orange-500/20'
                 : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
             }`}
           >
@@ -291,7 +291,7 @@ export const AccountsView: React.FC = () => {
               </div>
               <div className={`text-[11px] font-semibold tabular-nums mt-0.5 ${
                 activeCategoryTab === 'all'
-                  ? 'text-emerald-100'
+                  ? 'text-orange-100'
                   : 'text-slate-500 dark:text-slate-400'
               }`}>
                 {formatRupiah(summary.totalAccountBalance)}
@@ -310,14 +310,14 @@ export const AccountsView: React.FC = () => {
                 onClick={() => setActiveCategoryTab(tab.id)}
                 className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border text-left shrink-0 transition ${
                   isActive
-                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs ring-2 ring-emerald-500/20'
+                    ? 'bg-orange-600 text-white border-orange-600 shadow-xs ring-2 ring-orange-500/20'
                     : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
                 }`}
               >
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
                   isActive
                     ? 'bg-white/20 text-white'
-                    : 'bg-slate-100 dark:bg-slate-800 text-emerald-600 dark:text-emerald-400'
+                    : 'bg-slate-100 dark:bg-slate-800 text-orange-600 dark:text-orange-400'
                 }`}>
                   <CategoryIcon name={tab.icon} className="w-4 h-4" />
                 </div>
@@ -334,10 +334,10 @@ export const AccountsView: React.FC = () => {
                   </div>
                   <div className={`text-[11px] font-semibold tabular-nums mt-0.5 ${
                     isActive
-                      ? 'text-emerald-100'
+                      ? 'text-orange-100'
                       : isNegative
                       ? 'text-red-600 dark:text-red-400'
-                      : 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-orange-600 dark:text-orange-400'
                   }`}>
                     {formatRupiah(tab.totalBalance)}
                   </div>
@@ -363,7 +363,7 @@ export const AccountsView: React.FC = () => {
           <strong className={`font-bold tabular-nums ml-1 ${
             currentTabMeta.totalBalance < 0
               ? 'text-red-600 dark:text-red-400'
-              : 'text-emerald-600 dark:text-emerald-400'
+              : 'text-orange-600 dark:text-orange-400'
           }`}>
             {formatRupiah(currentTabMeta.totalBalance)}
           </strong>
@@ -382,7 +382,7 @@ export const AccountsView: React.FC = () => {
           </p>
           <button
             onClick={() => handleOpenCreate(activeCategoryTab !== 'all' ? (activeCategoryTab as AccountType) : undefined)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-orange-600 hover:bg-orange-700 text-white shadow-xs transition"
           >
             <Plus className="w-4 h-4" />
             <span>{activeCategoryTab === 'all' ? 'Tambah Sumber Dana' : `Tambah ${currentTabMeta.label}`}</span>
@@ -398,7 +398,7 @@ export const AccountsView: React.FC = () => {
                 key={acc.id}
                 className={`p-5 rounded-2xl bg-white dark:bg-slate-900 border transition shadow-xs flex flex-col justify-between ${
                   isSelected
-                    ? 'border-emerald-500 ring-2 ring-emerald-500/20'
+                    ? 'border-orange-500 ring-2 ring-orange-500/20'
                     : 'border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                 }`}
               >
@@ -491,7 +491,7 @@ export const AccountsView: React.FC = () => {
                     className={`text-[11px] font-semibold transition px-2.5 py-1.5 rounded-lg ${
                       isSelected
                         ? 'text-red-500 bg-red-50 dark:bg-red-950/40 hover:bg-red-100'
-                        : 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100'
+                        : 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100'
                     }`}
                   >
                     {isSelected ? 'Tutup Mutasi' : 'Lihat Mutasi'}
@@ -552,7 +552,7 @@ export const AccountsView: React.FC = () => {
                                   <div className="flex items-center gap-2 shrink-0">
                                     <div className="text-right text-[11px] tabular-nums font-semibold">
                                       {group.totalIncome > 0 && (
-                                        <div className="text-emerald-600 dark:text-emerald-400">
+                                        <div className="text-orange-600 dark:text-orange-400">
                                           +{formatRupiah(group.totalIncome, false)}
                                         </div>
                                       )}
@@ -591,7 +591,7 @@ export const AccountsView: React.FC = () => {
                                           <div
                                             className={`font-bold tabular-nums shrink-0 ${
                                               isIncome
-                                                ? 'text-emerald-600 dark:text-emerald-400'
+                                                ? 'text-orange-600 dark:text-orange-400'
                                                 : 'text-slate-900 dark:text-white'
                                             }`}
                                           >

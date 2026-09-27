@@ -51,7 +51,7 @@ export const AuthView: React.FC = () => {
       <div className="w-full max-w-sm">
         {/* Brand */}
         <div className="text-center mb-6">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center font-bold shadow-lg mx-auto">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-orange-600 to-amber-500 text-white flex items-center justify-center font-bold shadow-lg mx-auto">
             <Wallet className="w-7 h-7" />
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white mt-3">
@@ -70,7 +70,7 @@ export const AuthView: React.FC = () => {
               onClick={() => switchMode('login')}
               className={`py-2 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 ${
                 mode === 'login'
-                  ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                  ? 'bg-white dark:bg-slate-900 text-orange-600 dark:text-orange-400 shadow-xs'
                   : 'text-slate-500 dark:text-slate-400'
               }`}
             >
@@ -82,7 +82,7 @@ export const AuthView: React.FC = () => {
               onClick={() => switchMode('register')}
               className={`py-2 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 ${
                 mode === 'register'
-                  ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                  ? 'bg-white dark:bg-slate-900 text-orange-600 dark:text-orange-400 shadow-xs'
                   : 'text-slate-500 dark:text-slate-400'
               }`}
             >
@@ -113,7 +113,7 @@ export const AuthView: React.FC = () => {
                 onChange={e => setName(e.target.value)}
                 placeholder="Contoh: Budi Santoso"
                 autoComplete="username"
-                className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
               />
             </div>
 
@@ -129,7 +129,7 @@ export const AuthView: React.FC = () => {
                   onChange={e => setPassword(e.target.value)}
                   placeholder={mode === 'register' ? 'Minimal 4 karakter' : 'Kata sandi Anda'}
                   autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                  className="w-full pl-9 pr-10 py-2.5 text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                  className="w-full pl-9 pr-10 py-2.5 text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 />
                 <button
                   type="button"
@@ -155,7 +155,7 @@ export const AuthView: React.FC = () => {
                     onChange={e => setConfirmPassword(e.target.value)}
                     placeholder="Ulangi kata sandi"
                     autoComplete="new-password"
-                    className="w-full pl-9 pr-3.5 py-2.5 text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                    className="w-full pl-9 pr-3.5 py-2.5 text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                   />
                 </div>
               </div>
@@ -171,7 +171,7 @@ export const AuthView: React.FC = () => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-2.5 px-4 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white shadow-xs transition"
+              className="w-full py-2.5 px-4 rounded-xl text-sm font-bold bg-orange-600 hover:bg-orange-700 disabled:opacity-60 text-white shadow-xs transition"
             >
               {isSubmitting ? 'Memproses…' : mode === 'login' ? 'Masuk ke DigiNote' : 'Daftar Akun'}
             </button>
@@ -183,7 +183,7 @@ export const AuthView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => switchMode('register')}
-                    className="font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+                    className="font-bold text-orange-600 dark:text-orange-400 hover:underline"
                   >
                     Daftar di sini
                   </button>
@@ -194,7 +194,7 @@ export const AuthView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => switchMode('login')}
-                    className="font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+                    className="font-bold text-orange-600 dark:text-orange-400 hover:underline"
                   >
                     Masuk di sini
                   </button>

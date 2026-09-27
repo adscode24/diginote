@@ -162,7 +162,7 @@ export const CalendarView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-            <CalendarIcon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+            <CalendarIcon className="w-5 h-5 text-orange-600 dark:text-orange-400" />
             <span>Kalender Progres Keuangan</span>
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -227,7 +227,7 @@ export const CalendarView: React.FC = () => {
                   </div>
                   <div
                     className={`text-sm font-bold tabular-nums mt-1 ${
-                      isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
+                      isPositive ? 'text-orange-600 dark:text-orange-400' : 'text-red-600 dark:text-red-400'
                     }`}
                   >
                     {isPositive ? '+' : ''}{formatRupiah(net)}
@@ -237,7 +237,7 @@ export const CalendarView: React.FC = () => {
                 <div className="mt-2 pt-2 border-t border-slate-200/40 dark:border-slate-700/40 text-[10px] space-y-0.5 text-slate-500 dark:text-slate-400 tabular-nums">
                   <div className="flex justify-between">
                     <span>Masuk:</span>
-                    <span className="text-emerald-600 font-medium">+{formatRupiah(w.income, false)}</span>
+                    <span className="text-orange-600 font-medium">+{formatRupiah(w.income, false)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Keluar:</span>
@@ -283,7 +283,7 @@ export const CalendarView: React.FC = () => {
                   onClick={() => setSelectedDate(item.dateStr)}
                   className={`min-h-[64px] sm:min-h-[82px] p-1.5 rounded-xl border text-left transition flex flex-col justify-between relative group ${
                     isSelected
-                      ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/30 ring-2 ring-emerald-500/20'
+                      ? 'border-orange-500 bg-orange-50/50 dark:bg-orange-950/30 ring-2 ring-orange-500/20'
                       : item.isCurrentMonth
                       ? 'border-slate-200/70 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40'
                       : 'border-transparent text-slate-400/50 dark:text-slate-600 bg-slate-50/30 dark:bg-slate-950/20'
@@ -294,9 +294,9 @@ export const CalendarView: React.FC = () => {
                     <span
                       className={`text-xs font-semibold inline-flex items-center justify-center w-5 h-5 rounded-full ${
                         isCurrentDay
-                          ? 'bg-emerald-600 text-white font-bold'
+                          ? 'bg-orange-600 text-white font-bold'
                           : isSelected
-                          ? 'text-emerald-700 dark:text-emerald-300 font-bold'
+                          ? 'text-orange-700 dark:text-orange-300 font-bold'
                           : item.isCurrentMonth
                           ? 'text-slate-700 dark:text-slate-300'
                           : 'text-slate-400 dark:text-slate-600'
@@ -317,7 +317,7 @@ export const CalendarView: React.FC = () => {
                   {/* Income / Expense indicators */}
                   <div className="mt-1 space-y-0.5 overflow-hidden">
                     {hasIncome && (
-                      <div className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 truncate tabular-nums">
+                      <div className="text-[10px] font-medium text-orange-600 dark:text-orange-400 truncate tabular-nums">
                         +{stat.income >= 1000000 ? `${(stat.income / 1000000).toFixed(1)}jt` : `${Math.round(stat.income / 1000)}rb`}
                       </div>
                     )}
@@ -335,7 +335,7 @@ export const CalendarView: React.FC = () => {
           {/* Calendar Legend */}
           <div className="flex flex-wrap items-center gap-4 pt-4 mt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="w-2 h-2 rounded-full bg-orange-500" />
               <span>Pemasukan</span>
             </div>
             <div className="flex items-center gap-1.5">
@@ -354,7 +354,7 @@ export const CalendarView: React.FC = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div>
-                <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                <span className="text-[11px] font-semibold text-orange-600 dark:text-orange-400 uppercase tracking-wider">
                   Detail Tanggal
                 </span>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
@@ -363,7 +363,7 @@ export const CalendarView: React.FC = () => {
               </div>
               <button
                 onClick={() => setIsTxModalOpen(true)}
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition"
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-xl bg-orange-600 hover:bg-orange-700 text-white shadow-xs transition"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Catat Transaksi</span>
@@ -374,7 +374,7 @@ export const CalendarView: React.FC = () => {
             <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 text-xs">
               <div>
                 <span className="text-[11px] text-slate-400">Total Masuk</span>
-                <div className="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                <div className="font-bold text-orange-600 dark:text-orange-400 tabular-nums">
                   +{formatRupiah(selectedDayTotals.inc)}
                 </div>
               </div>
@@ -444,7 +444,7 @@ export const CalendarView: React.FC = () => {
 
                         <div
                           className={`font-bold tabular-nums shrink-0 ml-2 ${
-                            isIncome ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-900 dark:text-white'
+                            isIncome ? 'text-orange-600 dark:text-orange-400' : 'text-slate-900 dark:text-white'
                           }`}
                         >
                           {isIncome ? '+' : '-'}{formatRupiah(tx.amount)}
@@ -460,7 +460,7 @@ export const CalendarView: React.FC = () => {
           <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
             <button
               onClick={() => setIsTxModalOpen(true)}
-              className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition flex items-center justify-center gap-2 shadow-xs"
+              className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white transition flex items-center justify-center gap-2 shadow-xs"
             >
               <Plus className="w-4 h-4" />
               <span>+ Catat Pengeluaran / Pemasukan</span>

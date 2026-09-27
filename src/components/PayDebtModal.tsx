@@ -168,7 +168,7 @@ export const PayDebtModal: React.FC<PayDebtModalProps> = ({ isOpen, onClose, deb
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
           <div>
             <h3 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="w-2 h-2 rounded-full bg-orange-500" />
               {isPayable ? 'Bayar Hutang' : 'Terima Pembayaran Piutang'}
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -185,7 +185,7 @@ export const PayDebtModal: React.FC<PayDebtModalProps> = ({ isOpen, onClose, deb
 
         {successInfo ? (
           <div className="p-8 text-center space-y-3">
-            <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center">
+            <div className="w-14 h-14 rounded-full bg-orange-100 dark:bg-orange-950/80 text-orange-600 dark:text-orange-400 mx-auto flex items-center justify-center">
               <CheckCircle2 className="w-8 h-8" />
             </div>
             <h4 className="text-base font-bold text-slate-900 dark:text-white">
@@ -201,7 +201,7 @@ export const PayDebtModal: React.FC<PayDebtModalProps> = ({ isOpen, onClose, deb
                 {formatRupiah(successInfo.principalPortion || 0)} (bunga {successInfo.annualRate}% p.a.)
               </p>
             )}
-            <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 pt-1">
+            <div className="text-xs font-semibold text-orange-600 dark:text-orange-400 pt-1">
               Sisa Hutang: {formatRupiah(successInfo.remaining)}
             </div>
           </div>
@@ -223,8 +223,8 @@ export const PayDebtModal: React.FC<PayDebtModalProps> = ({ isOpen, onClose, deb
               </div>
               {debt.monthlyInstallment && debt.monthlyInstallment > 0 && (
                 <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-200/60 dark:border-slate-700">
-                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">Cicilan per Bulan:</span>
-                  <span className="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                  <span className="text-orange-600 dark:text-orange-400 font-medium">Cicilan per Bulan:</span>
+                  <span className="font-bold text-orange-600 dark:text-orange-400 tabular-nums">
                     {formatRupiah(debt.monthlyInstallment)}
                   </span>
                 </div>
@@ -242,8 +242,8 @@ export const PayDebtModal: React.FC<PayDebtModalProps> = ({ isOpen, onClose, deb
 
             {/* Rincian Amortisasi Cicilan Berjangka */}
             {previewBreakdown && (
-              <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 space-y-1.5">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800 dark:text-emerald-300">
+              <div className="p-3.5 rounded-xl bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800 space-y-1.5">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-orange-800 dark:text-orange-300">
                   <Percent className="w-3.5 h-3.5" />
                   <span>Rincian Cicilan (Bunga {previewBreakdown.annualRate}% p.a.)</span>
                 </div>
@@ -255,11 +255,11 @@ export const PayDebtModal: React.FC<PayDebtModalProps> = ({ isOpen, onClose, deb
                 </div>
                 <div className="flex justify-between items-center text-xs">
                   <span className="text-slate-500 dark:text-slate-400">Pokok berkurang:</span>
-                  <span className="font-semibold text-emerald-700 dark:text-emerald-300 tabular-nums">
+                  <span className="font-semibold text-orange-700 dark:text-orange-300 tabular-nums">
                     {formatRupiah(previewBreakdown.principalPortion)}
                   </span>
                 </div>
-                <div className="flex justify-between items-center text-xs pt-1 border-t border-emerald-200/70 dark:border-emerald-800">
+                <div className="flex justify-between items-center text-xs pt-1 border-t border-orange-200/70 dark:border-orange-800">
                   <span className="text-slate-500 dark:text-slate-400">Sisa pokok setelah bayar:</span>
                   <span className="font-bold text-slate-900 dark:text-white tabular-nums">
                     {formatRupiah(previewBreakdown.remainingAfter)}
@@ -276,13 +276,13 @@ export const PayDebtModal: React.FC<PayDebtModalProps> = ({ isOpen, onClose, deb
             {/* Sumber Dana (Account / Wallet) Selection */}
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5">
-                <Wallet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <Wallet className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
                 <span>Gunakan Sumber Dana *</span>
               </label>
               <select
                 value={selectedAccountId}
                 onChange={e => setSelectedAccountId(e.target.value)}
-                className="w-full px-3 py-2 text-xs font-medium rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3 py-2 text-xs font-medium rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
               >
                 {accounts.map(acc => (
                   <option key={acc.id} value={acc.id}>
@@ -299,7 +299,7 @@ export const PayDebtModal: React.FC<PayDebtModalProps> = ({ isOpen, onClose, deb
                   Nominal Pembayaran *
                 </label>
                 {debt.monthlyInstallment && (
-                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400">
+                  <span className="text-[11px] text-orange-600 dark:text-orange-400">
                     Nominal cicilan dapat disesuaikan
                   </span>
                 )}
@@ -314,7 +314,7 @@ export const PayDebtModal: React.FC<PayDebtModalProps> = ({ isOpen, onClose, deb
                   placeholder="0"
                   value={amountStr ? new Intl.NumberFormat('id-ID').format(Number(amountStr)) : ''}
                   onChange={handleAmountChange}
-                  className="w-full pl-11 pr-4 py-2.5 text-base font-bold tabular-nums rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                  className="w-full pl-11 pr-4 py-2.5 text-base font-bold tabular-nums rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 />
               </div>
 
@@ -324,7 +324,7 @@ export const PayDebtModal: React.FC<PayDebtModalProps> = ({ isOpen, onClose, deb
                   <button
                     type="button"
                     onClick={() => setPresetAmount(debt.monthlyInstallment!)}
-                    className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-200 transition border border-emerald-300 dark:border-emerald-700"
+                    className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-orange-100 dark:bg-orange-950/80 text-orange-800 dark:text-orange-200 hover:bg-orange-200 transition border border-orange-300 dark:border-orange-700"
                   >
                     Cicilan Bulanan ({formatRupiah(debt.monthlyInstallment)})
                   </button>
@@ -357,7 +357,7 @@ export const PayDebtModal: React.FC<PayDebtModalProps> = ({ isOpen, onClose, deb
                   type="date"
                   value={paymentDate}
                   onChange={e => setPaymentDate(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                  className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 />
               </div>
             </div>
@@ -409,7 +409,7 @@ export const PayDebtModal: React.FC<PayDebtModalProps> = ({ isOpen, onClose, deb
                 placeholder="Contoh: Cicilan ke-2 transfer m-banking"
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
               />
             </div>
 
@@ -439,7 +439,7 @@ export const PayDebtModal: React.FC<PayDebtModalProps> = ({ isOpen, onClose, deb
               </button>
               <button
                 type="submit"
-                className="py-2.5 px-5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition"
+                className="py-2.5 px-5 rounded-xl text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white shadow-xs transition"
               >
                 Konfirmasi Pembayaran
               </button>

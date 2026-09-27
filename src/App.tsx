@@ -40,24 +40,22 @@ function MainApp() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col antialiased selection:bg-emerald-500/20 selection:text-emerald-600">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col antialiased selection:bg-orange-500/20 selection:text-orange-600">
       {/* Clean Header */}
       <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
           {/* Brand Wordmark: DigiNote */}
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center font-bold shadow-xs">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 text-white flex items-center justify-center font-bold shadow-xs">
               <Wallet className="w-4 h-4" />
             </div>
             <div className="leading-tight">
               <span className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white block">
                 DigiNote
               </span>
-              {currentUser && (
-                <span className="text-[10px] text-slate-400 block -mt-0.5 truncate max-w-[140px]">
-                  {currentUser.name}
-                </span>
-              )}
+              <span className="text-[10px] font-medium text-orange-600 dark:text-orange-400 block -mt-0.5 tracking-wide">
+                Your Digital Note
+              </span>
             </div>
           </div>
 
@@ -67,13 +65,13 @@ function MainApp() {
               onClick={() => setActiveTab('summary')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
                 activeTab === 'summary'
-                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                  ? 'bg-orange-600 text-white border-orange-600 shadow-xs'
                   : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
               }`}
               title="Buka Summary (Kalender & Laporan)"
               aria-label="Summary"
             >
-              <CalendarDays className={`w-4 h-4 ${activeTab === 'summary' ? 'text-white' : 'text-emerald-600 dark:text-emerald-400'}`} />
+              <CalendarDays className={`w-4 h-4 ${activeTab === 'summary' ? 'text-white' : 'text-orange-600 dark:text-orange-400'}`} />
               <span>Summary</span>
             </button>
 
@@ -116,13 +114,13 @@ function MainApp() {
                   onClick={() => setActiveTab(item.id)}
                   className={`flex flex-col items-center justify-center flex-1 py-1.5 px-1 rounded-xl transition min-w-[44px] min-h-[44px] relative group ${
                     isActive
-                      ? 'text-emerald-600 dark:text-emerald-400 font-bold'
+                      ? 'text-orange-600 dark:text-orange-400 font-bold'
                       : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 font-medium'
                   }`}
                 >
                   {/* Active highlight pill indicator */}
                   {isActive && (
-                    <span className="absolute -top-1 w-8 h-1 bg-emerald-600 dark:bg-emerald-400 rounded-full" />
+                    <span className="absolute -top-1 w-8 h-1 bg-orange-600 dark:bg-orange-400 rounded-full" />
                   )}
 
                   <Icon

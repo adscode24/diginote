@@ -171,7 +171,7 @@ export const ReportView: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+            <BarChart3 className="w-5 h-5 text-orange-600 dark:text-orange-400" />
             <span>Laporan Keuangan Bulanan</span>
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -220,7 +220,7 @@ export const ReportView: React.FC = () => {
           {/* Export XLSX Button */}
           <button
             onClick={handleExportXLSX}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-orange-600 hover:bg-orange-700 text-white shadow-xs transition"
             title="Download Laporan Format Microsoft Excel (.xlsx)"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
@@ -230,7 +230,7 @@ export const ReportView: React.FC = () => {
       </div>
 
       {exportSuccessMessage && (
-        <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-xs font-medium text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
+        <div className="p-3 rounded-xl bg-orange-50 dark:bg-orange-950/60 border border-orange-200 dark:border-orange-800 text-xs font-medium text-orange-700 dark:text-orange-300 flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           <span>{exportSuccessMessage}</span>
         </div>
@@ -242,7 +242,7 @@ export const ReportView: React.FC = () => {
           <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
             Total Pemasukan
           </span>
-          <div className="text-lg sm:text-xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums mt-1">
+          <div className="text-lg sm:text-xl font-bold text-orange-600 dark:text-orange-400 tabular-nums mt-1">
             +{formatRupiah(summary.totalIncome)}
           </div>
           <span className="text-[10px] text-slate-400 mt-1 block">
@@ -311,7 +311,7 @@ export const ReportView: React.FC = () => {
               {/* Legend */}
               <div className="flex items-center gap-3 text-xs">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" />
+                  <span className="w-2.5 h-2.5 rounded-sm bg-orange-500" />
                   <span className="text-slate-600 dark:text-slate-300">Masuk</span>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -333,7 +333,7 @@ export const ReportView: React.FC = () => {
                       <div className="flex items-end gap-1.5 w-full justify-center h-full">
                         {/* Income Bar */}
                         <div
-                          className="w-3.5 sm:w-5 bg-emerald-500 rounded-t-sm transition-all duration-300 group-hover:bg-emerald-600 relative"
+                          className="w-3.5 sm:w-5 bg-orange-500 rounded-t-sm transition-all duration-300 group-hover:bg-orange-600 relative"
                           style={{ height: `${Math.max(4, incomeHeight)}%` }}
                           title={`Pemasukan ${w.week}: ${formatRupiah(w.income)}`}
                         />
@@ -464,7 +464,7 @@ export const ReportView: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                  <div className="text-xs font-bold text-orange-600 dark:text-orange-400 tabular-nums">
                     +{formatRupiah(cat.amount)}
                   </div>
                 </div>

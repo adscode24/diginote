@@ -23,11 +23,11 @@ export const DigiNoteLogo: React.FC<DigiNoteLogoProps> = ({
         className="shrink-0 drop-shadow-sm select-none"
       >
         <defs>
-          {/* Main Orange Gradient for App Icon */}
+          {/* Main Orange Gradient for App Icon (DigiNote brand #EA580C) */}
           <linearGradient id="diginoteIconGrad" x1="0.1" y1="0" x2="0.9" y2="1">
-            <stop offset="0%" stopColor="#FFA100" />
-            <stop offset="35%" stopColor="#FF7A00" />
-            <stop offset="100%" stopColor="#FF5200" />
+            <stop offset="0%" stopColor="#FB923C" />
+            <stop offset="55%" stopColor="#F97316" />
+            <stop offset="100%" stopColor="#EA580C" />
           </linearGradient>
 
           {/* Phone Screen Gradient */}

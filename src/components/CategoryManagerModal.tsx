@@ -142,7 +142,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
               }}
               className={`py-2 text-xs font-semibold rounded-lg transition ${
                 activeType === 'income'
-                  ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                  ? 'bg-white dark:bg-slate-900 text-orange-600 dark:text-orange-400 shadow-xs'
                   : 'text-slate-600 dark:text-slate-400'
               }`}
             >
@@ -164,7 +164,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                 placeholder="Contoh: Belanja Online, Bensin, dll"
                 value={name}
                 onChange={e => setName(e.target.value)}
-                className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
               />
               {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
             </div>
@@ -202,7 +202,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                     onClick={() => setSelectedIcon(iconName)}
                     className={`p-2 rounded-lg transition ${
                       selectedIcon === iconName
-                        ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400'
+                        ? 'bg-orange-100 dark:bg-orange-950/80 text-orange-600 dark:text-orange-400'
                         : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800'
                     }`}
                   >
@@ -215,7 +215,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
             <div className="flex items-center gap-2 pt-1">
               <button
                 type="submit"
-                className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-4 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-xs"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-4 rounded-xl text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white transition shadow-xs"
               >
                 {editingId ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
                 <span>{editingId ? 'Simpan Perubahan' : 'Tambah Kategori'}</span>

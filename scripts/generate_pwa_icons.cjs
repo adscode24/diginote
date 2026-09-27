@@ -2,7 +2,25 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
-// Create a valid PNG in pure node.js with exact DigiNote orange logo
+// DigiNote emblem: orange (#EA580C) ring + phone + growth arrow + Rp coin + pen
+// on white background, matching the brand logo. Pure node.js PNG writer.
+const ORANGE = [234, 88, 12, 255];
+const WHITE = [255, 255, 255, 255];
+
+function distToSegment(px, py, ax, ay, bx, by) {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  let t = 0;
+  if (lenSq > 0) {
+    t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+  }
+  const cx = ax + t * dx;
+  const cy = ay + t * dy;
+  return Math.hypot(px - cx, py - cy);
+}
+
 function createDigiNotePNG(width, height) {
   // Signature
   const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
@@ -31,107 +49,94 @@ function createDigiNotePNG(width, height) {
   const rawData = Buffer.alloc(height * (1 + width * 4));
   let offset = 0;
 
-  const cornerRadius = width * 0.23;
-  const cx = width / 2;
-  const cy = height / 2;
+  const CX = 0.5;
+  const CY = 0.488;
 
-  // Coordinate mapper
+  function putPixel(r, g, b, a) {
+    rawData[offset++] = r;
+    rawData[offset++] = g;
+    rawData[offset++] = b;
+    rawData[offset++] = a;
+  }
+
+  function inRect(nx, ny, x0, x1, y0, y1) {
+    return nx >= x0 && nx <= x1 && ny >= y0 && ny <= y1;
+  }
+
   for (let y = 0; y < height; y++) {
     rawData[offset++] = 0; // Filter type 0
-    const ny = y / height; // 0 to 1
+    const ny = y / height;
 
     for (let x = 0; x < width; x++) {
-      const nx = x / width; // 0 to 1
+      const nx = x / width;
+      const dCenter = Math.hypot(nx - CX, ny - CY);
 
-      // Rounded rectangle test (squircle)
-      let inSquircle = false;
-      const qx = Math.max(0, Math.abs(x - cx) - (width / 2 - cornerRadius));
-      const qy = Math.max(0, Math.abs(y - cy) - (height / 2 - cornerRadius));
-      if (qx * qx + qy * qy <= cornerRadius * cornerRadius) {
-        inSquircle = true;
-      }
-
-      if (!inSquircle) {
-        // Transparent
-        rawData[offset++] = 0;
-        rawData[offset++] = 0;
-        rawData[offset++] = 0;
-        rawData[offset++] = 0;
+      // 1. Outer ring band
+      if (dCenter >= 0.299 && dCenter <= 0.357) {
+        putPixel(...ORANGE);
         continue;
       }
 
-      // Check if pixel is inside the Phone (top right of n)
-      // Phone is around nx: 0.52 to 0.68, ny: 0.20 to 0.44
-      const inPhoneFrame = (nx >= 0.52 && nx <= 0.68 && ny >= 0.20 && ny <= 0.44);
-      const inPhoneScreen = (nx >= 0.54 && nx <= 0.66 && ny >= 0.24 && ny <= 0.42);
-
-      // Check if pixel is inside the Banknote (top left of n)
-      // Banknote tilted around nx: 0.30 to 0.52, ny: 0.22 to 0.42
-      // Approximate rotated box
-      const bx = (nx - 0.40) * Math.cos(0.28) - (ny - 0.32) * Math.sin(0.28);
-      const by = (nx - 0.40) * Math.sin(0.28) + (ny - 0.32) * Math.cos(0.28);
-      const inBill = (Math.abs(bx) < 0.13 && Math.abs(by) < 0.08);
-      const inBillInner = (Math.abs(bx) < 0.10 && Math.abs(by) < 0.06);
-
-      // Check if pixel is inside the white letter "n"
-      // Left leg: nx ~ 0.37 to 0.45, ny ~ 0.40 to 0.72
-      // Right leg: nx ~ 0.57 to 0.65, ny ~ 0.43 to 0.72
-      // Arch: connecting at top ny ~ 0.35 to 0.48, nx between 0.37 and 0.65
-      const inLeftLeg = (nx >= 0.37 && nx <= 0.45 && ny >= 0.38 && ny <= 0.72);
-      const inRightLeg = (nx >= 0.57 && nx <= 0.65 && ny >= 0.42 && ny <= 0.72);
-      
-      // Arch curve calculation
-      const archCenterDist = Math.sqrt(Math.pow((nx - 0.51) / 0.14, 2) + Math.pow((ny - 0.45) / 0.11, 2));
-      const inArch = (archCenterDist >= 0.65 && archCenterDist <= 1.35 && ny <= 0.45 && ny >= 0.32);
-
-      // Rounded bottom caps for legs
-      const inLeftCap = Math.hypot(nx - 0.41, ny - 0.71) < 0.045;
-      const inRightCap = Math.hypot(nx - 0.61, ny - 0.71) < 0.045;
-
-      const inLetterN = inLeftLeg || inRightLeg || inArch || inLeftCap || inRightCap;
-
-      if (inLetterN) {
-        // Pure crisp white letter 'n'
-        rawData[offset++] = 255;
-        rawData[offset++] = 255;
-        rawData[offset++] = 255;
-        rawData[offset++] = 255;
-      } else if (inPhoneScreen) {
-        // Light blue-gray screen
-        rawData[offset++] = 220;
-        rawData[offset++] = 230;
-        rawData[offset++] = 242;
-        rawData[offset++] = 255;
-      } else if (inPhoneFrame) {
-        // White phone frame
-        rawData[offset++] = 255;
-        rawData[offset++] = 255;
-        rawData[offset++] = 255;
-        rawData[offset++] = 255;
-      } else if (inBillInner) {
-        // Light peach / orange banknote interior
-        rawData[offset++] = 255;
-        rawData[offset++] = 230;
-        rawData[offset++] = 205;
-        rawData[offset++] = 255;
-      } else if (inBill) {
-        // White bill border
-        rawData[offset++] = 255;
-        rawData[offset++] = 255;
-        rawData[offset++] = 255;
-        rawData[offset++] = 255;
-      } else {
-        // Rich vibrant warm orange gradient
-        // From #FFA000 at top to #FF5200 at bottom
-        const t = ny;
-        const r = 255;
-        const g = Math.round(160 * (1 - t) + 82 * t);
-        const b = 0;
-        rawData[offset++] = r;
-        rawData[offset++] = g;
-        rawData[offset++] = b;
-        rawData[offset++] = 255;
+      // 2. Smartphone frame (outline)
+      const inPhoneOuter = inRect(nx, ny, 0.53, 0.7, 0.29, 0.63);
+      const inPhoneInner = inRect(nx, ny, 0.561, 0.669, 0.321, 0.599);
+      const inNotch = inRect(nx, ny, 0.576, 0.654, 0.3, 0.322);
+      const inHomeBar = inRect(nx, ny, 0.586, 0.645, 0.585, 0.6);
+      if ((inPhoneOuter && !inPhoneInner) || inNotch || inHomeBar) {
+        putPixel(...ORANGE);
+        continue;
       }
+
+      // 3. Growth arrow (polyline + head)
+      const onArrow =
+        distToSegment(nx, ny, 0.439, 0.557, 0.512, 0.469) < 0.0195 ||
+        distToSegment(nx, ny, 0.512, 0.469, 0.557, 0.512) < 0.0195 ||
+        distToSegment(nx, ny, 0.557, 0.512, 0.654, 0.381) < 0.0195 ||
+        distToSegment(nx, ny, 0.654, 0.381, 0.602, 0.387) < 0.016 ||
+        distToSegment(nx, ny, 0.654, 0.381, 0.648, 0.438) < 0.016;
+      if (onArrow) {
+        putPixel(...ORANGE);
+        continue;
+      }
+
+      // 4. Rp coin (disc + white ring)
+      const dCoin = Math.hypot(nx - 0.342, ny - 0.635);
+      if (dCoin <= 0.078) {
+        if (dCoin >= 0.043 && dCoin <= 0.0625) {
+          putPixel(...WHITE);
+        } else {
+          putPixel(...ORANGE);
+        }
+        continue;
+      }
+
+      // 5. Pen (bar + tip)
+      const inPenBar = inRect(nx, ny, 0.707, 0.758, 0.352, 0.566);
+      const inPenTip =
+        ny >= 0.566 && ny <= 0.645 && Math.abs(nx - 0.7325) <= (0.645 - ny) * 0.33;
+      if (inPenBar || inPenTip) {
+        putPixel(...ORANGE);
+        continue;
+      }
+
+      // 6. Banknote (tilted outline + center dot)
+      const cosA = Math.cos(0.279);
+      const sinA = Math.sin(0.279);
+      const bx = (nx - 0.352) * cosA - (ny - 0.467) * sinA;
+      const by = (nx - 0.352) * sinA + (ny - 0.467) * cosA;
+      const inBillOuter = Math.abs(bx) < 0.078 && Math.abs(by) < 0.047;
+      const inBillInner = Math.abs(bx) < 0.054 && Math.abs(by) < 0.023;
+      if (inBillOuter && !inBillInner) {
+        putPixel(...ORANGE);
+        continue;
+      }
+      if (Math.hypot(nx - 0.352, ny - 0.467) < 0.016) {
+        putPixel(...ORANGE);
+        continue;
+      }
+
+      // Background: white (opaque, safe for maskable + apple-touch)
+      putPixel(...WHITE);
     }
   }
 

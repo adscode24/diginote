@@ -151,21 +151,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
     <div className="space-y-6 pb-6">
       {/* Daily Reminder Banner if not recorded today */}
       {!hasLoggedToday && reminderSettings.enabled && (
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-600 to-amber-700 text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
               <BellRing className="w-5 h-5 text-white" />
             </div>
             <div>
               <h4 className="text-sm font-bold">Waktunya Catat Keuangan Hari Ini!</h4>
-              <p className="text-xs text-emerald-100 mt-0.5">
+              <p className="text-xs text-orange-100 mt-0.5">
                 Belum ada pengeluaran atau pemasukan yang dicatat hari ini ({formatDateIndo(today)}).
               </p>
             </div>
           </div>
           <button
             onClick={() => setIsTxModalOpen(true)}
-            className="self-start sm:self-auto px-4 py-2 text-xs font-bold rounded-xl bg-white text-emerald-800 hover:bg-emerald-50 transition shadow-xs whitespace-nowrap"
+            className="self-start sm:self-auto px-4 py-2 text-xs font-bold rounded-xl bg-white text-orange-800 hover:bg-orange-50 transition shadow-xs whitespace-nowrap"
           >
             + Catat Sekarang
           </button>
@@ -186,7 +186,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
         {/* Month & Year Select Dropdowns */}
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 p-1 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800">
-            <Calendar className="w-4 h-4 text-emerald-600 dark:text-emerald-400 ml-1.5 shrink-0" />
+            <Calendar className="w-4 h-4 text-orange-600 dark:text-orange-400 ml-1.5 shrink-0" />
             <select
               value={selectedMonth}
               onChange={e => setSelectedMonth(Number(e.target.value))}
@@ -218,14 +218,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
         {/* Total Saldo Sumber Dana */}
         <div
           onClick={() => onNavigateTab('accounts')}
-          className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between cursor-pointer hover:border-emerald-500 transition group"
+          className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between cursor-pointer hover:border-orange-500 transition group"
         >
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition">
                 Total Saldo Sumber Dana
               </span>
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-xl bg-orange-50 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 flex items-center justify-center">
                 <Wallet className="w-4 h-4" />
               </div>
             </div>
@@ -246,26 +246,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
         {/* Monthly Income Card (Clickable to view details) */}
         <div
           onClick={() => setBreakdownType('income')}
-          className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between cursor-pointer hover:border-emerald-500 hover:ring-2 hover:ring-emerald-500/20 transition group"
+          className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between cursor-pointer hover:border-orange-500 hover:ring-2 hover:ring-orange-500/20 transition group"
           title="Klik untuk melihat daftar rincian pemasukan bulan ini"
         >
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition flex items-center gap-1">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition flex items-center gap-1">
                 <span>Pemasukan ({new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(new Date(selectedYear, selectedMonth - 1, 1))})</span>
-                <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/60 px-1 rounded">Rincian ↗</span>
+                <span className="text-[10px] text-orange-600 font-bold bg-orange-50 dark:bg-orange-950/60 px-1 rounded">Rincian ↗</span>
               </span>
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-xl bg-orange-50 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 flex items-center justify-center">
                 <ArrowDownLeft className="w-4 h-4" />
               </div>
             </div>
-            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums mt-3">
+            <div className="text-2xl font-bold text-orange-600 dark:text-orange-400 tabular-nums mt-3">
               +{formatRupiah(filteredIncome)}
             </div>
           </div>
           <div className="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
             <span>{monthlyTransactions.filter(t => t.type === 'income').length} Transaksi Masuk</span>
-            <span className="text-emerald-600 font-medium">Lihat Rincian</span>
+            <span className="text-orange-600 font-medium">Lihat Rincian</span>
           </div>
         </div>
 
@@ -324,14 +324,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
       <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Wallet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <Wallet className="w-4 h-4 text-orange-600 dark:text-orange-400" />
             <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
               Sumber Dana Saya
             </h3>
           </div>
           <button
             onClick={() => onNavigateTab('accounts')}
-            className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5"
+            className="text-xs font-semibold text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-0.5"
           >
             <span>Buka Halaman Dana</span>
             <ChevronRight className="w-3.5 h-3.5" />
@@ -342,7 +342,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
           {accounts.length === 0 && (
             <button
               onClick={() => onNavigateTab('accounts')}
-              className="col-span-2 sm:col-span-4 p-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 hover:border-emerald-500 hover:text-emerald-600 transition"
+              className="col-span-2 sm:col-span-4 p-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 hover:border-orange-500 hover:text-orange-600 transition"
             >
               Belum ada sumber dana. Klik untuk buat sumber dana pertama Anda.
             </button>
@@ -352,7 +352,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
               <div
                 key={acc.id}
                 onClick={() => onNavigateTab('accounts')}
-                className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800 cursor-pointer hover:border-emerald-500 transition"
+                className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800 cursor-pointer hover:border-orange-500 transition"
               >
                 <div className="flex items-center gap-2 mb-1.5">
                   <div
@@ -378,7 +378,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
       <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <BellRing className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <BellRing className="w-4 h-4 text-orange-600 dark:text-orange-400" />
             <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
               Tagihan Rutin
             </h3>
@@ -388,7 +388,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
               setBillToEdit(null);
               setIsBillModalOpen(true);
             }}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold rounded-lg bg-orange-600 hover:bg-orange-700 text-white transition"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Tambah Tagihan</span>
@@ -414,7 +414,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                     <span
                       className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
                         bill.paid
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300'
+                          ? 'bg-orange-100 text-orange-700 dark:bg-orange-950/80 dark:text-orange-300'
                           : bill.statusInfo.isOverdue
                           ? 'bg-red-100 text-red-700 dark:bg-red-950/80 dark:text-red-300'
                           : bill.statusInfo.isDueSoon
@@ -439,7 +439,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                   {!bill.paid && (
                     <button
                       onClick={() => setBillToPay(bill)}
-                      className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-xs"
+                      className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-orange-600 hover:bg-orange-700 text-white transition shadow-xs"
                     >
                       Bayar
                     </button>
@@ -450,7 +450,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                         setBillToEdit(bill);
                         setIsBillModalOpen(true);
                       }}
-                      className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                      className="p-1.5 text-slate-400 hover:text-orange-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
                       title="Edit tagihan"
                     >
                       <Pencil className="w-3.5 h-3.5" />
@@ -486,7 +486,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
               </div>
               <button
                 onClick={() => onNavigateTab('debts')}
-                className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5"
+                className="text-xs font-semibold text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-0.5"
               >
                 <span>Lihat Semua</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -496,7 +496,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
             <div className="mt-4 space-y-3">
               {urgentDebts.length === 0 ? (
                 <div className="p-6 text-center text-xs text-slate-400">
-                  <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+                  <CheckCircle2 className="w-8 h-8 text-orange-500 mx-auto mb-2" />
                   <p>Tidak ada hutang yang mendekati tanggal jatuh tempo.</p>
                 </div>
               ) : (
@@ -563,7 +563,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
 
                       <button
                         onClick={() => setSelectedDebtToPay(debt)}
-                        className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-xs shrink-0"
+                        className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-orange-600 hover:bg-orange-700 text-white transition shadow-xs shrink-0"
                       >
                         Bayar
                       </button>
@@ -584,14 +584,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
           <div>
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
-                <Receipt className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <Receipt className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                   Transaksi Terbaru
                 </h3>
               </div>
               <button
                 onClick={() => onNavigateTab('transactions')}
-                className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5"
+                className="text-xs font-semibold text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-0.5"
               >
                 <span>Lihat Semua</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -635,7 +635,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
 
                       <div
                         className={`font-bold tabular-nums shrink-0 ml-2 ${
-                          isIncome ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-900 dark:text-white'
+                          isIncome ? 'text-orange-600 dark:text-orange-400' : 'text-slate-900 dark:text-white'
                         }`}
                       >
                         {isIncome ? '+' : '-'}{formatRupiah(tx.amount)}
@@ -650,7 +650,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
           <div className="pt-3 mt-4 border-t border-slate-100 dark:border-slate-800 text-center">
             <button
               onClick={() => onNavigateTab('transactions')}
-              className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
+              className="text-xs font-semibold text-orange-600 dark:text-orange-400 hover:underline"
             >
               Lihat Riwayat Seluruh Transaksi
             </button>
@@ -676,7 +676,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
               <div className="flex items-center gap-2.5">
                 <div
                   className={`w-9 h-9 rounded-xl flex items-center justify-center text-white shrink-0 ${
-                    breakdownType === 'income' ? 'bg-emerald-600' : 'bg-red-600'
+                    breakdownType === 'income' ? 'bg-orange-600' : 'bg-red-600'
                   }`}
                 >
                   {breakdownType === 'income' ? (
@@ -706,7 +706,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
             <div
               className={`px-6 py-3 border-b flex items-center justify-between text-xs font-semibold shrink-0 ${
                 breakdownType === 'income'
-                  ? 'bg-emerald-50/80 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200 border-emerald-100 dark:border-emerald-900/40'
+                  ? 'bg-orange-50/80 dark:bg-orange-950/40 text-orange-800 dark:text-orange-200 border-orange-100 dark:border-orange-900/40'
                   : 'bg-red-50/80 dark:bg-red-950/40 text-red-800 dark:text-red-200 border-red-100 dark:border-red-900/40'
               }`}
             >
@@ -753,7 +753,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                       <div
                         className={`text-sm font-bold tabular-nums shrink-0 ml-3 ${
                           breakdownType === 'income'
-                            ? 'text-emerald-600 dark:text-emerald-400'
+                            ? 'text-orange-600 dark:text-orange-400'
                             : 'text-red-600 dark:text-red-400'
                         }`}
                       >

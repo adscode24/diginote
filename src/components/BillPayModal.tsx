@@ -100,7 +100,7 @@ export const BillPayModal: React.FC<BillPayModalProps> = ({ isOpen, onClose, bil
 
         {success ? (
           <div className="p-8 text-center space-y-3">
-            <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center">
+            <div className="w-14 h-14 rounded-full bg-orange-100 dark:bg-orange-950/80 text-orange-600 dark:text-orange-400 mx-auto flex items-center justify-center">
               <CheckCircle2 className="w-8 h-8" />
             </div>
             <h4 className="text-base font-bold text-slate-900 dark:text-white">
@@ -133,20 +133,20 @@ export const BillPayModal: React.FC<BillPayModalProps> = ({ isOpen, onClose, bil
                   value={amountStr ? new Intl.NumberFormat('id-ID').format(Number(amountStr)) : ''}
                   onChange={e => setAmountStr(e.target.value.replace(/[^0-9]/g, ''))}
                   placeholder="0"
-                  className="w-full pl-11 pr-4 py-2.5 text-base font-bold tabular-nums rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                  className="w-full pl-11 pr-4 py-2.5 text-base font-bold tabular-nums rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 />
               </div>
             </div>
 
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5">
-                <Tags className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <Tags className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
                 <span>Tercatat dengan Kategori Pengeluaran *</span>
               </label>
               <select
                 value={categoryId}
                 onChange={e => setCategoryId(e.target.value)}
-                className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
               >
                 {expenseCategories.map(c => (
                   <option key={c.id} value={c.id}>
@@ -158,13 +158,13 @@ export const BillPayModal: React.FC<BillPayModalProps> = ({ isOpen, onClose, bil
 
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5">
-                <Wallet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <Wallet className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
                 <span>Sumber Dana</span>
               </label>
               <select
                 value={accountId}
                 onChange={e => setAccountId(e.target.value)}
-                className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
               >
                 <option value="">Tanpa sumber dana (hanya catat)</option>
                 {accounts.map(a => (
@@ -185,7 +185,7 @@ export const BillPayModal: React.FC<BillPayModalProps> = ({ isOpen, onClose, bil
                   type="date"
                   value={paymentDate}
                   onChange={e => setPaymentDate(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                  className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 />
               </div>
             </div>
@@ -207,7 +207,7 @@ export const BillPayModal: React.FC<BillPayModalProps> = ({ isOpen, onClose, bil
               </button>
               <button
                 type="submit"
-                className="py-2.5 px-5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition"
+                className="py-2.5 px-5 rounded-xl text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white shadow-xs transition"
               >
                 Konfirmasi Pembayaran
               </button>

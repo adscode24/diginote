@@ -146,7 +146,7 @@ export const TransactionsView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-            <Receipt className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+            <Receipt className="w-5 h-5 text-orange-600 dark:text-orange-400" />
             <span>Riwayat Transaksi Harian</span>
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -168,7 +168,7 @@ export const TransactionsView: React.FC = () => {
               setTxToEdit(null);
               setIsTxModalOpen(true);
             }}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-orange-600 hover:bg-orange-700 text-white shadow-sm transition"
           >
             <Plus className="w-4 h-4" />
             <span>Catat Transaksi</span>
@@ -187,7 +187,7 @@ export const TransactionsView: React.FC = () => {
               placeholder="Cari transaksi, keterangan, atau nominal..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-10 pr-9 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+              className="w-full pl-10 pr-9 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
             />
             {search && (
               <button
@@ -225,7 +225,7 @@ export const TransactionsView: React.FC = () => {
               onClick={() => setTypeFilter('income')}
               className={`px-3 py-1.5 text-xs rounded-lg transition ${
                 typeFilter === 'income'
-                  ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs font-bold'
+                  ? 'bg-white dark:bg-slate-900 text-orange-600 dark:text-orange-400 shadow-xs font-bold'
                   : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 font-medium'
               }`}
             >
@@ -267,7 +267,7 @@ export const TransactionsView: React.FC = () => {
                 >
                   {/* Left: Month Name & Transaction Count */}
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
                       <Calendar className="w-5 h-5" />
                     </div>
                     <div>
@@ -290,7 +290,7 @@ export const TransactionsView: React.FC = () => {
                     <div className="flex items-center gap-3 sm:gap-4 text-xs font-semibold tabular-nums">
                       <div className="text-right">
                         <span className="text-[10px] text-slate-400 block font-normal">Masuk</span>
-                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                        <span className="text-orange-600 dark:text-orange-400 font-bold">
                           +{formatRupiah(group.totalIncome)}
                         </span>
                       </div>
@@ -363,7 +363,7 @@ export const TransactionsView: React.FC = () => {
                               <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                                 <span>{formatDateIndo(tx.date)}</span>
                                 <span>·</span>
-                                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                                <span className="font-semibold text-orange-600 dark:text-orange-400">
                                   {tx.accountName || tx.paymentMethod}
                                 </span>
                                 {tx.description && (
@@ -392,7 +392,7 @@ export const TransactionsView: React.FC = () => {
                                 className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition"
                                 title="Lihat Bukti Transfer"
                               >
-                                <ImageIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                                <ImageIcon className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                               </button>
                             )}
 
@@ -400,7 +400,7 @@ export const TransactionsView: React.FC = () => {
                               <div
                                 className={`text-xs sm:text-sm font-bold tabular-nums ${
                                   isIncome
-                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    ? 'text-orange-600 dark:text-orange-400'
                                     : 'text-slate-900 dark:text-white'
                                 }`}
                               >

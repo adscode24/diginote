@@ -17,7 +17,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ compact = fa
   if (isInstalled) {
     if (compact) return null;
     return (
-      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg">
+      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 rounded-lg">
         <CheckCircle2 className="w-3.5 h-3.5" />
         <span>Terpasang di Perangkat</span>
       </div>
@@ -40,8 +40,8 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ compact = fa
           onClick={handleInstallClick}
           className={`inline-flex items-center gap-2 font-medium rounded-lg transition-colors shadow-sm ${
             compact
-              ? 'px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white'
-              : 'px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white'
+              ? 'px-3 py-1.5 text-xs bg-orange-600 hover:bg-orange-700 text-white'
+              : 'px-4 py-2 text-sm bg-orange-600 hover:bg-orange-700 text-white'
           }`}
           title="Pasang aplikasi di layar utama Android / Desktop"
         >
@@ -50,8 +50,8 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ compact = fa
         </button>
 
         {installSuccess && (
-          <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-emerald-800 text-white px-4 py-2 rounded-xl shadow-lg text-sm flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+          <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-orange-800 text-white px-4 py-2 rounded-xl shadow-lg text-sm flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-orange-300" />
             <span>Aplikasi berhasil dipasang di perangkat Anda!</span>
           </div>
         )}
@@ -78,7 +78,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ compact = fa
             <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-2xl border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-150">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                 <h3 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Smartphone className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                  <Smartphone className="w-5 h-5 text-orange-600 dark:text-orange-400" />
                   Pasang di Layar Utama iOS
                 </h3>
                 <button
@@ -91,19 +91,19 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ compact = fa
 
               <div className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
                 <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xs font-bold shrink-0">
+                  <div className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-950 text-orange-600 dark:text-orange-400 flex items-center justify-center text-xs font-bold shrink-0">
                     1
                   </div>
                   <p>Tekan tombol <strong>Bagikan (Share)</strong> ikon panah ke atas di bagian bawah Safari.</p>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xs font-bold shrink-0">
+                  <div className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-950 text-orange-600 dark:text-orange-400 flex items-center justify-center text-xs font-bold shrink-0">
                     2
                   </div>
                   <p>Gulir menu dan pilih <strong>"Tambahkan ke Layar Utama" (Add to Home Screen)</strong>.</p>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xs font-bold shrink-0">
+                  <div className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-950 text-orange-600 dark:text-orange-400 flex items-center justify-center text-xs font-bold shrink-0">
                     3
                   </div>
                   <p>Tekan <strong>Tambah</strong> di pojok kanan atas. Aplikasi siap digunakan seperti aplikasi native!</p>

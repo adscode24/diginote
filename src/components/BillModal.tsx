@@ -106,7 +106,7 @@ export const BillModal: React.FC<BillModalProps> = ({ isOpen, onClose, billToEdi
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
           <div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <BellRing className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <BellRing className="w-4 h-4 text-orange-600 dark:text-orange-400" />
               <span>{isEditing ? 'Edit Tagihan Rutin' : 'Tambah Tagihan Rutin'}</span>
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -131,7 +131,7 @@ export const BillModal: React.FC<BillModalProps> = ({ isOpen, onClose, billToEdi
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="Contoh: WiFi IndiHome, Listrik PLN, Air PDAM"
-              className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+              className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
             />
           </div>
 
@@ -150,7 +150,7 @@ export const BillModal: React.FC<BillModalProps> = ({ isOpen, onClose, billToEdi
                   value={amountStr ? new Intl.NumberFormat('id-ID').format(Number(amountStr)) : ''}
                   onChange={e => setAmountStr(e.target.value.replace(/[^0-9]/g, ''))}
                   placeholder="0"
-                  className="w-full pl-9 pr-3 py-2.5 text-sm font-bold tabular-nums rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                  className="w-full pl-9 pr-3 py-2.5 text-sm font-bold tabular-nums rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 />
               </div>
             </div>
@@ -163,7 +163,7 @@ export const BillModal: React.FC<BillModalProps> = ({ isOpen, onClose, billToEdi
                 <select
                   value={dueDay}
                   onChange={e => setDueDay(Number(e.target.value))}
-                  className="w-full pl-9 pr-3 py-2.5 text-sm font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                  className="w-full pl-9 pr-3 py-2.5 text-sm font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 >
                   {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
                     <option key={day} value={day}>
@@ -182,7 +182,7 @@ export const BillModal: React.FC<BillModalProps> = ({ isOpen, onClose, billToEdi
             <select
               value={categoryId}
               onChange={e => setCategoryId(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+              className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
             >
               {expenseCategories.map(c => (
                 <option key={c.id} value={c.id}>
@@ -195,14 +195,14 @@ export const BillModal: React.FC<BillModalProps> = ({ isOpen, onClose, billToEdi
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
               <span className="flex items-center gap-1.5">
-                <Wallet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <Wallet className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
                 <span>Sumber Dana Default (Opsional)</span>
               </span>
             </label>
             <select
               value={accountId}
               onChange={e => setAccountId(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+              className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
             >
               <option value="">Pilih saat bayar</option>
               {accounts.map(a => (
@@ -222,7 +222,7 @@ export const BillModal: React.FC<BillModalProps> = ({ isOpen, onClose, billToEdi
               value={notes}
               onChange={e => setNotes(e.target.value)}
               placeholder="Contoh: No. pelanggan, ID meter"
-              className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+              className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
             />
           </div>
 
@@ -243,7 +243,7 @@ export const BillModal: React.FC<BillModalProps> = ({ isOpen, onClose, billToEdi
             </button>
             <button
               type="submit"
-              className="py-2.5 px-5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition"
+              className="py-2.5 px-5 rounded-xl text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white shadow-xs transition"
             >
               {isEditing ? 'Simpan Perubahan' : 'Simpan Tagihan'}
             </button>

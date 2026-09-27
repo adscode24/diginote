@@ -71,6 +71,36 @@ export async function pushVaultDoc(uid: string, vault: VaultDoc): Promise<void> 
   await setDoc(doc(db, 'vaults', uid), vault);
 }
 
+export interface VaultMeta {
+  updatedAt: number;
+  updatedBy: string;
+}
+
+/** Metadata ringan untuk deteksi perubahan (snapshot murah, tanpa download isi vault). */
+export async function getVaultMeta(uid: string): Promise<VaultMeta | null> {
+  const db = requireDb();
+  const snap = await getDoc(doc(db, 'vaults_meta', uid));
+  return snap.exists() ? (snap.data() as VaultMeta) : null;
+}
+
+export async function pushVaultMeta(uid: string, meta: VaultMeta): Promise<void> {
+  const db = requireDb();
+  await setDoc(doc(db, 'vaults_meta', uid), meta);
+}
+
+export function subscribeVaultMeta(uid: string, onChange: (meta: VaultMeta | null) => void): Unsubscribe {
+  const db = requireDb();
+  return onSnapshot(
+    doc(db, 'vaults_meta', uid),
+    snap => {
+      onChange(snap.exists() ? (snap.data() as VaultMeta) : null);
+    },
+    err => {
+      console.error('Vault meta subscribe error:', err);
+    }
+  );
+}
+
 export function subscribeVaultDoc(uid: string, onChange: (vault: VaultDoc | null) => void): Unsubscribe {
   const db = requireDb();
   return onSnapshot(

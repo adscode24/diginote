@@ -20,7 +20,9 @@ sinkronisasi cloud lintas perangkat dengan enkripsi zero-knowledge (AES-GCM 256-
 
 Satu email = satu akun = satu Kode Vault Cloud. Login dengan email yang sama di
 perangkat lain (web/HP/APK) menampilkan data yang sama setelah membuka vault
-dengan frasa sandi vault.
+dengan frasa sandi vault. Sinkronisasi dilakukan manual lewat tombol
+**Sinkronkan ke Cloud** — perangkat lain menerima notifikasi ringan dan menarik
+dengan tombol **Sinkronkan Sekarang** (tidak ada proses otomatis yang membekukan UI).
 
 ## Pengembangan lokal
 
@@ -55,6 +57,9 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
     match /vaults/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+    match /vaults_meta/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
   }

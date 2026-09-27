@@ -40,6 +40,8 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose 
     syncStatus,
     lastSyncedAt,
     cloudVaultId,
+    pushToVaultNow,
+    pullFromVaultNow,
   } = useFinance();
   const { currentUser } = useAuth();
   const { vaultKey, lock, requestOpen } = useVaultKey();
@@ -255,9 +257,42 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose 
                 )}
               </div>
               <p className="text-[11px] text-slate-400 leading-relaxed">
-                Setiap perubahan otomatis tersinkron ke semua perangkat yang login dengan email yang
-                sama. Login di HP/PC lain dengan email + kata sandi ini untuk melihat data yang sama.
+                Sinkronisasi dilakukan manual: tekan <strong>Sinkronkan ke Cloud</strong> setelah
+                mengubah data. Perangkat lain akan menerima notifikasi dan bisa menariknya dengan
+                tombol <strong>Sinkronkan Sekarang</strong>.
               </p>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const ok = await pushToVaultNow();
+                    setStatusMessage(
+                      ok
+                        ? { type: 'success', text: 'Data berhasil disinkronkan ke cloud.' }
+                        : { type: 'error', text: 'Gagal sinkronisasi. Periksa koneksi / vault.' }
+                    );
+                  }}
+                  disabled={syncStatus === 'syncing'}
+                  className="py-2 px-3 text-xs font-semibold rounded-xl bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white transition"
+                >
+                  {syncStatus === 'syncing' ? 'Memproses…' : '⬆ Sinkronkan ke Cloud'}
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const ok = await pullFromVaultNow();
+                    setStatusMessage(
+                      ok
+                        ? { type: 'success', text: 'Data terbaru dari cloud berhasil diterapkan.' }
+                        : { type: 'error', text: 'Gagal menarik data. Periksa koneksi / vault.' }
+                    );
+                  }}
+                  disabled={syncStatus === 'syncing'}
+                  className="py-2 px-3 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 text-slate-700 dark:text-slate-300 transition"
+                >
+                  {syncStatus === 'syncing' ? 'Memproses…' : '⬇ Tarik dari Cloud'}
+                </button>
+              </div>
             </div>
           )}
 

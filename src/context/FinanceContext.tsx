@@ -546,70 +546,47 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
 
   const clearSyncNotice = () => setSyncNotice(null);
 
-  // Sync to localStorage
+  // Penyimpanan lokal: SATU effect debounce (anti-freeze).
+  // Alasan: foto struk base64 membuat state bermegabyte; stringify + setItem
+  // sinkron 8x tiap perubahan mengunci UI. Debounce menggabungkan burst
+  // (mis. apply pull) menjadi satu tulis. Bila quota penuh, ulangi tanpa foto
+  // agar data keuangan selalu tersimpan.
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(accounts));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [accounts]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [transactions]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(categories));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [categories]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.DEBTS, JSON.stringify(debts));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [debts]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.BILLS, JSON.stringify(bills));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [bills]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.BILL_PAYMENTS, JSON.stringify(billPayments));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [billPayments]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.REMINDERS, JSON.stringify(reminderSettings));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [reminderSettings]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.SYNC, JSON.stringify(syncSettings));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [syncSettings]);
+    const timer = setTimeout(() => {
+      const pairs: [string, unknown][] = [
+        [STORAGE_KEYS.ACCOUNTS, accounts],
+        [STORAGE_KEYS.TRANSACTIONS, transactions],
+        [STORAGE_KEYS.CATEGORIES, categories],
+        [STORAGE_KEYS.DEBTS, debts],
+        [STORAGE_KEYS.BILLS, bills],
+        [STORAGE_KEYS.BILL_PAYMENTS, billPayments],
+        [STORAGE_KEYS.REMINDERS, reminderSettings],
+        [STORAGE_KEYS.SYNC, syncSettings],
+      ];
+      try {
+        for (const [key, value] of pairs) {
+          localStorage.setItem(key, JSON.stringify(value));
+        }
+      } catch (e) {
+        console.error('localStorage penuh, simpan ulang tanpa foto:', e);
+        try {
+          const stripPhotos = (v: unknown): unknown =>
+            JSON.parse(
+              JSON.stringify(v, (k, val) =>
+                typeof val === 'string' && val.startsWith('data:') ? undefined : val
+              )
+            );
+          for (const [key, value] of pairs) {
+            localStorage.setItem(key, JSON.stringify(stripPhotos(value)));
+          }
+        } catch (e2) {
+          console.error(e2);
+        }
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accounts, transactions, categories, debts, bills, billPayments, reminderSettings, syncSettings]);
 
   // Robust Dark / Light / System Theme Management
   useEffect(() => {

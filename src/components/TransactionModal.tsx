@@ -100,8 +100,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 800;
-        const MAX_HEIGHT = 800;
+        // Kompresi agresif (640px, kualitas 0.55): struk tetap terbaca,
+        // ukuran ~5x lebih kecil agar penyimpanan & sinkronisasi tidak freeze.
+        const MAX_WIDTH = 640;
+        const MAX_HEIGHT = 640;
         let width = img.width;
         let height = img.height;
 
@@ -122,7 +124,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
 
-        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.55);
         setReceiptImage(compressedDataUrl);
       };
       img.src = event.target?.result as string;

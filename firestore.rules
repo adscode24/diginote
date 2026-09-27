@@ -1,0 +1,11 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Cloud Vault pribadi DigiNote: dokumen ID == uid pemilik.
+    // Setiap email terisolasi: hanya pemilik yang bisa baca/tulis vault-nya sendiri.
+    // Login dengan email+sandi yang sama di HP lain (uid sama) -> data sama & tersinkron.
+    match /digiVaults/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}

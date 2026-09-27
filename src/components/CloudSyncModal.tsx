@@ -2,10 +2,6 @@ import React, { useState } from 'react';
 import {
   X,
   Cloud,
-  Lock,
-  KeyRound,
-  UploadCloud,
-  DownloadCloud,
   CheckCircle2,
   Copy,
   Check,
@@ -14,13 +10,13 @@ import {
   FileUp,
   AlertCircle,
   RefreshCw,
+  UploadCloud,
+  DownloadCloud,
+  KeyRound,
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { useAuth } from '../context/AuthContext';
-import { useVaultKey } from '../context/VaultKeyContext';
-import { isCloudEnabled } from '../services/firebase';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
-import { formatDateIndo } from '../utils/formatters';
 
 interface CloudSyncModalProps {
   isOpen: boolean;
@@ -29,78 +25,72 @@ interface CloudSyncModalProps {
 
 export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose }) => {
   const {
-    syncSettings,
-    updateSyncSettings,
-    syncToCloud,
-    pullFromCloud,
-    exportBackupFile,
-    importBackupFile,
-    isSyncing,
-    syncError,
+    cloudVaultId,
     syncStatus,
     lastSyncedAt,
-    cloudVaultId,
     pushToVaultNow,
     pullFromVaultNow,
+    exportBackupFile,
+    importBackupFile,
   } = useFinance();
   const { currentUser } = useAuth();
-  const { vaultKey, lock, requestOpen } = useVaultKey();
-  const cloudMode = isCloudEnabled();
 
-  const [passphrase, setPassphrase] = useState('');
-  const [targetVaultId, setTargetVaultId] = useState(syncSettings.vaultId);
+  const [backupPassphrase, setBackupPassphrase] = useState('');
   const [copied, setCopied] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   useBodyScrollLock(isOpen);
 
   if (!isOpen) return null;
 
   const handleCopyVaultId = () => {
-    navigator.clipboard.writeText(cloudMode && cloudVaultId ? cloudVaultId : syncSettings.vaultId);
+    if (!cloudVaultId) return;
+    navigator.clipboard.writeText(cloudVaultId);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handlePush = async () => {
-    if (!passphrase.trim()) {
-      setStatusMessage({ type: 'error', text: 'Masukkan kata sandi enkripsi rahasia Anda terlebih dahulu.' });
-      return;
-    }
+    setBusy(true);
+    setStatusMessage(null);
     try {
-      await syncToCloud(passphrase);
-      setStatusMessage({ type: 'success', text: 'Data berhasil dienkripsi dan diunggah ke Cloud!' });
+      const ok = await pushToVaultNow();
+      setStatusMessage(
+        ok
+          ? { type: 'success', text: 'Data berhasil disinkronkan ke cloud!' }
+          : { type: 'error', text: 'Sinkronisasi tidak dapat dilakukan saat ini.' }
+      );
     } catch (err: unknown) {
       setStatusMessage({ type: 'error', text: err instanceof Error ? err.message : 'Gagal sinkronisasi' });
+    } finally {
+      setBusy(false);
     }
   };
 
   const handlePull = async () => {
-    if (!targetVaultId.trim()) {
-      setStatusMessage({ type: 'error', text: 'Masukkan Kode Vault yang ingin dihubungkan.' });
-      return;
-    }
-    if (!passphrase.trim()) {
-      setStatusMessage({ type: 'error', text: 'Masukkan kata sandi enkripsi untuk membuka data.' });
-      return;
-    }
-
+    setBusy(true);
+    setStatusMessage(null);
     try {
-      await pullFromCloud(targetVaultId.trim(), passphrase);
-      setStatusMessage({ type: 'success', text: 'Data berhasil ditarik dari Cloud dan didekripsi dengan aman!' });
+      const ok = await pullFromVaultNow();
+      setStatusMessage(
+        ok
+          ? { type: 'success', text: 'Data terbaru dari cloud berhasil diterapkan!' }
+          : { type: 'error', text: 'Tidak ada data baru atau penarikan gagal.' }
+      );
     } catch (err: unknown) {
       setStatusMessage({ type: 'error', text: err instanceof Error ? err.message : 'Gagal mengambil data' });
+    } finally {
+      setBusy(false);
     }
   };
 
-  const effectiveBackupPassphrase = passphrase.trim() || (cloudMode ? vaultKey || '' : '');
-
   const handleExportFile = async () => {
-    if (!effectiveBackupPassphrase) {
-      setStatusMessage({ type: 'error', text: 'Masukkan kata sandi enkripsi sebelum mengekspor backup.' });
+    if (!backupPassphrase.trim()) {
+      setStatusMessage({ type: 'error', text: 'Masukkan kata sandi untuk mengenkripsi file cadangan.' });
       return;
     }
     try {
-      await exportBackupFile(effectiveBackupPassphrase);
+      await exportBackupFile(backupPassphrase);
       setStatusMessage({ type: 'success', text: 'File cadangan terenkripsi (.enc.json) berhasil diunduh.' });
     } catch (err: unknown) {
       setStatusMessage({ type: 'error', text: err instanceof Error ? err.message : 'Gagal mengekspor file' });
@@ -110,17 +100,28 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!effectiveBackupPassphrase) {
-      setStatusMessage({ type: 'error', text: 'Masukkan kata sandi enkripsi file sebelum membuka file.' });
+    if (!backupPassphrase.trim()) {
+      setStatusMessage({ type: 'error', text: 'Masukkan kata sandi file cadangan untuk membukanya.' });
       return;
     }
     try {
-      await importBackupFile(file, effectiveBackupPassphrase);
-      setStatusMessage({ type: 'success', text: 'Data cadangan terenkripsi berhasil dipulihkan!' });
+      await importBackupFile(file, backupPassphrase);
+      setStatusMessage({ type: 'success', text: 'Data cadangan berhasil dipulihkan!' });
     } catch (err: unknown) {
       setStatusMessage({ type: 'error', text: err instanceof Error ? err.message : 'Gagal mendekripsi file' });
     }
   };
+
+  const statusLabel =
+    syncStatus === 'synced'
+      ? 'Tersinkron'
+      : syncStatus === 'syncing'
+      ? 'Menyinkronkan…'
+      : syncStatus === 'connecting'
+      ? 'Menghubungkan…'
+      : syncStatus === 'offline'
+      ? 'Lokal / Offline'
+      : 'Gagal sinkron';
 
   return (
     <div
@@ -142,10 +143,10 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose 
             </div>
             <div>
               <h3 className="text-base font-semibold text-slate-900 dark:text-white">
-                Sinkronisasi Cloud & Keamanan Enkripsi
+                Sinkronisasi Cloud
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Akses catatan keuangan Anda di berbagai perangkat (Android, PC, Tablet)
+                Satu akun berlaku di web, web-mobile, dan Android
               </p>
             </div>
           </div>
@@ -162,252 +163,96 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose 
           <div className="p-3.5 rounded-xl bg-orange-50 dark:bg-orange-950/40 border border-orange-200/80 dark:border-orange-800 flex items-start gap-2.5 text-xs text-orange-900 dark:text-orange-300">
             <ShieldCheck className="w-5 h-5 text-orange-600 dark:text-orange-400 shrink-0 mt-0.5" />
             <div>
-              <span className="font-semibold block">Privasi Tingkat Militer (AES-GCM 256-bit):</span>
-              Data keuangan Anda dienkripsi secara lokal di perangkat Anda sebelum dikirim ke Cloud.
-              Hanya orang yang memiliki kata sandi ini yang dapat membaca datanya.
+              <span className="font-semibold block">Vault pribadi per akun:</span>
+              Hanya akun yang login (email + kata sandi) yang bisa membaca dan menulis
+              vault-nya sendiri. Login dengan email yang sama di perangkat lain membuka
+              data yang sama.
             </div>
           </div>
 
-          {/* Panel Akun Cloud (mode online): sinkronisasi otomatis antar perangkat */}
-          {cloudMode && (
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-500 dark:text-slate-400">Akun cloud:</span>
-                <span className="font-bold text-slate-900 dark:text-white truncate max-w-[220px]">
-                  {currentUser?.email || currentUser?.name || '-'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-500 dark:text-slate-400">Kode Vault Cloud:</span>
-                <span className="font-mono font-bold text-slate-900 dark:text-white tabular-nums">
-                  {cloudVaultId || '…'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-500 dark:text-slate-400">Status sinkronisasi:</span>
-                <span
-                  className={`font-bold flex items-center gap-1.5 ${
-                    syncStatus === 'synced'
-                      ? 'text-orange-600 dark:text-orange-400'
-                      : syncStatus === 'syncing'
-                      ? 'text-blue-600 dark:text-blue-400'
-                      : syncStatus === 'locked'
-                      ? 'text-amber-600 dark:text-amber-400'
-                      : 'text-red-600 dark:text-red-400'
-                  }`}
-                >
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      syncStatus === 'synced'
-                        ? 'bg-orange-500'
-                        : syncStatus === 'syncing'
-                        ? 'bg-blue-500 animate-pulse'
-                        : syncStatus === 'locked'
-                        ? 'bg-amber-500'
-                        : 'bg-red-500'
-                    }`}
-                  />
-                  <span>
-                    {syncStatus === 'synced'
-                      ? 'Tersinkron'
-                      : syncStatus === 'syncing'
-                      ? 'Menyinkronkan…'
-                      : syncStatus === 'locked'
-                      ? 'Vault terkunci'
-                      : syncStatus === 'offline'
-                      ? 'Mode lokal'
-                      : 'Gagal sinkron'}
-                  </span>
-                </span>
-              </div>
-              {lastSyncedAt && (
-                <div className="text-[11px] text-slate-400">
-                  Terakhir sinkron:{' '}
-                  {new Date(lastSyncedAt).toLocaleString('id-ID', {
-                    day: 'numeric',
-                    month: 'short',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </div>
-              )}
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[11px] text-slate-400">
-                  {vaultKey ? 'Vault terbuka di perangkat ini' : 'Vault terkunci di perangkat ini'}
-                </span>
-                {vaultKey && currentUser ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      lock(currentUser.id);
-                      setStatusMessage({ type: 'success', text: 'Vault dikunci di perangkat ini.' });
-                    }}
-                    className="text-[11px] font-semibold text-red-600 dark:text-red-400 hover:underline"
-                  >
-                    Kunci Vault
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={requestOpen}
-                    className="text-[11px] font-semibold text-orange-600 dark:text-orange-400 hover:underline"
-                  >
-                    {cloudVaultId ? 'Buka Vault' : 'Aktifkan Sinkronisasi'}
-                  </button>
-                )}
-              </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                Sinkronisasi dilakukan manual: tekan <strong>Sinkronkan ke Cloud</strong> setelah
-                mengubah data. Perangkat lain akan menerima notifikasi dan bisa menariknya dengan
-                tombol <strong>Sinkronkan Sekarang</strong>.
-              </p>
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const ok = await pushToVaultNow();
-                    setStatusMessage(
-                      ok
-                        ? { type: 'success', text: 'Data berhasil disinkronkan ke cloud.' }
-                        : { type: 'error', text: 'Gagal sinkronisasi. Periksa koneksi / vault.' }
-                    );
-                  }}
-                  disabled={syncStatus === 'syncing'}
-                  className="py-2 px-3 text-xs font-semibold rounded-xl bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white transition"
-                >
-                  {syncStatus === 'syncing' ? 'Memproses…' : '⬆ Sinkronkan ke Cloud'}
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const ok = await pullFromVaultNow();
-                    setStatusMessage(
-                      ok
-                        ? { type: 'success', text: 'Data terbaru dari cloud berhasil diterapkan.' }
-                        : { type: 'error', text: 'Gagal menarik data. Periksa koneksi / vault.' }
-                    );
-                  }}
-                  disabled={syncStatus === 'syncing'}
-                  className="py-2 px-3 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 text-slate-700 dark:text-slate-300 transition"
-                >
-                  {syncStatus === 'syncing' ? 'Memproses…' : '⬇ Tarik dari Cloud'}
-                </button>
-              </div>
+          {/* Account + Vault Code */}
+          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-slate-500 dark:text-slate-400">Akun:</span>
+              <span className="font-bold text-slate-900 dark:text-white truncate max-w-[240px]">
+                {currentUser?.email || currentUser?.name || '-'}
+              </span>
             </div>
-          )}
-
-          {/* Vault ID Box (hanya mode lokal) */}
-          {!cloudMode && (
             <div>
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-                Kode Vault Perangkat Anda
+              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+                Kode Vault Cloud (sama di semua perangkat = data sama)
               </label>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 px-3.5 py-2 text-sm font-mono font-bold tracking-wider rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white tabular-nums">
-                {syncSettings.vaultId}
+              <div className="flex items-center gap-2">
+                <div className="flex-1 px-3.5 py-2 text-sm font-mono font-bold tracking-wider rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white tabular-nums">
+                  {cloudVaultId || '…'}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyVaultId}
+                  disabled={!cloudVaultId}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition disabled:opacity-50"
+                >
+                  {copied ? <Check className="w-4 h-4 text-orange-600" /> : <Copy className="w-4 h-4" />}
+                  <span>{copied ? 'Tersalin' : 'Salin'}</span>
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={handleCopyVaultId}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition"
-              >
-                {copied ? <Check className="w-4 h-4 text-orange-600" /> : <Copy className="w-4 h-4" />}
-                <span>{copied ? 'Tersalin' : 'Salin'}</span>
-              </button>
             </div>
-            <p className="text-[11px] text-slate-400 mt-1">
-              Gunakan kode ini di HP Android atau perangkat lain untuk menghubungkan akun.
-            </p>
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-slate-500 dark:text-slate-400">Status:</span>
+              <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <RefreshCw className={`w-3.5 h-3.5 ${syncStatus === 'syncing' ? 'animate-spin text-blue-500' : 'text-orange-500'}`} />
+                <span>{statusLabel}</span>
+              </span>
             </div>
-          )}
+            {lastSyncedAt && (
+              <div className="text-[11px] text-slate-400">
+                Terakhir sinkron:{' '}
+                {new Date(lastSyncedAt).toLocaleString('id-ID', {
+                  day: 'numeric',
+                  month: 'short',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </div>
+            )}
+          </div>
 
-          {/* Secret Passphrase Input (hanya mode lokal) */}
-          {!cloudMode && (
-          <div>
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5 flex items-center justify-between">
-              <span>Kata Sandi Enkripsi Rahasia *</span>
-              <span className="text-[11px] text-slate-400">Wajib diingat untuk buka data</span>
-            </label>
+          {/* Sync Action Buttons */}
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={handlePush}
+              disabled={busy}
+              className="py-2.5 px-4 rounded-xl text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white shadow-xs transition flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <UploadCloud className="w-4 h-4" />
+              <span>{busy ? 'Memproses…' : 'Sinkronkan ke Cloud'}</span>
+            </button>
+            <button
+              onClick={handlePull}
+              disabled={busy}
+              className="py-2.5 px-4 rounded-xl text-xs font-semibold border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 transition flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <DownloadCloud className="w-4 h-4" />
+              <span>{busy ? 'Memproses…' : 'Tarik dari Cloud'}</span>
+            </button>
+          </div>
+
+          {/* Offline File Backup & Restore (terenkripsi kata sandi) */}
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
+            <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+              Cadangan berkas terenkripsi (.enc.json):
+            </span>
             <div className="relative">
               <KeyRound className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="password"
-                placeholder="Masukkan kata sandi privasi Anda"
-                value={passphrase}
-                onChange={e => setPassphrase(e.target.value)}
+                placeholder="Kata sandi file cadangan"
+                value={backupPassphrase}
+                onChange={e => setBackupPassphrase(e.target.value)}
                 className="w-full pl-9 pr-3.5 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
               />
             </div>
-          </div>
-          )}
-
-          {/* Sync Action Buttons (hanya mode lokal; mode cloud otomatis) */}
-          {!cloudMode && (
-            <div className="grid grid-cols-2 gap-3 pt-1">
-              <button
-                onClick={handlePush}
-                disabled={isSyncing}
-                className="py-2.5 px-4 rounded-xl text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white shadow-xs transition flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                <UploadCloud className="w-4 h-4" />
-                <span>{isSyncing ? 'Mengunggah...' : 'Unggah ke Cloud'}</span>
-              </button>
-
-              <button
-                onClick={handlePull}
-                disabled={isSyncing}
-                className="py-2.5 px-4 rounded-xl text-xs font-semibold border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 transition flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                <DownloadCloud className="w-4 h-4" />
-                <span>{isSyncing ? 'Mengunduh...' : 'Tarik dari Cloud'}</span>
-              </button>
-            </div>
-          )}
-
-          {!cloudMode && syncSettings.lastSyncedAt && (
-            <div className="text-[11px] text-slate-400 text-center">
-              Terakhir disinkronkan:{' '}
-              <strong>{formatDateIndo(new Date(syncSettings.lastSyncedAt).toISOString().split('T')[0])}</strong>{' '}
-              pukul{' '}
-              {new Date(syncSettings.lastSyncedAt).toLocaleTimeString('id-ID', {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </div>
-          )}
-
-          {/* Connect Another Device Vault (hanya mode lokal) */}
-          {!cloudMode && (
-            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
-              <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                Hubungkan ke Vault Perangkat Lain:
-              </span>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Contoh: DN-8492-1092"
-                value={targetVaultId}
-                onChange={e => setTargetVaultId(e.target.value.toUpperCase())}
-                className="flex-1 px-3 py-1.5 text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  updateSyncSettings({ vaultId: targetVaultId.trim() });
-                  setStatusMessage({ type: 'success', text: `Vault ID diubah ke ${targetVaultId.trim()}` });
-                }}
-                className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 transition"
-              >
-                Ganti Vault
-              </button>
-            </div>
-            </div>
-          )}
-
-          {/* Offline File Backup & Restore */}
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-            <span className="text-slate-500 dark:text-slate-400">Cadangan Berkas (.enc.json):</span>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 text-xs">
               <button
                 type="button"
                 onClick={handleExportFile}
@@ -416,7 +261,6 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose 
                 <FileDown className="w-3.5 h-3.5 text-orange-600" />
                 <span>Simpan File</span>
               </button>
-
               <label className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-[11px] font-medium text-slate-700 dark:text-slate-300 transition cursor-pointer">
                 <FileUp className="w-3.5 h-3.5 text-blue-600" />
                 <span>Buka File</span>

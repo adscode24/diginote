@@ -8,15 +8,12 @@ import {
 } from 'firebase/auth';
 import { hashPassphrase } from '../services/crypto';
 import { isCloudEnabled, getFirebaseAuth } from '../services/firebase';
-import { ensureUserProfile } from '../services/onlineSync';
-import { generateVaultId } from '../services/crypto';
 
 export interface AppUser {
   id: string;
   name: string; // email pada mode online, nama pada mode offline
   email?: string;
   passwordHash?: string; // hanya mode offline
-  vaultId?: string; // kode vault cloud (mode online)
   createdAt: number;
 }
 
@@ -32,6 +29,29 @@ interface AuthContextType {
 
 const USERS_KEY = 'diginote_users_v2';
 const SESSION_KEY = 'diginote_session_v2';
+const ACTIVE_EMAIL_KEY = 'diginote_active_email';
+
+export function getActiveEmail(): string | null {
+  try {
+    return sessionStorage.getItem(ACTIVE_EMAIL_KEY) || localStorage.getItem(ACTIVE_EMAIL_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setActiveEmail(email: string | null) {
+  try {
+    if (email) {
+      sessionStorage.setItem(ACTIVE_EMAIL_KEY, email);
+      localStorage.setItem(ACTIVE_EMAIL_KEY, email);
+    } else {
+      sessionStorage.removeItem(ACTIVE_EMAIL_KEY);
+      localStorage.removeItem(ACTIVE_EMAIL_KEY);
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -84,28 +104,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setAuthReady(true);
       return;
     }
-    const unsub = onAuthStateChanged(auth, async fb => {
+    const unsub = onAuthStateChanged(auth, fb => {
       setFbUser(fb);
       if (fb) {
-        try {
-          const { getUserProfile } = await import('../services/onlineSync');
-          const profile = await getUserProfile(fb.uid);
-          setFbProfile({
-            id: fb.uid,
-            name: fb.email || 'Pengguna',
-            email: fb.email || undefined,
-            vaultId: profile?.vaultId,
-            createdAt: profile ? profile.createdAt : Date.now(),
-          });
-        } catch (e) {
-          console.error(e);
-          setFbProfile({
-            id: fb.uid,
-            name: fb.email || 'Pengguna',
-            email: fb.email || undefined,
-            createdAt: Date.now(),
-          });
-        }
+        if (fb.email) setActiveEmail(fb.email);
+        setFbProfile({
+          id: fb.uid,
+          name: fb.displayName || fb.email || 'Pengguna',
+          email: fb.email || undefined,
+          createdAt: Date.now(),
+        });
       } else {
         setFbProfile(null);
       }
@@ -136,14 +144,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             throw new Error(translateFirebaseError(err.code));
           }
         );
-        // Buatkan profil + kode vault cloud sendiri untuk akun ini
-        const profile = await ensureUserProfile(cred.user.uid, email, generateVaultId());
+        // Kode vault cloud dibuat otomatis saat vault digiVaults pertama dibuat
+        // (ensureUserVault) — sama untuk semua perangkat yang login email ini.
+        setActiveEmail(email);
         const user: AppUser = {
           id: cred.user.uid,
           name: email,
           email,
-          vaultId: profile.vaultId,
-          createdAt: profile.createdAt,
+          createdAt: Date.now(),
         };
         setFbProfile(user);
         return user;
@@ -188,6 +196,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             throw new Error(translateFirebaseError(err.code));
           }
         );
+        setActiveEmail(email);
         // Profil dimuat oleh listener onAuthStateChanged
         return;
       }
@@ -211,6 +220,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 
   const logout = useCallback(() => {
+    setActiveEmail(null);
     if (online) {
       const auth = getFirebaseAuth();
       if (auth) signOut(auth).catch(e => console.error(e));

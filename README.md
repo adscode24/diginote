@@ -2,7 +2,7 @@
 
 Aplikasi pencatatan keuangan modern: transaksi, sumber dana, hutang/piutang (termasuk
 amortisasi KPR cicilan berjangka), tagihan rutin, kalender, laporan PDF/Excel, dan
-sinkronisasi cloud lintas perangkat dengan enkripsi zero-knowledge (AES-GCM 256-bit).
+sinkronisasi cloud lintas perangkat (vault terstruktur per akun, realtime).
 
 ## Teknologi
 
@@ -15,14 +15,15 @@ sinkronisasi cloud lintas perangkat dengan enkripsi zero-knowledge (AES-GCM 256-
 
 | Mode     | Syarat                                              | Data                          |
 | -------- | --------------------------------------------------- | ----------------------------- |
-| Cloud    | 4 env `VITE_FIREBASE_*` terisi                      | Akun email, vault terenkripsi per akun, realtime antar perangkat |
-| Lokal    | Tanpa env Firebase                                  | Akun lokal per perangkat, tanpa sinkron |
+| Cloud    | Firebase aktif (config sudah di repo)               | Akun email, vault terstruktur per akun, realtime antar perangkat |
+| Lokal    | Akun offline (nama, tanpa email)                    | Data per perangkat, tanpa sinkron |
 
-Satu email = satu akun = satu Kode Vault Cloud. Login dengan email yang sama di
-perangkat lain (web/HP/APK) menampilkan data yang sama setelah membuka vault
-dengan frasa sandi vault. Sinkronisasi dilakukan manual lewat tombol
-**Sinkronkan ke Cloud** — perangkat lain menerima notifikasi ringan dan menarik
-dengan tombol **Sinkronkan Sekarang** (tidak ada proses otomatis yang membekukan UI).
+Satu email = satu akun = satu Kode Vault Cloud (`digiVaults/{uid}`). Login dengan
+email yang sama di perangkat lain (web/HP/APK) menampilkan data yang sama —
+tanpa daftar ulang, tanpa frasa sandi. Setiap edit tersinkron otomatis
+(debounced) + realtime antar perangkat terbuka. Tombol manual tetap ada:
+**Sinkronkan ke Cloud** (Beranda/Pengaturan) dan **Tarik dari Cloud**.
+Lihat `FIRESTORE_SETUP.md` untuk aktivasi Firebase.
 
 ## Pengembangan lokal
 
@@ -35,36 +36,13 @@ npm run build    # build produksi web (dist/)
 
 Mode cloud lokal: salin `.env.example` ke `.env` dan isi kunci Firebase.
 
-## Konfigurasi Firebase (wajib untuk sinkron cloud)
+## Konfigurasi Firebase (satu kali, lihat FIRESTORE_SETUP.md)
 
-1. Firebase Console → project baru → **Authentication** → aktifkan **Email/Password**.
+1. Firebase Console → project → **Authentication** → aktifkan **Email/Password**.
 2. **Firestore Database** → Create database (production mode).
-3. **Rules** → tempel aturan per-pengguna (lihat bawah) → Publish.
-4. **Project Settings → Your apps (Web)** → salin config.
-5. **Vercel** (web): Project → Settings → Environment Variables:
-   `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`,
-   `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID` → Redeploy.
-6. **GitHub** (APK): repo → Settings → Secrets and variables → Actions →
-   tambah 4 secret `VITE_FIREBASE_*` yang **sama** → jalankan ulang workflow rilis.
-
-### Aturan Firestore
-
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
-    }
-    match /vaults/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
-    }
-    match /vaults_meta/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
-    }
-  }
-}
-```
+3. **Rules** → tempel isi `firestore.rules` → Publish.
+4. Config klien (`firebase-applet-config.json`) sudah di repo — tidak perlu env manual.
+   Web (Vercel) dan APK langsung mode Cloud setelah deploy.
 
 ## Rilis Android
 
@@ -79,8 +57,8 @@ service cloud.firestore {
 ## Struktur penting
 
 - `src/context/AuthContext.tsx` — login/daftar lokal + Firebase
-- `src/context/VaultKeyContext.tsx` — frasa sandi vault (memori + session)
-- `src/context/FinanceContext.tsx` — state + mesin auto-sync cloud
-- `src/services/onlineSync.ts` — profil & vault Firestore
-- `src/services/crypto.ts` — enkripsi AES-GCM + PBKDF2
+- `src/context/FinanceContext.tsx` — state + mesin sinkronisasi vault cloud
+- `src/services/cloudSync.ts` — vault Firestore `digiVaults/{uid}` (pola Fuel-Traxr)
+- `src/services/firebase.ts` — init Firebase + persistence WebView
+- `src/services/crypto.ts` — enkripsi AES-GCM + PBKDF2 (cadangan berkas)
 - `scripts/` — generator ikon, resources Capacitor, injeksi signing rilis

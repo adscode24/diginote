@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   LayoutDashboard,
   Receipt,
@@ -12,7 +12,6 @@ import {
 } from 'lucide-react';
 import { FinanceProvider } from './context/FinanceContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { VaultKeyProvider, useVaultKey } from './context/VaultKeyContext';
 import { isCloudEnabled } from './services/firebase';
 import { ActiveTab } from './types';
 import { DashboardView } from './components/DashboardView';
@@ -22,12 +21,10 @@ import { DebtsView } from './components/DebtsView';
 import { SummaryView } from './components/SummaryView';
 import { SettingsView } from './components/SettingsView';
 import { AuthView } from './components/AuthView';
-import { VaultUnlockModal } from './components/VaultUnlockModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 function MainApp() {
   const { currentUser, logout } = useAuth();
-  const { lock } = useVaultKey();
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
 
   const navItems: { id: ActiveTab; label: string; shortLabel: string; icon: React.FC<{ className?: string }> }[] = [
@@ -41,7 +38,6 @@ function MainApp() {
 
   const handleLogout = () => {
     if (confirm(`Keluar dari akun "${currentUser?.name}"?`)) {
-      if (currentUser) lock(currentUser.id);
       logout();
       setActiveTab('dashboard');
     }
@@ -166,13 +162,7 @@ function MainApp() {
 }
 
 function GatedApp() {
-  const { currentUser, mode, authReady } = useAuth();
-  const { restore } = useVaultKey();
-
-  // Pulihkan kunci vault tersimpan agar tidak ditanya ulang tiap refresh
-  useEffect(() => {
-    if (currentUser) restore(currentUser.id);
-  }, [currentUser, restore]);
+  const { currentUser, authReady } = useAuth();
 
   // Tunggu status sesi Firebase pulih agar pengguna login tidak melihat kedip login
   if (!authReady) {
@@ -198,7 +188,6 @@ function GatedApp() {
   return (
     <FinanceProvider userId={currentUser.id}>
       <MainApp />
-      {mode === 'online' && <VaultUnlockModal uid={currentUser.id} email={currentUser.email} />}
     </FinanceProvider>
   );
 }
@@ -207,9 +196,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <VaultKeyProvider>
-          <GatedApp />
-        </VaultKeyProvider>
+        <GatedApp />
       </AuthProvider>
     </ErrorBoundary>
   );

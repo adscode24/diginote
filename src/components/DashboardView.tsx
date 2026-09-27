@@ -186,10 +186,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
               className={`w-2 h-2 rounded-full ${
                 syncStatus === 'synced'
                   ? 'bg-orange-500'
-                  : syncStatus === 'syncing'
+                  : syncStatus === 'syncing' || syncStatus === 'connecting'
                   ? 'bg-blue-500 animate-pulse'
-                  : syncStatus === 'locked'
-                  ? 'bg-amber-500'
                   : 'bg-red-500'
               }`}
             />
@@ -198,14 +196,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                 ? 'Cloud tersinkron'
                 : syncStatus === 'syncing'
                 ? 'Menyinkronkan…'
-                : syncStatus === 'locked'
-                ? 'Vault terkunci'
+                : syncStatus === 'connecting'
+                ? 'Menghubungkan…'
                 : 'Sinkronisasi gagal'}
             </span>
           </div>
           <button
             onClick={() => void pushToVaultNow()}
-            disabled={syncStatus === 'syncing' || syncStatus === 'locked'}
+            disabled={syncStatus === 'syncing' || syncStatus === 'connecting'}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded-lg bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white transition"
             title="Kirim data perangkat ini ke cloud"
           >

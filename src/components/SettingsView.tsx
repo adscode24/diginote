@@ -24,7 +24,7 @@ export const SettingsView: React.FC = () => {
     setThemeMode,
     reminderSettings,
     updateReminderSettings,
-    syncSettings,
+    cloudVaultId,
     resetToDefaultData,
     clearAllData,
   } = useFinance();
@@ -215,10 +215,10 @@ export const SettingsView: React.FC = () => {
           <div>
             <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Cloud className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-              <span>Sinkronisasi Cloud & Enkripsi Data</span>
+              <span>Sinkronisasi Cloud Antar Perangkat</span>
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Enkripsi AES-GCM 256-bit menjamin data keuangan Anda sepenuhnya privat antar perangkat
+              Satu akun berlaku di semua perangkat — data tersinkron otomatis via vault pribadi Anda
             </p>
           </div>
 
@@ -234,12 +234,12 @@ export const SettingsView: React.FC = () => {
           <div>
             <span className="text-slate-500 dark:text-slate-400">Kode Vault Cloud:</span>{' '}
             <strong className="font-mono text-slate-900 dark:text-white tabular-nums">
-              {syncSettings.vaultId}
+              {cloudVaultId || '-'}
             </strong>
           </div>
           <div className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400 font-semibold text-[11px]">
             <Shield className="w-3.5 h-3.5" />
-            <span>Terenkripsi Lokal</span>
+            <span>Vault Pribadi</span>
           </div>
         </div>
       </div>

@@ -1,6 +1,11 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
-import { getFirestore, type Firestore } from 'firebase/firestore';
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  type Firestore,
+} from 'firebase/firestore';
 
 interface FirebaseConfig {
   apiKey: string;
@@ -49,6 +54,12 @@ export function getFirebaseAuth(): Auth | null {
 export function getFirebaseDb(): Firestore | null {
   const a = ensureApp();
   if (!a) return null;
-  if (!db) db = getFirestore(a);
+  if (!db) {
+    // Cache offline persisten: aplikasi tetap bisa dibaca/ditulis tanpa internet,
+    // sinkron saat koneksi kembali (penting untuk HP/APK).
+    db = initializeFirestore(a, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    });
+  }
   return db;
 }

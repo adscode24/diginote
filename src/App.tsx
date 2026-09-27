@@ -23,6 +23,7 @@ import { SummaryView } from './components/SummaryView';
 import { SettingsView } from './components/SettingsView';
 import { AuthView } from './components/AuthView';
 import { VaultUnlockModal } from './components/VaultUnlockModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 function MainApp() {
   const { currentUser, logout } = useAuth();
@@ -165,7 +166,22 @@ function MainApp() {
 }
 
 function GatedApp() {
-  const { currentUser, mode } = useAuth();
+  const { currentUser, mode, authReady } = useAuth();
+
+  // Tunggu status sesi Firebase pulih agar pengguna login tidak melihat kedip login
+  if (!authReady) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <img src="/icon.svg" alt="Logo DigiNote" className="w-20 h-20 rounded-3xl shadow-lg mx-auto" />
+          <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
+            <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+            <span>Memuat DigiNote…</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Belum login -> halaman login/pendaftaran
   if (!currentUser) {
@@ -183,10 +199,12 @@ function GatedApp() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <VaultKeyProvider>
-        <GatedApp />
-      </VaultKeyProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <VaultKeyProvider>
+          <GatedApp />
+        </VaultKeyProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

@@ -6,7 +6,6 @@ import {
   CreditCard,
   CalendarDays,
   Settings,
-  LogOut,
   Cloud,
   CloudOff,
 } from 'lucide-react';
@@ -24,9 +23,12 @@ import { AuthView } from './components/AuthView';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { forceUnlockBodyScroll } from './hooks/useBodyScrollLock';
 
+import { ProfileView } from './components/ProfileView';
+
 function MainApp() {
-  const { currentUser, logout } = useAuth();
+  const { currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const profileInitial = ((currentUser?.name || 'D').trim()[0] || 'D').toUpperCase();
 
   // Penyembuhan otomatis: tidak ada modal yang bisa terbuka saat pindah halaman,
   // jadi paksa buka kunci scroll di sini agar halaman tak pernah macet.
@@ -42,13 +44,6 @@ function MainApp() {
     { id: 'summary', label: 'Summary', shortLabel: 'Summary', icon: CalendarDays },
     { id: 'settings', label: 'Pengaturan', shortLabel: 'Setelan', icon: Settings },
   ];
-
-  const handleLogout = () => {
-    if (confirm(`Keluar dari akun "${currentUser?.name}"?`)) {
-      logout();
-      setActiveTab('dashboard');
-    }
-  };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col antialiased selection:bg-orange-500/20 selection:text-orange-600">
@@ -101,14 +96,18 @@ function MainApp() {
               <span>Summary</span>
             </button>
 
-            {/* Logout */}
+            {/* Foto Profil -> Halaman Profile */}
             <button
-              onClick={handleLogout}
-              className="flex items-center justify-center w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:border-red-300 transition"
-              title="Keluar dari akun"
-              aria-label="Keluar"
+              onClick={() => setActiveTab('profile')}
+              className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-extrabold text-white transition shadow-xs ${
+                activeTab === 'profile'
+                  ? 'bg-gradient-to-tr from-orange-700 to-amber-600 ring-2 ring-orange-500/40'
+                  : 'bg-gradient-to-tr from-orange-600 to-amber-500 hover:ring-2 hover:ring-orange-500/30'
+              }`}
+              title={currentUser?.name || 'Profil'}
+              aria-label="Profil pengguna"
             >
-              <LogOut className="w-4 h-4" />
+              {profileInitial}
             </button>
           </div>
         </div>
@@ -122,6 +121,7 @@ function MainApp() {
         {activeTab === 'debts' && <DebtsView />}
         {activeTab === 'summary' && <SummaryView />}
         {activeTab === 'settings' && <SettingsView />}
+        {activeTab === 'profile' && <ProfileView onBack={() => setActiveTab('dashboard')} />}
       </main>
 
       {/* Bottom Navigation Bar for BOTH Desktop and Mobile (User Requirement: "navigation bar berada di bagian bawah") */}

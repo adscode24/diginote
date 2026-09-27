@@ -4,6 +4,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   type User,
 } from 'firebase/auth';
 import { hashPassphrase } from '../services/crypto';
@@ -25,6 +26,10 @@ interface AuthContextType {
   login: (identifier: string, password: string) => Promise<void>;
   register: (identifier: string, password: string) => Promise<AppUser>;
   logout: () => void;
+  /** Mode online: kirim email reset password ke email akun saat ini. */
+  sendPasswordReset: () => Promise<void>;
+  /** Mode offline: ubah kata sandi dengan verifikasi kata sandi lama. */
+  changeOfflinePassword: (oldPassword: string, newPassword: string) => Promise<void>;
 }
 
 const USERS_KEY = 'diginote_users_v2';
@@ -236,6 +241,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [online]);
 
+  const sendPasswordReset = useCallback(async (): Promise<void> => {
+    if (!online) throw new Error('Hanya tersedia di mode cloud');
+    const auth = getFirebaseAuth();
+    if (!auth) throw new Error('Layanan cloud belum dikonfigurasi');
+    const email = fbProfile?.email || getActiveEmail();
+    if (!email) throw new Error('Email akun tidak ditemukan');
+    await sendPasswordResetEmail(auth, email).catch((err: { code?: string }) => {
+      throw new Error(translateFirebaseError(err.code));
+    });
+  }, [online, fbProfile]);
+
+  const changeOfflinePassword = useCallback(
+    async (oldPassword: string, newPassword: string): Promise<void> => {
+      if (online) throw new Error('Gunakan reset via email di mode cloud');
+      if (!localUser) throw new Error('Tidak ada pengguna aktif');
+      if (newPassword.length < 4) throw new Error('Kata sandi baru minimal 4 karakter');
+      const oldHash = await hashPassphrase(oldPassword);
+      if (localUser.passwordHash !== oldHash) throw new Error('Kata sandi lama salah');
+      const newHash = await hashPassphrase(newPassword);
+      const updated: AppUser = { ...localUser, passwordHash: newHash };
+      const latest = loadLocalUsers().map(u => (u.id === updated.id ? updated : u));
+      persistLocalUsers(latest);
+      setLocalUser(updated);
+    },
+    [online, localUser]
+  );
+
   return (
     <AuthContext.Provider
       value={{
@@ -246,6 +278,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         register,
         logout,
+        sendPasswordReset,
+        changeOfflinePassword,
       }}
     >
       {children}

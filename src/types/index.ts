@@ -115,7 +115,7 @@ export interface SyncSettings {
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
-export type ActiveTab = 'dashboard' | 'transactions' | 'accounts' | 'debts' | 'summary' | 'settings';
+export type ActiveTab = 'dashboard' | 'transactions' | 'accounts' | 'debts' | 'summary' | 'settings' | 'profile';
 
 export interface FinanceSummary {
   totalIncome: number;

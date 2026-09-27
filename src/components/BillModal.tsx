@@ -62,9 +62,9 @@ export const BillModal: React.FC<BillModalProps> = ({ isOpen, onClose, billToEdi
       setError('Nama tagihan wajib diisi (mis. WiFi, Listrik)');
       return;
     }
-    const amount = Number(amountStr);
-    if (!amount || amount <= 0) {
-      setError('Nominal tagihan harus lebih besar dari 0');
+    const amount = Number(amountStr) || 0;
+    if (amount < 0) {
+      setError('Nominal tagihan tidak valid');
       return;
     }
     if (!dueDay || dueDay < 1 || dueDay > 31) {
@@ -138,7 +138,7 @@ export const BillModal: React.FC<BillModalProps> = ({ isOpen, onClose, billToEdi
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-                Nominal / Bulan (Rp) *
+                Nominal / Bulan (Rp) <span className="font-normal text-slate-400">(Opsional)</span>
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">

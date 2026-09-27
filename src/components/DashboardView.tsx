@@ -19,6 +19,7 @@ import {
   Cloud,
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
+import { useAuth } from '../context/AuthContext';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import {
   formatRupiah,
@@ -41,6 +42,7 @@ interface DashboardViewProps {
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) => {
   const { summary, transactions, debts, accounts, categories, reminderSettings, bills, billPayments, deleteBill, syncNotice, clearSyncNotice, syncStatus, pullFromVaultNow } = useFinance();
+  const { currentUser } = useAuth();
 
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
   const [selectedDebtToPay, setSelectedDebtToPay] = useState<Debt | null>(null);
@@ -178,28 +180,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
         </div>
       )}
 
-      {/* Daily Reminder Banner if not recorded today */}
-      {!hasLoggedToday && reminderSettings.enabled && (
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-600 to-amber-700 text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-              <BellRing className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold">Waktunya Catat Keuangan Hari Ini!</h4>
-              <p className="text-xs text-orange-100 mt-0.5">
-                Belum ada pengeluaran atau pemasukan yang dicatat hari ini ({formatDateIndo(today)}).
-              </p>
-            </div>
+      {/* Kartu Ucapan Selamat Datang */}
+      <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-600 to-amber-700 text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0 text-lg font-extrabold">
+            {((currentUser?.name || 'D').trim()[0] || 'D').toUpperCase()}
           </div>
-          <button
-            onClick={() => setIsTxModalOpen(true)}
-            className="self-start sm:self-auto px-4 py-2 text-xs font-bold rounded-xl bg-white text-orange-800 hover:bg-orange-50 transition shadow-xs whitespace-nowrap"
-          >
-            + Catat Sekarang
-          </button>
+          <div>
+            <h4 className="text-sm font-bold">Selamat Datang, {currentUser?.name || 'Pengguna'}!</h4>
+            <p className="text-xs text-orange-100 mt-0.5">
+              {formatDateIndo(today)}
+              {!hasLoggedToday && reminderSettings.enabled && ' · Belum ada catatan hari ini, yuk catat!'}
+            </p>
+          </div>
         </div>
-      )}
+        <button
+          onClick={() => setIsTxModalOpen(true)}
+          className="self-start sm:self-auto px-4 py-2 text-xs font-bold rounded-xl bg-white text-orange-800 hover:bg-orange-50 transition shadow-xs whitespace-nowrap"
+        >
+          + Catat Sekarang
+        </button>
+      </div>
 
       {/* Header Bar with Month Filter Selector */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">

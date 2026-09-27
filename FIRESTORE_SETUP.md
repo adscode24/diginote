@@ -42,13 +42,11 @@ dan APK langsung mode Cloud setelah deploy.
 - **Daftar sekali** di perangkat mana pun → vault `digiVaults/{uid}` dibuat
   otomatis dengan Kode Vault (mis. `DN-XXXXXX`) + data lokal perangkat itu.
 - **Login di perangkat lain** → vault yang sama ditarik otomatis bila lokal kosong.
-- **Setiap edit** → push debounced (~900ms) ke cloud (last-write-wins per vault).
-- **Realtime**: edit di satu perangkat langsung diterapkan di perangkat lain
-  yang terbuka (dengan guard anti-gema ala Fuel-Traxr).
-- **Offline**: cache persisten (IndexedDB) + penyimpanan lokal per akun;
-  sinkron saat online kembali.
-- Tombol manual tetap ada: **Sinkronkan ke Cloud** (Beranda/Pengaturan) dan
-  **Tarik dari Cloud**.
+- **Sinkronisasi manual**: **Pengaturan → Sinkronisasi Cloud → Sinkronkan ke Cloud**
+  (upload) / **Tarik dari Cloud** (download). Tidak ada proses latar.
+- **Offline**: cache persisten (IndexedDB) + penyimpanan lokal per akun.
+- Foto struk (base64) tidak diunggah ke cloud agar payload kecil dan UI tidak freeze;
+  foto tetap aman di masing-masing perangkat dan disambung ulang saat pull.
 
 ## Troubleshooting
 

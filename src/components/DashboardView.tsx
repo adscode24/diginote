@@ -40,7 +40,7 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) => {
-  const { summary, transactions, debts, accounts, categories, reminderSettings, bills, billPayments, deleteBill, syncNotice, clearSyncNotice, syncStatus, pushToVaultNow, pullFromVaultNow } = useFinance();
+  const { summary, transactions, debts, accounts, categories, reminderSettings, bills, billPayments, deleteBill, syncNotice, clearSyncNotice, syncStatus, pullFromVaultNow } = useFinance();
 
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
   const [selectedDebtToPay, setSelectedDebtToPay] = useState<Debt | null>(null);
@@ -150,7 +150,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
 
   return (
     <div className="space-y-6 pb-6">
-      {/* Cloud Sync Notice */}
+      {/* Cloud Sync Notice (umpan balik operasi manual dari Pengaturan) */}
       {syncNotice && (
         <div className="p-3.5 rounded-2xl bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800 text-xs text-orange-800 dark:text-orange-200 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -175,41 +175,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
               <X className="w-4 h-4" />
             </button>
           </div>
-        </div>
-      )}
-
-      {/* Sync Status + Manual Sync Button */}
-      {syncStatus !== 'offline' && (
-        <div className="flex items-center justify-between px-1">
-          <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                syncStatus === 'synced'
-                  ? 'bg-orange-500'
-                  : syncStatus === 'syncing' || syncStatus === 'connecting'
-                  ? 'bg-blue-500 animate-pulse'
-                  : 'bg-red-500'
-              }`}
-            />
-            <span>
-              {syncStatus === 'synced'
-                ? 'Cloud tersinkron'
-                : syncStatus === 'syncing'
-                ? 'Menyinkronkan…'
-                : syncStatus === 'connecting'
-                ? 'Menghubungkan…'
-                : 'Sinkronisasi gagal'}
-            </span>
-          </div>
-          <button
-            onClick={() => void pushToVaultNow()}
-            disabled={syncStatus === 'syncing' || syncStatus === 'connecting'}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded-lg bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white transition"
-            title="Kirim data perangkat ini ke cloud"
-          >
-            <Cloud className="w-3.5 h-3.5" />
-            <span>Sinkronkan ke Cloud</span>
-          </button>
         </div>
       )}
 

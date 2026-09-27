@@ -59,10 +59,19 @@ const VAULT_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // tanpa I,O,0,1 
  * Data aplikasi punya banyak field opsional yang sering `undefined`
  * (mis. receiptImage, accountNumber, notes). Klon JSON menghilangkan semua
  * key undefined secara rekursif sehingga push vault dijamin tidak crash.
+ *
+ * Foto struk (data: URL base64) juga dibuang dari payload cloud: ukurannya
+ * bisa bermegabyte sehingga membekukan UI saat serialize + melampaui batas
+ * 1MB per dokumen Firestore. Foto tetap tersimpan lokal di perangkat dan
+ * disambung ulang berdasarkan ID saat pull (lihat applyCloudVault).
  */
 function sanitizeForFirestore<T>(value: T): T {
   try {
-    return JSON.parse(JSON.stringify(value ?? null)) as T;
+    return JSON.parse(
+      JSON.stringify(value ?? null, (k, v) =>
+        typeof v === 'string' && v.startsWith('data:') ? undefined : v
+      )
+    ) as T;
   } catch {
     return value;
   }

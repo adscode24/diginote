@@ -20,9 +20,10 @@ sinkronisasi cloud lintas perangkat (vault terstruktur per akun, realtime).
 
 Satu email = satu akun = satu Kode Vault Cloud (`digiVaults/{uid}`). Login dengan
 email yang sama di perangkat lain (web/HP/APK) menampilkan data yang sama —
-tanpa daftar ulang, tanpa frasa sandi. Setiap edit tersinkron otomatis
-(debounced) + realtime antar perangkat terbuka. Tombol manual tetap ada:
-**Sinkronkan ke Cloud** (Beranda/Pengaturan) dan **Tarik dari Cloud**.
+tanpa daftar ulang, tanpa frasa sandi. Sinkronisasi hanya terjadi lewat tombol
+di halaman Pengaturan (**Sinkronkan ke Cloud** / **Tarik dari Cloud**) — tidak
+ada proses latar, sehingga UI tidak pernah freeze. Foto struk tersimpan lokal
+dan tidak ikut ke cloud (menjaga payload tetap kecil).
 Lihat `FIRESTORE_SETUP.md` untuk aktivasi Firebase.
 
 ## Pengembangan lokal

@@ -22,12 +22,10 @@ import { getActiveEmail } from './AuthContext';
 import {
   ensureUserVault,
   pushVault,
-  subscribeVault,
   fetchVault,
   type CloudVault,
   type VaultPayload,
   type VaultOwner,
-  CloudSyncError,
 } from '../services/cloudSync';
 
 interface FinanceContextType {
@@ -320,11 +318,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
   const [syncNotice, setSyncNotice] = useState<{ text: string; action: 'pull' | null } | null>(null);
   const [cloudVaultId, setCloudVaultId] = useState<string | null>(null);
   const [syncErrorMsg, setSyncErrorMsg] = useState<string | null>(null);
-  const applyingCloudRef = React.useRef(false);
-  const justAppliedRef = React.useRef(false);
-  const lastCloudUpdatedAtRef = React.useRef<string>('');
-  const lastPushedAtRef = React.useRef<string>('');
-  const pushTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const vaultOwner = (email?: string | null): VaultOwner => ({
     uid: userId,
@@ -332,11 +325,37 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
   });
 
   const applyCloudVault = (vault: CloudVault) => {
-    if (Array.isArray(vault.transactions)) setTransactions(vault.transactions);
+    // Foto struk tidak ikut ke cloud (lihat sanitizeForFirestore) — sambung ulang
+    // foto lokal berdasarkan ID agar tidak hilang saat pull.
+    const localTxById = new Map(transactions.map(t => [t.id, t]));
+    const localPayById = new Map(
+      debts.flatMap(d => (d.payments || []).map(p => [`${d.id}:${p.id}`, p]))
+    );
+    if (Array.isArray(vault.transactions)) {
+      setTransactions(
+        vault.transactions.map(t => {
+          const local = localTxById.get(t.id);
+          if (local?.receiptUrl && !t.receiptUrl) return { ...t, receiptUrl: local.receiptUrl };
+          return t;
+        })
+      );
+    }
     if (Array.isArray(vault.categories) && vault.categories.length > 0)
       setCategories(vault.categories);
     if (Array.isArray(vault.accounts)) setAccounts(vault.accounts);
-    if (Array.isArray(vault.debts)) setDebts(vault.debts);
+    if (Array.isArray(vault.debts)) {
+      setDebts(
+        vault.debts.map(d => ({
+          ...d,
+          payments: (d.payments || []).map(p => {
+            const local = localPayById.get(`${d.id}:${p.id}`);
+            if (local?.receiptImage && !p.receiptImage)
+              return { ...p, receiptImage: local.receiptImage };
+            return p;
+          }),
+        }))
+      );
+    }
     if (Array.isArray(vault.bills)) setBills(vault.bills);
     if (Array.isArray(vault.billPayments)) setBillPayments(vault.billPayments);
     if (vault.reminderSettings) setReminderSettings(vault.reminderSettings);
@@ -373,19 +392,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
 
   const currentEmail = (): string | null => getActiveEmail();
 
-  // Setup vault + langganan realtime per akun Firebase asli.
+  // Setup vault per akun Firebase asli (satu kali per login).
+  // TIDAK ada langganan realtime / push otomatis: seluruh sinkronisasi
+  // hanya terjadi lewat tombol di halaman Pengaturan (anti-freeze).
   // Akun lokal/offline (user_...) tetap offline-only dan tidak menyentuh cloud.
   useEffect(() => {
-    // Reset penanda antar akun
-    lastCloudUpdatedAtRef.current = '';
-    lastPushedAtRef.current = '';
-    justAppliedRef.current = false;
-    applyingCloudRef.current = false;
-    if (pushTimerRef.current) {
-      clearTimeout(pushTimerRef.current);
-      pushTimerRef.current = null;
-    }
-
     if (!cloudEnabled || !isCloudCapableUid(userId)) {
       setCloudVaultId(null);
       setSyncStatus('offline');
@@ -395,7 +406,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     }
 
     let cancelled = false;
-    let unsubscribe: (() => void) | undefined;
 
     setSyncStatus(navigator.onLine ? 'connecting' : 'offline');
     setSyncErrorMsg(null);
@@ -421,27 +431,21 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
           reminderSettings,
         };
         if (legacy) {
-          applyingCloudRef.current = true;
-          justAppliedRef.current = true;
           if (legacy.transactions.length > 0) setTransactions(legacy.transactions);
           if (legacy.categories.length > 0) setCategories(legacy.categories);
           if (legacy.accounts.length > 0) setAccounts(legacy.accounts);
           if (legacy.debts.length > 0) setDebts(legacy.debts);
           if (legacy.reminderSettings) setReminderSettings(legacy.reminderSettings);
-          setTimeout(() => {
-            applyingCloudRef.current = false;
-          }, 0);
-          setSyncNotice({ text: 'Data lama perangkat ini dimuat dan akan disinkronkan ke cloud.', action: null });
+          setSyncNotice({ text: 'Data lama perangkat ini dimuat. Buka Pengaturan untuk sinkronisasi.', action: null });
         }
 
         const owner = vaultOwner(currentEmail());
         const vault = await ensureUserVault(owner, localSnapshot);
         if (cancelled) return;
         setCloudVaultId(vault.vaultCode || '');
-        lastCloudUpdatedAtRef.current = vault.updatedAt || '';
         setLastSyncedAt(Date.now());
 
-        // Jika cloud punya data sedangkan lokal kosong, pakai cloud.
+        // Jika cloud punya data sedangkan lokal kosong, pakai cloud (sekali saja).
         const localEmpty =
           localSnapshot.transactions.length === 0 &&
           localSnapshot.accounts.length === 0 &&
@@ -454,57 +458,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
           vault.bills.length > 0 ||
           vault.billPayments.length > 0;
         if (localEmpty && cloudHasData) {
-          applyingCloudRef.current = true;
-          justAppliedRef.current = true;
           applyCloudVault(vault);
-          setTimeout(() => {
-            applyingCloudRef.current = false;
-          }, 0);
-        } else if (!localEmpty && !cloudHasData) {
-          // Perangkat pertama: vault baru saja dibuat dari localSnapshot
-          lastPushedAtRef.current = vault.updatedAt || '';
         }
 
         setSyncStatus(navigator.onLine ? 'synced' : 'offline');
-
-        unsubscribe = subscribeVault(
-          owner,
-          remote => {
-            if (cancelled) return;
-            if (!remote) return;
-            if (remote.vaultCode) setCloudVaultId(remote.vaultCode);
-            // Echo dari push kita sendiri -> jangan timpa balik
-            if (remote.updatedAt && remote.updatedAt === lastPushedAtRef.current) {
-              lastCloudUpdatedAtRef.current = remote.updatedAt;
-              setLastSyncedAt(Date.now());
-              setSyncStatus(navigator.onLine ? 'synced' : 'offline');
-              return;
-            }
-            if (remote.updatedAt && remote.updatedAt === lastCloudUpdatedAtRef.current) return;
-            // Ada edit lokal yang belum terkirim -> menangkan lokal, push akan jalan
-            if (pushTimerRef.current) return;
-            applyingCloudRef.current = true;
-            justAppliedRef.current = true;
-            lastCloudUpdatedAtRef.current = remote.updatedAt || '';
-            applyCloudVault(remote);
-            setSyncStatus(navigator.onLine ? 'synced' : 'offline');
-            setSyncErrorMsg(null);
-            setSyncNotice({ text: 'Data diperbarui dari perangkat lain.', action: null });
-            setTimeout(() => {
-              applyingCloudRef.current = false;
-            }, 0);
-          },
-          (err: CloudSyncError) => {
-            if (cancelled) return;
-            if (!navigator.onLine) {
-              setSyncStatus('offline');
-              setSyncErrorMsg(null);
-            } else {
-              setSyncStatus('error');
-              setSyncErrorMsg(err.message);
-            }
-          }
-        );
       } catch (err: unknown) {
         if (cancelled) return;
         const msg = (err as Error)?.message || 'Gagal menghubungkan cloud.';
@@ -520,69 +477,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
 
     return () => {
       cancelled = true;
-      if (unsubscribe) unsubscribe();
-      if (pushTimerRef.current) {
-        clearTimeout(pushTimerRef.current);
-        pushTimerRef.current = null;
-      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
-  // Cloud Vault: dorong setiap perubahan lokal (debounced) agar semua perangkat sinkron.
-  useEffect(() => {
-    if (!cloudEnabled || !isCloudCapableUid(userId)) return;
-    if (!cloudVaultId) return;
-    if (applyingCloudRef.current || justAppliedRef.current) {
-      justAppliedRef.current = false;
-      return;
-    }
-    if (!navigator.onLine) {
-      setSyncStatus('offline');
-      return;
-    }
-    setSyncStatus('syncing');
-    if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
-    pushTimerRef.current = setTimeout(async () => {
-      pushTimerRef.current = null;
-      if (!navigator.onLine) {
-        setSyncStatus('offline');
-        return;
-      }
-      try {
-        const updatedAt = await pushVault(vaultOwner(currentEmail()), cloudVaultId, {
-          transactions,
-          categories,
-          accounts,
-          debts,
-          bills,
-          billPayments,
-          reminderSettings,
-        });
-        lastPushedAtRef.current = updatedAt;
-        lastCloudUpdatedAtRef.current = updatedAt;
-        setLastSyncedAt(Date.now());
-        setSyncStatus('synced');
-        setSyncErrorMsg(null);
-      } catch (err: unknown) {
-        const msg = (err as Error)?.message || 'Gagal sinkron ke cloud.';
-        if (!navigator.onLine) {
-          setSyncStatus('offline');
-          setSyncErrorMsg(null);
-        } else {
-          setSyncStatus('error');
-          setSyncErrorMsg(msg);
-        }
-      }
-    }, 900);
-    return () => {
-      if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transactions, accounts, debts, categories, bills, billPayments, reminderSettings, cloudVaultId, userId]);
-
   /**
-   * Push manual: kirim seluruh data lokal ke cloud SEKARANG (tombol "Sinkronkan ke Cloud").
+   * Push manual: kirim seluruh data lokal ke cloud SEKARANG (hanya via Pengaturan).
    */
   const pushToVaultNow = useCallback(async (): Promise<boolean> => {
     if (!cloudEnabled || !isCloudCapableUid(userId) || !cloudVaultId) return false;
@@ -601,8 +501,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
         billPayments,
         reminderSettings,
       });
-      lastPushedAtRef.current = updatedAt;
-      lastCloudUpdatedAtRef.current = updatedAt;
       setLastSyncedAt(Date.now());
       setSyncStatus('synced');
       setSyncErrorMsg(null);
@@ -619,7 +517,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
   }, [cloudEnabled, userId, transactions, accounts, debts, categories, bills, billPayments, reminderSettings, cloudVaultId]);
 
   /**
-   * Pull manual: tarik data terbaru dari cloud SEKARANG (tombol "Sinkronkan Sekarang").
+   * Pull manual: tarik data terbaru dari cloud SEKARANG (hanya via Pengaturan).
    */
   const pullFromVaultNow = useCallback(async (): Promise<boolean> => {
     if (!cloudEnabled || !isCloudCapableUid(userId)) return false;
@@ -630,17 +528,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
         setSyncStatus(navigator.onLine ? 'synced' : 'offline');
         return false;
       }
-      applyingCloudRef.current = true;
-      justAppliedRef.current = true;
-      lastCloudUpdatedAtRef.current = remote.updatedAt || '';
       if (remote.vaultCode) setCloudVaultId(remote.vaultCode);
       applyCloudVault(remote);
       setSyncStatus(navigator.onLine ? 'synced' : 'offline');
       setSyncErrorMsg(null);
       setSyncNotice(null);
-      setTimeout(() => {
-        applyingCloudRef.current = false;
-      }, 0);
       return true;
     } catch (err: unknown) {
       const msg = (err as Error)?.message || 'Gagal menarik data dari cloud.';

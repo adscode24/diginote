@@ -16,7 +16,7 @@ async function startServer() {
 
   // Health check endpoint
   app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', service: 'BukuKas Sync Engine', timestamp: Date.now() });
+    res.json({ status: 'ok', service: 'DigiNote Sync Engine', timestamp: Date.now() });
   });
 
   // Cloud Sync: Push encrypted vault
@@ -80,7 +80,7 @@ async function startServer() {
 
   const port = process.env.PORT || 3000;
   app.listen(Number(port), '0.0.0.0', () => {
-    console.log(`BukuKas Server running on http://0.0.0.0:${port}`);
+    console.log(`DigiNote Server running on http://0.0.0.0:${port}`);
   });
 }
 

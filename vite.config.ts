@@ -14,8 +14,8 @@ export default defineConfig(() => {
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg'],
         manifest: {
           id: '/',
-          name: 'Notaku - Catatan Keuangan',
-          short_name: 'Notaku',
+          name: 'DigiNote - Catatan Keuangan',
+          short_name: 'DigiNote',
           description: 'Aplikasi pencatatan keuangan dan pengelolaan sumber dana dengan enkripsi privasi.',
           theme_color: '#0F172A',
           background_color: '#0F172A',

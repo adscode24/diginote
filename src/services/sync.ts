@@ -84,7 +84,7 @@ export async function pullFromCloudVault(
 export async function exportEncryptedBackup(
   data: SyncPayload,
   passphrase: string,
-  fileName = 'bukukas_backup_terenkripsi.json'
+  fileName = 'diginote_backup_terenkripsi.json'
 ): Promise<void> {
   const encrypted = await encryptData(data, passphrase);
   const blob = new Blob([encrypted], { type: 'application/json' });

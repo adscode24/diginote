@@ -235,7 +235,7 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose 
             <div className="flex gap-2">
               <input
                 type="text"
-                placeholder="Contoh: BK-8492-1092"
+                placeholder="Contoh: DN-8492-1092"
                 value={targetVaultId}
                 onChange={e => setTargetVaultId(e.target.value.toUpperCase())}
                 className="flex-1 px-3 py-1.5 text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white"

@@ -1,12 +1,12 @@
 import React from 'react';
 
-interface NotakuLogoProps {
+interface DigiNoteLogoProps {
   size?: number;
   className?: string;
   showText?: boolean;
 }
 
-export const NotakuLogo: React.FC<NotakuLogoProps> = ({
+export const DigiNoteLogo: React.FC<DigiNoteLogoProps> = ({
   size = 36,
   className = '',
   showText = false,
@@ -24,7 +24,7 @@ export const NotakuLogo: React.FC<NotakuLogoProps> = ({
       >
         <defs>
           {/* Main Orange Gradient for App Icon */}
-          <linearGradient id="notakuIconGrad" x1="0.1" y1="0" x2="0.9" y2="1">
+          <linearGradient id="diginoteIconGrad" x1="0.1" y1="0" x2="0.9" y2="1">
             <stop offset="0%" stopColor="#FFA100" />
             <stop offset="35%" stopColor="#FF7A00" />
             <stop offset="100%" stopColor="#FF5200" />
@@ -37,16 +37,16 @@ export const NotakuLogo: React.FC<NotakuLogoProps> = ({
           </linearGradient>
 
           {/* Drop shadow for bill and phone */}
-          <filter id="notakuElementShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <filter id="diginoteElementShadow" x="-20%" y="-20%" width="140%" height="140%">
             <feDropShadow dx="0" dy="8" stdDeviation="10" floodColor="#000000" floodOpacity="0.22" />
           </filter>
         </defs>
 
         {/* Squircle Background Container */}
-        <rect width="512" height="512" rx="120" fill="url(#notakuIconGrad)" />
+        <rect width="512" height="512" rx="120" fill="url(#diginoteIconGrad)" />
 
         {/* 1. Banknote / Uang Kertas (Tilted to the left) */}
-        <g transform="translate(205, 175) rotate(-16)" filter="url(#notakuElementShadow)">
+        <g transform="translate(205, 175) rotate(-16)" filter="url(#diginoteElementShadow)">
           {/* Outer white outline/body */}
           <rect
             x="-72"
@@ -80,7 +80,7 @@ export const NotakuLogo: React.FC<NotakuLogoProps> = ({
         </g>
 
         {/* 2. Smartphone (Standing upright on right) */}
-        <g transform="translate(306, 170) rotate(1.5)" filter="url(#notakuElementShadow)">
+        <g transform="translate(306, 170) rotate(1.5)" filter="url(#diginoteElementShadow)">
           {/* Phone White Body */}
           <rect
             x="-44"
@@ -121,7 +121,7 @@ export const NotakuLogo: React.FC<NotakuLogoProps> = ({
       {/* Optional Wordmark matching the image's logo text */}
       {showText && (
         <span className="text-lg font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-0.5">
-          <span>Notaku</span>
+          <span>DigiNote</span>
         </span>
       )}
     </div>

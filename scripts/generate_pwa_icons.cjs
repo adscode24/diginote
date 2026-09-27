@@ -2,8 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
-// Create a valid PNG in pure node.js with exact Notaku orange logo
-function createNotakuPNG(width, height) {
+// Create a valid PNG in pure node.js with exact DigiNote orange logo
+function createDigiNotePNG(width, height) {
   // Signature
   const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
@@ -165,11 +165,11 @@ if (!fs.existsSync(publicDir)) {
   fs.mkdirSync(publicDir, { recursive: true });
 }
 
-// Generate PWA icons with Notaku branding
-fs.writeFileSync(path.join(publicDir, 'pwa-192x192.png'), createNotakuPNG(192, 192));
-fs.writeFileSync(path.join(publicDir, 'pwa-512x512.png'), createNotakuPNG(512, 512));
-fs.writeFileSync(path.join(publicDir, 'pwa-maskable-512x512.png'), createNotakuPNG(512, 512));
-fs.writeFileSync(path.join(publicDir, 'apple-touch-icon.png'), createNotakuPNG(180, 180));
-fs.writeFileSync(path.join(publicDir, 'favicon.ico'), createNotakuPNG(64, 64));
+// Generate PWA icons with DigiNote branding
+fs.writeFileSync(path.join(publicDir, 'pwa-192x192.png'), createDigiNotePNG(192, 192));
+fs.writeFileSync(path.join(publicDir, 'pwa-512x512.png'), createDigiNotePNG(512, 512));
+fs.writeFileSync(path.join(publicDir, 'pwa-maskable-512x512.png'), createDigiNotePNG(512, 512));
+fs.writeFileSync(path.join(publicDir, 'apple-touch-icon.png'), createDigiNotePNG(180, 180));
+fs.writeFileSync(path.join(publicDir, 'favicon.ico'), createDigiNotePNG(64, 64));
 
-console.log('Notaku PWA icons generated successfully in public/');
+console.log('DigiNote PWA icons generated successfully in public/');

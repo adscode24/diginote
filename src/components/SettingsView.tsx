@@ -74,7 +74,7 @@ export const SettingsView: React.FC = () => {
     <div className="space-y-6 max-w-4xl pb-16">
       <div>
         <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-          Pengaturan Aplikasi Notaku
+          Pengaturan Aplikasi DigiNote
         </h2>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
           Sesuaikan preferensi tema tampilan, notifikasi harian, enkripsi data, dan kelola penyimpanan
@@ -229,7 +229,7 @@ export const SettingsView: React.FC = () => {
           <div>
             <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Smartphone className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <span>Instalasi Notaku di HP / Android</span>
+              <span>Instalasi DigiNote di HP / Android</span>
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               Pasang ke layar beranda untuk pengalaman cepat, tanpa browser, dan berfungsi offline

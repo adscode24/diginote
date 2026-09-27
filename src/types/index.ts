@@ -102,7 +102,7 @@ export interface ReminderSettings {
 }
 
 export interface SyncSettings {
-  vaultId: string; // Cloud sync identifier (e.g. BK-7839-4412)
+  vaultId: string; // Cloud sync identifier (e.g. DN-7839-4412)
   isEncrypted: boolean;
   passphraseHash?: string;
   lastSyncedAt?: number;

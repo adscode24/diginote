@@ -75,6 +75,18 @@ interface FinanceContextType {
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
+  TRANSACTIONS: 'diginote_transactions_v2',
+  CATEGORIES: 'diginote_categories_v2',
+  ACCOUNTS: 'diginote_accounts_v2',
+  DEBTS: 'diginote_debts_v2',
+  REMINDERS: 'diginote_reminders_v2',
+  SYNC: 'diginote_sync_v2',
+  THEME: 'diginote_theme_v2',
+};
+
+// Legacy keys from before the Notaku -> DigiNote rename.
+// Read once and migrated automatically so existing users keep their data.
+const LEGACY_STORAGE_KEYS = {
   TRANSACTIONS: 'notaku_transactions_v2',
   CATEGORIES: 'notaku_categories_v2',
   ACCOUNTS: 'notaku_accounts_v2',
@@ -83,6 +95,22 @@ const STORAGE_KEYS = {
   SYNC: 'notaku_sync_v2',
   THEME: 'notaku_theme_v2',
 };
+
+function readStoredKey(newKey: string, legacyKey: string): string | null {
+  try {
+    const current = localStorage.getItem(newKey);
+    if (current) return current;
+    const legacy = localStorage.getItem(legacyKey);
+    if (legacy) {
+      localStorage.setItem(newKey, legacy);
+      localStorage.removeItem(legacyKey);
+      return legacy;
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return null;
+}
 
 // Initial sample data
 function getInitialSampleData() {
@@ -271,7 +299,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // 1. Accounts / Sumber Dana State
   const [accounts, setAccounts] = useState<Account[]>(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.ACCOUNTS);
+      const stored = readStoredKey(STORAGE_KEYS.ACCOUNTS, LEGACY_STORAGE_KEYS.ACCOUNTS);
       if (stored) return JSON.parse(stored);
     } catch (e) {
       console.error(e);
@@ -282,7 +310,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // 2. Transactions State
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
+      const stored = readStoredKey(STORAGE_KEYS.TRANSACTIONS, LEGACY_STORAGE_KEYS.TRANSACTIONS);
       if (stored) return JSON.parse(stored);
     } catch (e) {
       console.error(e);
@@ -293,7 +321,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // 3. Categories State
   const [categories, setCategories] = useState<Category[]>(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
+      const stored = readStoredKey(STORAGE_KEYS.CATEGORIES, LEGACY_STORAGE_KEYS.CATEGORIES);
       if (stored) return JSON.parse(stored);
     } catch (e) {
       console.error(e);
@@ -304,7 +332,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // 4. Debts State
   const [debts, setDebts] = useState<Debt[]>(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.DEBTS);
+      const stored = readStoredKey(STORAGE_KEYS.DEBTS, LEGACY_STORAGE_KEYS.DEBTS);
       if (stored) return JSON.parse(stored);
     } catch (e) {
       console.error(e);
@@ -315,7 +343,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // 5. Reminder Settings
   const [reminderSettings, setReminderSettings] = useState<ReminderSettings>(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.REMINDERS);
+      const stored = readStoredKey(STORAGE_KEYS.REMINDERS, LEGACY_STORAGE_KEYS.REMINDERS);
       if (stored) return JSON.parse(stored);
     } catch (e) {
       console.error(e);
@@ -326,7 +354,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // 6. Sync Settings
   const [syncSettings, setSyncSettings] = useState<SyncSettings>(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.SYNC);
+      const stored = readStoredKey(STORAGE_KEYS.SYNC, LEGACY_STORAGE_KEYS.SYNC);
       if (stored) return JSON.parse(stored);
     } catch (e) {
       console.error(e);
@@ -341,7 +369,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // 7. Theme State
   const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.THEME);
+      const stored = readStoredKey(STORAGE_KEYS.THEME, LEGACY_STORAGE_KEYS.THEME);
       if (stored === 'light' || stored === 'dark' || stored === 'system') return stored;
     } catch (e) {
       console.error(e);
@@ -992,7 +1020,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       reminderSettings,
       timestamp: Date.now(),
     };
-    await exportEncryptedBackup(payload, passphrase, `notaku_backup_${getTodayString()}.enc.json`);
+    await exportEncryptedBackup(payload, passphrase, `diginote_backup_${getTodayString()}.enc.json`);
   };
 
   const importBackupFile = async (file: File, passphrase: string): Promise<boolean> => {
@@ -1030,6 +1058,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       localStorage.removeItem(STORAGE_KEYS.DEBTS);
       localStorage.removeItem(STORAGE_KEYS.ACCOUNTS);
       localStorage.removeItem(STORAGE_KEYS.CATEGORIES);
+      localStorage.removeItem(LEGACY_STORAGE_KEYS.TRANSACTIONS);
+      localStorage.removeItem(LEGACY_STORAGE_KEYS.DEBTS);
+      localStorage.removeItem(LEGACY_STORAGE_KEYS.ACCOUNTS);
+      localStorage.removeItem(LEGACY_STORAGE_KEYS.CATEGORIES);
     } catch (e) {
       console.error(e);
     }

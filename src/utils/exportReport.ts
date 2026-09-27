@@ -13,7 +13,7 @@ export function exportToXLSX(
 
   // 1. Sheet Ringkasan
   const summaryData = [
-    ['LAPORAN KEUANGAN BULANAN - NOTAKU'],
+    ['LAPORAN KEUANGAN BULANAN - DIGINOTE'],
     ['Periode:', monthYearStr],
     ['Tanggal Ekspor:', new Date().toLocaleDateString('id-ID')],
     [],
@@ -86,7 +86,7 @@ export function exportToPDF(
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
   doc.setTextColor(15, 23, 42); // slate-900
-  doc.text('NOTAKU - LAPORAN KEUANGAN', 14, y);
+  doc.text('DIGINOTE - LAPORAN KEUANGAN', 14, y);
 
   y += 7;
   doc.setFontSize(11);
@@ -247,7 +247,7 @@ export function exportToPDF(
     doc.setPage(i);
     doc.setFontSize(8);
     doc.setTextColor(148, 163, 184);
-    doc.text(`Halaman ${i} dari ${pageCount} | Notaku`, 196, 290, { align: 'right' });
+    doc.text(`Halaman ${i} dari ${pageCount} | DigiNote`, 196, 290, { align: 'right' });
   }
 
   const safeName = periodTitle.replace(/[^a-zA-Z0-9]/g, '_');

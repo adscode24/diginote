@@ -140,12 +140,12 @@ export async function decryptData<T = unknown>(encryptedJson: string, passphrase
 }
 
 /**
- * Generate a friendly Vault ID (e.g. BK-7839-4412)
+ * Generate a friendly Vault ID (e.g. DN-7839-4412)
  */
 export function generateVaultId(): string {
   const part1 = Math.floor(1000 + Math.random() * 9000);
   const part2 = Math.floor(1000 + Math.random() * 9000);
-  return `BK-${part1}-${part2}`;
+  return `DN-${part1}-${part2}`;
 }
 
 /**

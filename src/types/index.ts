@@ -68,6 +68,10 @@ export interface DebtPayment {
   receiptImage?: string; // base64 image receipt / bukti transfer
   transactionId?: string; // linked transaction id
   createdAt: number;
+  // Rincian amortisasi cicilan berjangka (KPR): porsi bunga vs pokok
+  interestPortion?: number; // porsi cicilan untuk bunga bulan berjalan (Rp)
+  principalPortion?: number; // porsi cicilan yang memotong pokok (Rp)
+  annualRateApplied?: number; // suku bunga periode aktif saat bayar (% p.a.)
 }
 
 export interface Debt {

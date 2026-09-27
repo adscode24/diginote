@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { X, CheckCircle2, Upload, Trash2, ArrowUpRight, AlertCircle, Calendar, Wallet } from 'lucide-react';
+import { X, CheckCircle2, Upload, Trash2, ArrowUpRight, AlertCircle, Calendar, Wallet, Percent } from 'lucide-react';
 import { Debt } from '../types';
 import { useFinance } from '../context/FinanceContext';
-import { formatRupiah, getTodayString } from '../utils/formatters';
+import { formatRupiah, getTodayString, getActiveTierRate, calculateTieredPayment } from '../utils/formatters';
 
 interface PayDebtModalProps {
   isOpen: boolean;
@@ -19,7 +19,13 @@ export const PayDebtModal: React.FC<PayDebtModalProps> = ({ isOpen, onClose, deb
   const [notes, setNotes] = useState('');
   const [receiptImage, setReceiptImage] = useState<string | undefined>(undefined);
   const [error, setError] = useState('');
-  const [successInfo, setSuccessInfo] = useState<{ amount: number; remaining: number } | null>(null);
+  const [successInfo, setSuccessInfo] = useState<{
+    amount: number;
+    remaining: number;
+    interestPortion?: number;
+    principalPortion?: number;
+    annualRate?: number;
+  } | null>(null);
 
   React.useEffect(() => {
     if (debt && isOpen) {
@@ -109,20 +115,40 @@ export const PayDebtModal: React.FC<PayDebtModalProps> = ({ isOpen, onClose, deb
     }
 
     try {
-      const remainingAfter = Math.max(0, debt.remainingAmount - numericAmount);
-      payDebt(debt.id, numericAmount, paymentDate, notes.trim(), receiptImage, selectedAccountId);
+      const result = payDebt(debt.id, numericAmount, paymentDate, notes.trim(), receiptImage, selectedAccountId);
 
-      setSuccessInfo({ amount: numericAmount, remaining: remainingAfter });
+      setSuccessInfo({
+        amount: numericAmount,
+        remaining: result.breakdown ? result.breakdown.remainingAfter : Math.max(0, debt.remainingAmount - numericAmount),
+        interestPortion: result.breakdown?.interestPortion,
+        principalPortion: result.breakdown?.principalPortion,
+        annualRate: result.breakdown?.annualRate,
+      });
       setTimeout(() => {
         setSuccessInfo(null);
         onClose();
-      }, 1800);
+      }, 2600);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Gagal memproses pembayaran');
     }
   };
 
   const isPayable = debt.type === 'payable';
+
+  // Preview rincian amortisasi cicilan berjangka sebelum konfirmasi
+  const numericAmountPreview = Number(amountStr) || 0;
+  const paidSoFarPreview =
+    typeof debt.totalTenor === 'number' && typeof debt.remainingTenor === 'number'
+      ? Math.max(0, debt.totalTenor - debt.remainingTenor)
+      : debt.payments.length;
+  const activeRatePreview =
+    isPayable && debt.installmentCategory === 'tiered_installment'
+      ? getActiveTierRate(debt.tieredPeriods, paidSoFarPreview)
+      : undefined;
+  const previewBreakdown =
+    activeRatePreview !== undefined && activeRatePreview > 0 && numericAmountPreview > 0
+      ? { ...calculateTieredPayment(debt.remainingAmount, activeRatePreview, numericAmountPreview), annualRate: activeRatePreview }
+      : null;
 
   return (
     <div
@@ -167,6 +193,12 @@ export const PayDebtModal: React.FC<PayDebtModalProps> = ({ isOpen, onClose, deb
               Uang sebesar <strong>{formatRupiah(successInfo.amount)}</strong> telah dipotong dari sumber dana
               dan tercatat ke transaksi pengeluaran.
             </p>
+            {successInfo.annualRate !== undefined && (
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Bunga {formatRupiah(successInfo.interestPortion || 0)} · Pokok berkurang{' '}
+                {formatRupiah(successInfo.principalPortion || 0)} (bunga {successInfo.annualRate}% p.a.)
+              </p>
+            )}
             <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 pt-1">
               Sisa Hutang: {formatRupiah(successInfo.remaining)}
             </div>
@@ -205,6 +237,39 @@ export const PayDebtModal: React.FC<PayDebtModalProps> = ({ isOpen, onClose, deb
                 </div>
               )}
             </div>
+
+            {/* Rincian Amortisasi Cicilan Berjangka */}
+            {previewBreakdown && (
+              <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 space-y-1.5">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                  <Percent className="w-3.5 h-3.5" />
+                  <span>Rincian Cicilan (Bunga {previewBreakdown.annualRate}% p.a.)</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-500 dark:text-slate-400">Bunga bulan ini:</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300 tabular-nums">
+                    {formatRupiah(previewBreakdown.interestPortion)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-500 dark:text-slate-400">Pokok berkurang:</span>
+                  <span className="font-semibold text-emerald-700 dark:text-emerald-300 tabular-nums">
+                    {formatRupiah(previewBreakdown.principalPortion)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs pt-1 border-t border-emerald-200/70 dark:border-emerald-800">
+                  <span className="text-slate-500 dark:text-slate-400">Sisa pokok setelah bayar:</span>
+                  <span className="font-bold text-slate-900 dark:text-white tabular-nums">
+                    {formatRupiah(previewBreakdown.remainingAfter)}
+                  </span>
+                </div>
+                {previewBreakdown.principalPortion < 0 && (
+                  <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                    Nominal kurang dari bunga berjalan — selisihnya menambah sisa pokok (kapitalisasi bunga).
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Sumber Dana (Account / Wallet) Selection */}
             <div>

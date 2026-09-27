@@ -12,7 +12,7 @@ import {
   ThemeMode,
 } from '../types';
 import { ALL_DEFAULT_CATEGORIES, DEFAULT_ACCOUNTS } from '../utils/constants';
-import { getTodayString, calculatePayoffDate, getNextDueDate } from '../utils/formatters';
+import { getTodayString, calculatePayoffDate, getNextDueDate, getActiveTierRate, calculateTieredPayment, TieredPaymentResult } from '../utils/formatters';
 import { generateVaultId, hashPassphrase } from '../services/crypto';
 import { pushToCloudVault, pullFromCloudVault, exportEncryptedBackup, importEncryptedBackup, SyncPayload } from '../services/sync';
 
@@ -55,7 +55,7 @@ interface FinanceContextType {
     notes: string,
     receiptImage?: string,
     accountId?: string
-  ) => { payment: DebtPayment; transaction: Transaction };
+  ) => { payment: DebtPayment; transaction: Transaction; breakdown?: TieredPaymentResult & { annualRate: number } };
   deleteDebtPayment: (debtId: string, paymentId: string) => void;
 
   // Settings & Theme
@@ -761,7 +761,34 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (amount <= 0) throw new Error('Nominal pembayaran harus lebih dari 0');
 
     const paymentId = `pay_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    const newRemaining = Math.max(0, targetDebt.remainingAmount - amount);
+
+    // Amortisasi cicilan berjangka (KPR): cicilan menutup bunga berjalan dulu,
+    // sisanya memotong pokok. Rumus: sisa = a - (c - ((a*b)/12).
+    // Hanya untuk hutang payable + skema tiered + ada periode bunga aktif.
+    let breakdown: (TieredPaymentResult & { annualRate: number }) | undefined;
+    let newRemaining: number;
+    if (
+      targetDebt.type === 'payable' &&
+      targetDebt.installmentCategory === 'tiered_installment' &&
+      targetDebt.tieredPeriods &&
+      targetDebt.tieredPeriods.length > 0
+    ) {
+      const paidSoFar =
+        typeof targetDebt.totalTenor === 'number' && typeof targetDebt.remainingTenor === 'number'
+          ? Math.max(0, targetDebt.totalTenor - targetDebt.remainingTenor)
+          : targetDebt.payments.length;
+      const activeRate = getActiveTierRate(targetDebt.tieredPeriods, paidSoFar);
+      if (activeRate !== undefined && activeRate > 0) {
+        const result = calculateTieredPayment(targetDebt.remainingAmount, activeRate, amount);
+        breakdown = { ...result, annualRate: activeRate };
+        newRemaining = result.remainingAfter;
+      } else {
+        newRemaining = Math.max(0, targetDebt.remainingAmount - amount);
+      }
+    } else {
+      newRemaining = Math.max(0, targetDebt.remainingAmount - amount);
+    }
+
     let newStatus: DebtStatus = newRemaining === 0 ? 'paid' : 'partial';
 
     // Handle installment tenor decrement
@@ -827,6 +854,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       receiptImage,
       transactionId: newTx.id,
       createdAt: Date.now(),
+      interestPortion: breakdown?.interestPortion,
+      principalPortion: breakdown?.principalPortion,
+      annualRateApplied: breakdown?.annualRate,
     };
 
     // Deduct from account balance if account selected
@@ -857,7 +887,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     setTransactions(prev => [newTx, ...prev]);
 
-    return { payment: newPayment, transaction: newTx };
+    return { payment: newPayment, transaction: newTx, breakdown };
   };
 
   const deleteDebtPayment = (debtId: string, paymentId: string) => {
@@ -895,7 +925,31 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (d.id !== debtId) return d;
         const newPayments = d.payments.filter(p => p.id !== paymentId);
         const totalPaid = newPayments.reduce((acc, curr) => acc + curr.amount, 0);
-        const newRemaining = Math.max(0, d.totalAmount - totalPaid);
+
+        // Cicilan berjangka: hitung ulang dengan replay amortisasi kronologis
+        // agar konsisten dengan rumus sisa = a - (c - ((a*b)/12)).
+        let newRemaining: number;
+        if (d.type === 'payable' && d.installmentCategory === 'tiered_installment' && d.tieredPeriods && d.tieredPeriods.length > 0) {
+          const chronological = [...newPayments].sort((x, y) =>
+            x.paymentDate === y.paymentDate ? x.createdAt - y.createdAt : x.paymentDate < y.paymentDate ? -1 : 1
+          );
+          const elapsedOffset =
+            typeof d.totalTenor === 'number' && typeof d.remainingTenor === 'number'
+              ? Math.max(0, d.totalTenor - d.remainingTenor - newPayments.length - 1)
+              : 0;
+          let balance = d.totalAmount;
+          chronological.forEach((p, i) => {
+            const rate = getActiveTierRate(d.tieredPeriods, elapsedOffset + i);
+            if (rate !== undefined && rate > 0) {
+              balance = calculateTieredPayment(balance, rate, p.amount).remainingAfter;
+            } else {
+              balance = Math.max(0, balance - p.amount);
+            }
+          });
+          newRemaining = balance;
+        } else {
+          newRemaining = Math.max(0, d.totalAmount - totalPaid);
+        }
         const newStatus: DebtStatus = newRemaining === 0 ? 'paid' : totalPaid > 0 ? 'partial' : 'unpaid';
 
         let restoredTenor = d.remainingTenor;

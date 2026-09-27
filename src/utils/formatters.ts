@@ -1,3 +1,5 @@
+import type { TieredPeriod } from '../types';
+
 export function formatRupiah(amount: number, withPrefix = true): string {
   const rounded = Math.round(amount || 0);
   const formatted = new Intl.NumberFormat('id-ID', {
@@ -172,5 +174,83 @@ export function calculatePayoffDate(dueDay: number, remainingTenor: number): { d
   }).format(payoffDate);
 
   return { dateStr, formatted };
+}
+
+/**
+ * Menentukan index periode bunga aktif berdasarkan jumlah cicilan yang sudah dibayar.
+ * Periode dihitung berurutan sesuai durasi masing-masing (dalam bulan).
+ * Jika sudah melewati semua periode, gunakan periode terakhir.
+ * Return -1 jika tidak ada periode yang valid.
+ */
+export function getActiveTierPeriodIndex(periods: TieredPeriod[] | undefined, paidCount: number): number {
+  if (!periods || periods.length === 0) return -1;
+  const elapsed = Math.max(0, Math.floor(paidCount));
+  let cumulative = 0;
+  for (let i = 0; i < periods.length; i++) {
+    const duration = Math.max(0, Math.floor(Number(periods[i]?.durationMonths) || 0));
+    cumulative += duration;
+    if (elapsed < cumulative) return i;
+  }
+  return periods.length - 1;
+}
+
+/**
+ * Mengambil suku bunga (% p.a.) periode aktif.
+ * Return undefined jika tidak ada periode / bunga yang valid (= pakai perilaku lama).
+ */
+export function getActiveTierRate(periods: TieredPeriod[] | undefined, paidCount: number): number | undefined {
+  const idx = getActiveTierPeriodIndex(periods, paidCount);
+  if (idx < 0 || !periods) return undefined;
+  const rate = Number(periods[idx]?.interestRate);
+  if (!isFinite(rate) || rate < 0) return undefined;
+  return rate;
+}
+
+export interface TieredPaymentResult {
+  interestPortion: number; // porsi cicilan untuk bunga bulan berjalan (Rp, dibulatkan)
+  principalPortion: number; // porsi cicilan yang memotong pokok (Rp, dibulatkan, bisa negatif)
+  remainingAfter: number; // sisa pokok setelah pembayaran (Rp, dibulatkan, >= 0)
+  isFullPayoff: boolean; // true jika pembayaran melunasi seluruh sisa pokok
+}
+
+/**
+ * Menghitung sisa pokok hutang cicilan berjangka setelah satu pembayaran.
+ *
+ * Rumus: sisa_baru = a - (c - ((a * b) / 12))
+ *   a = sisa pokok sebelum dibayar (Rp)
+ *   b = suku bunga periode aktif (% p.a., mis. 5 untuk 5%)
+ *   c = nominal cicilan yang dibayar (Rp)
+ *
+ * Contoh: a=10.000.000, b=5, c=500.000
+ *   bunga = 10.000.000*5%/12 = 41.667
+ *   sisa = 10.000.000 - (500.000-41.667) = 9.541.667
+ *
+ * Aturan khusus:
+ * - Jika nominal >= sisa pokok (bayar lunas), sisa menjadi 0.
+ * - Jika cicilan < bunga berjalan, pokok bertambah (kapitalisasi bunga, seperti KPR riil).
+ */
+export function calculateTieredPayment(
+  principalBefore: number,
+  annualRatePct: number,
+  paymentAmount: number
+): TieredPaymentResult {
+  const a = Math.max(0, Math.round(principalBefore));
+  const c = Math.max(0, Math.round(paymentAmount));
+  const b = Number(annualRatePct) || 0;
+
+  if (a === 0) {
+    return { interestPortion: 0, principalPortion: 0, remainingAfter: 0, isFullPayoff: true };
+  }
+
+  // Bayar lunas: nominal menutup seluruh sisa pokok -> hutang selesai.
+  if (c >= a) {
+    const interestPortion = Math.round((a * b) / 100 / 12);
+    return { interestPortion, principalPortion: a, remainingAfter: 0, isFullPayoff: true };
+  }
+
+  const interestPortion = Math.round((a * b) / 100 / 12);
+  const principalPortion = c - interestPortion;
+  const remainingAfter = Math.max(0, a - principalPortion);
+  return { interestPortion, principalPortion, remainingAfter, isFullPayoff: remainingAfter === 0 };
 }
 

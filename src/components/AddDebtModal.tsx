@@ -102,48 +102,6 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
       ? calculatePayoffDate(dueDayOfMonth, remainingTenorNum)
       : null;
 
-  // Preset Template KPR untuk Cicilan Berjangka
-  const applyKprTemplate3Years = () => {
-    const totalAmount = Number(totalAmountStr) || 450000000;
-    const initialInstallment = Number(monthlyInstallmentStr) || 3850000;
-    setTieredPeriods([
-      {
-        id: 'tier_1',
-        name: 'Tahun 1 - 3 (Bunga Fix 3.75% Promo)',
-        durationMonths: 36,
-        monthlyAmount: initialInstallment,
-        interestRate: 3.75,
-        isFloating: false,
-      },
-      {
-        id: 'tier_2',
-        name: 'Tahun 4 - 5 (Bunga Fix 6.50% Cap)',
-        durationMonths: 24,
-        monthlyAmount: Math.round(initialInstallment * 1.25),
-        interestRate: 6.5,
-        isFloating: false,
-      },
-      {
-        id: 'tier_3',
-        name: 'Tahun ke-6 dst (Bunga Floating Pasar ~11%)',
-        durationMonths: Math.max(0, (remainingTenorNum || 180) - 60),
-        monthlyAmount: Math.round(initialInstallment * 1.55),
-        interestRate: 11.0,
-        isFloating: true,
-      },
-    ]);
-    if (!monthlyInstallmentStr) {
-      setMonthlyInstallmentStr(String(initialInstallment));
-    }
-    if (!totalAmountStr) {
-      setTotalAmountStr(String(totalAmount));
-    }
-    if (!remainingTenorStr) {
-      setRemainingTenorStr('180');
-      setTotalTenorStr('180');
-    }
-  };
-
   const addTierPeriod = () => {
     setTieredPeriods(prev => [
       ...prev,
@@ -207,6 +165,25 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
       if (!remainingTenor || remainingTenor <= 0) {
         setError('Sisa tenor cicilan harus diisi (berapa kali lagi harus dibayar)');
         return;
+      }
+
+      // Validasi tahapan periode bunga untuk cicilan berjangka
+      if (installmentCategory === 'tiered_installment') {
+        for (let i = 0; i < tieredPeriods.length; i++) {
+          const p = tieredPeriods[i];
+          if (!p.durationMonths || p.durationMonths < 1) {
+            setError(`Periode "${p.name || `#${i + 1}`}": Tenor (bulan) minimal 1 bulan`);
+            return;
+          }
+          if (p.interestRate === undefined || p.interestRate === null || Number.isNaN(p.interestRate) || p.interestRate < 0) {
+            setError(`Periode "${p.name || `#${i + 1}`}": Bunga (% p.a) harus diisi (0 atau lebih)`);
+            return;
+          }
+          if (!p.monthlyAmount || p.monthlyAmount <= 0) {
+            setError(`Periode "${p.name || `#${i + 1}`}": Cicilan per bulan harus lebih besar dari 0`);
+            return;
+          }
+        }
       }
 
       // Hitung tanggal jatuh tempo terdekat
@@ -531,19 +508,17 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                         <span>Skema Tahapan Periode KPR (Bunga Fix & Floating)</span>
                       </h4>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Catat perubahan suku bunga dan perkiraan angsuran tiap periode
+                        Isi manual tiap tahapan: Tenor (bulan), Bunga (% p.a), dan Cicilan per bulan
                       </p>
                     </div>
-                    {tieredPeriods.length === 0 && (
-                      <button
-                        type="button"
-                        onClick={applyKprTemplate3Years}
-                        className="text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800 transition flex items-center gap-1"
-                      >
-                        <Sparkles className="w-3 h-3" />
-                        <span>Gunakan Template KPR</span>
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={addTierPeriod}
+                      className="text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800 transition flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Tambah Periode</span>
+                    </button>
                   </div>
 
                   {tieredPeriods.length > 0 ? (
@@ -630,14 +605,15 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                     <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 text-center">
                       <Info className="w-6 h-6 text-slate-400 mx-auto mb-1.5" />
                       <p className="text-xs text-slate-600 dark:text-slate-400">
-                        Belum ada tahapan periode bunga KPR.
+                        Belum ada tahapan periode bunga. Isi manual tiap periode: Tenor (bulan), Bunga (% p.a), dan Cicilan per bulan.
                       </p>
                       <button
                         type="button"
-                        onClick={applyKprTemplate3Years}
-                        className="mt-2 text-xs font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 underline"
+                        onClick={addTierPeriod}
+                        className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 rounded-xl transition"
                       >
-                        Terapkan skema umum KPR (Fixed 3 Tahun + Floating)
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Tambah Periode Bunga KPR</span>
                       </button>
                     </div>
                   )}

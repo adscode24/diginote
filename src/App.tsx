@@ -51,11 +51,13 @@ function MainApp() {
       {/* Clean Header */}
       <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
-          {/* Brand Wordmark: DigiNote */}
+          {/* Brand: Logo Vektor DigiNote */}
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 text-white flex items-center justify-center font-bold shadow-xs">
-              <Wallet className="w-4 h-4" />
-            </div>
+            <img
+              src="/icon.svg"
+              alt="Logo DigiNote"
+              className="w-8 h-8 rounded-xl shadow-xs"
+            />
             <div className="leading-tight">
               <span className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white block">
                 DigiNote

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Wallet, Eye, EyeOff, LogIn, UserPlus, AlertCircle, Lock, Cloud, Smartphone } from 'lucide-react';
+import { Eye, EyeOff, LogIn, UserPlus, AlertCircle, Lock, Cloud, Smartphone } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { isCloudEnabled } from '../services/firebase';
 
@@ -53,9 +53,11 @@ export const AuthView: React.FC = () => {
       <div className="w-full max-w-sm">
         {/* Brand */}
         <div className="text-center mb-6">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-orange-600 to-amber-500 text-white flex items-center justify-center font-bold shadow-lg mx-auto">
-            <Wallet className="w-7 h-7" />
-          </div>
+          <img
+            src="/icon.svg"
+            alt="Logo DigiNote"
+            className="w-20 h-20 rounded-3xl shadow-lg mx-auto"
+          />
           <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white mt-3">
             DigiNote
           </h1>

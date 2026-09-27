@@ -1,23 +1,5 @@
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="512" height="512" fill="#FFFFFF" />
-  <!-- Outer ring -->
-  <circle cx="256" cy="250" r="168" stroke="#EA580C" stroke-width="30" fill="none" />
-  <!-- Smartphone -->
-  <rect x="270" y="150" width="90" height="170" rx="18" stroke="#EA580C" stroke-width="16" fill="#FFFFFF" />
-  <rect x="295" y="162" width="40" height="10" rx="5" fill="#EA580C" />
-  <rect x="300" y="300" width="30" height="8" rx="4" fill="#EA580C" />
-  <!-- Growth chart arrow -->
-  <polyline points="225,285 262,240 285,262 335,195" stroke="#EA580C" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-  <polyline points="308,198 335,195 332,224" stroke="#EA580C" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-  <!-- Rp coin -->
-  <circle cx="175" cy="325" r="40" fill="#EA580C" />
-  <circle cx="175" cy="325" r="27" stroke="#FFFFFF" stroke-width="10" fill="none" />
-  <!-- Pen -->
-  <rect x="362" y="180" width="26" height="110" rx="13" fill="#EA580C" />
-  <polygon points="362,290 388,290 375,330" fill="#EA580C" />
-  <!-- Banknote -->
-  <g transform="rotate(16 180 239)">
-    <rect x="140" y="215" width="80" height="48" rx="8" stroke="#EA580C" stroke-width="12" fill="#FFFFFF" />
-    <circle cx="180" cy="239" r="8" fill="#EA580C" />
-  </g>
+  <rect x="8" y="8" width="496" height="496" rx="118" fill="#EA580C" />
+  <text x="256" y="248" text-anchor="middle" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="104" font-weight="800" letter-spacing="1" fill="#FFFFFF">Digital</text>
+  <text x="256" y="356" text-anchor="middle" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="100" font-weight="300" letter-spacing="6" fill="#FFFFFF">Note</text>
 </svg>

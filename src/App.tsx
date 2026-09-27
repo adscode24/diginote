@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard,
   Receipt,
@@ -22,10 +22,17 @@ import { SummaryView } from './components/SummaryView';
 import { SettingsView } from './components/SettingsView';
 import { AuthView } from './components/AuthView';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { forceUnlockBodyScroll } from './hooks/useBodyScrollLock';
 
 function MainApp() {
   const { currentUser, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+
+  // Penyembuhan otomatis: tidak ada modal yang bisa terbuka saat pindah halaman,
+  // jadi paksa buka kunci scroll di sini agar halaman tak pernah macet.
+  useEffect(() => {
+    forceUnlockBodyScroll();
+  }, [activeTab]);
 
   const navItems: { id: ActiveTab; label: string; shortLabel: string; icon: React.FC<{ className?: string }> }[] = [
     { id: 'dashboard', label: 'Dashboard', shortLabel: 'Beranda', icon: LayoutDashboard },

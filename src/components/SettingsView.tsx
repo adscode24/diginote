@@ -12,6 +12,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
+import { useAuth } from '../context/AuthContext';
 import { ThemeMode } from '../types';
 import { requestNotificationPermission, sendDailyReminderNotification, isNotificationSupported } from '../services/notifications';
 import { CloudSyncModal } from './CloudSyncModal';
@@ -33,6 +34,7 @@ export const SettingsView: React.FC = () => {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   useBodyScrollLock(showClearConfirm || isSyncModalOpen);
+  const { currentUser, mode: authMode } = useAuth();
 
   const handleToggleReminder = async (enabled: boolean) => {
     if (enabled && isNotificationSupported()) {
@@ -79,6 +81,25 @@ export const SettingsView: React.FC = () => {
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
           Sesuaikan preferensi tema tampilan, notifikasi harian, enkripsi data, dan kelola penyimpanan
         </p>
+        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+            v1.0.0
+          </span>
+          <span
+            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+              authMode === 'online'
+                ? 'bg-orange-100 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+            }`}
+          >
+            {authMode === 'online' ? 'Mode Cloud' : 'Mode Lokal'}
+          </span>
+          {currentUser?.email && (
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 truncate max-w-[220px]">
+              {currentUser.email}
+            </span>
+          )}
+        </div>
       </div>
 
       {feedbackMessage && (

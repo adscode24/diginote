@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { KeyRound, ShieldCheck, AlertCircle, Lock } from 'lucide-react';
 import { useVaultKey } from '../context/VaultKeyContext';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
-import { getVaultDoc } from '../services/onlineSync';
+import { getVaultDoc, type VaultDoc } from '../services/onlineSync';
 import { decryptData } from '../services/crypto';
+import { getVaultSeen, setVaultSeen } from '../services/vaultSession';
 
 interface VaultUnlockModalProps {
   uid: string;
@@ -11,32 +12,59 @@ interface VaultUnlockModalProps {
 }
 
 /**
- * Gerbang frasa sandi vault:
- * - Akun baru (belum ada vault): buat frasa sandi baru.
- * - Perangkat baru (vault sudah ada): masukkan frasa sandi untuk membuka.
+ * Gerbang frasa sandi vault. Hanya muncul bila:
+ * - vault cloud SUDAH ADA + lebih baru dari yang terakhir dilihat + belum dibuka
+ *   (artinya ada perubahan data dari perangkat lain), atau
+ * - pengguna sengaja membukanya (tombol di Pengaturan) untuk membuat vault baru.
+ * Kunci yang pernah dimasukkan tersimpan di perangkat ini sehingga tidak ditanya berulang.
  */
 export const VaultUnlockModal: React.FC<VaultUnlockModalProps> = ({ uid, email }) => {
-  const { vaultKey, vaultKeyUid, unlock, dismissed, dismiss } = useVaultKey();
-  const [mode, setMode] = useState<'loading' | 'create' | 'unlock'>('loading');
+  const { vaultKey, vaultKeyUid, unlock, dismiss, promptOpen } = useVaultKey();
+  const [remote, setRemote] = useState<VaultDoc | null>(null);
+  const [checked, setChecked] = useState(false);
   const [passphrase, setPassphrase] = useState('');
   const [confirm, setConfirm] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState('');
   const [checking, setChecking] = useState(false);
 
-  const open = (!vaultKey || vaultKeyUid !== uid) && !dismissed;
+  const hasKey = !!vaultKey && vaultKeyUid === uid;
+
+  useEffect(() => {
+    if (hasKey) return;
+    setChecked(false);
+    setRemote(null);
+    getVaultDoc(uid)
+      .then(doc => {
+        setRemote(doc);
+        setChecked(true);
+      })
+      .catch(() => setChecked(true));
+  }, [uid, hasKey]);
+
+  const hasUnseenChanges = !!remote && remote.updatedAt > getVaultSeen(uid);
+  // Mode buat: hanya bila diminta eksplisit dan belum ada vault
+  const showCreate = !hasKey && promptOpen && checked && !remote;
+  // Mode buka: ada perubahan yang belum dilihat dan belum dibuka
+  const showUnlock = !hasKey && checked && hasUnseenChanges;
+  const open = showCreate || showUnlock;
   useBodyScrollLock(open);
 
   useEffect(() => {
-    if (!open) return;
-    setMode('loading');
-    setError('');
-    getVaultDoc(uid)
-      .then(remote => setMode(remote ? 'unlock' : 'create'))
-      .catch(() => setMode('create'));
-  }, [uid, open]);
+    if (open) {
+      setError('');
+      setPassphrase('');
+      setConfirm('');
+    }
+  }, [open ]);
 
   if (!open) return null;
+  const mode: 'create' | 'unlock' = showCreate ? 'create' : 'unlock';
+
+  const handleDismiss = () => {
+    if (remote) setVaultSeen(uid, remote.updatedAt);
+    dismiss();
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,14 +89,14 @@ export const VaultUnlockModal: React.FC<VaultUnlockModalProps> = ({ uid, email }
     setError('');
     setChecking(true);
     try {
-      const remote = await getVaultDoc(uid);
-      if (!remote) {
-        // Vault belum ada (terhapus / akun baru) -> anggap sebagai pembuatan
+      const latest = remote || (await getVaultDoc(uid));
+      if (!latest) {
         unlock(uid, passphrase);
         return;
       }
       // Verifikasi dengan trial-decrypt sebelum membuka
-      await decryptData(remote.payload, passphrase);
+      await decryptData(latest.payload, passphrase);
+      setVaultSeen(uid, latest.updatedAt);
       unlock(uid, passphrase);
     } catch {
       setError('Frasa sandi salah. Data tidak dapat dibuka.');
@@ -88,7 +116,7 @@ export const VaultUnlockModal: React.FC<VaultUnlockModalProps> = ({ uid, email }
           </div>
           <div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white">
-              {mode === 'create' ? 'Amankan Vault Cloud Anda' : 'Buka Vault Cloud'}
+              {mode === 'create' ? 'Amankan Vault Cloud Anda' : 'Ada Perubahan Baru'}
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               {email || 'Akun cloud'} · {mode === 'create' ? 'buat frasa sandi baru' : 'masukkan frasa sandi'}
@@ -97,94 +125,88 @@ export const VaultUnlockModal: React.FC<VaultUnlockModalProps> = ({ uid, email }
         </div>
 
         <div className="overflow-y-auto flex-1 p-6">
-          {mode === 'loading' ? (
-            <p className="text-xs text-slate-500 dark:text-slate-400 text-center py-6">
-              Memeriksa vault cloud…
+          <form onSubmit={mode === 'create' ? handleCreate : handleUnlock} className="space-y-4">
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              {mode === 'create' ? (
+                <>
+                  Buat <strong>frasa sandi vault</strong> untuk mengenkripsi data Anda. Data di server
+                  hanya tersimpan terenkripsi — <strong>jangan sampai lupa</strong>, karena kami tidak
+                  bisa memulihkannya.
+                </>
+              ) : (
+                <>
+                  Ada <strong>perubahan data dari perangkat lain</strong> yang belum Anda lihat.
+                  Masukkan <strong>frasa sandi vault</strong> untuk membuka dan menyelaraskannya.
+                </>
+              )}
             </p>
-          ) : (
-            <form onSubmit={mode === 'create' ? handleCreate : handleUnlock} className="space-y-4">
-              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                {mode === 'create' ? (
-                  <>
-                    Buat <strong>frasa sandi vault</strong> untuk mengenkripsi data Anda. Data di server
-                    hanya tersimpan terenkripsi — <strong>jangan sampai lupa</strong>, karena kami tidak
-                    bisa memulihkannya.
-                  </>
-                ) : (
-                  <>
-                    Vault cloud akun ini terenkripsi. Masukkan <strong>frasa sandi vault</strong> yang
-                    dibuat di perangkat pertama agar data yang sama tampil di sini.
-                  </>
-                )}
-              </p>
 
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                Frasa Sandi Vault *
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type={showPass ? 'text' : 'password'}
+                  value={passphrase}
+                  onChange={e => setPassphrase(e.target.value)}
+                  placeholder="Minimal 6 karakter"
+                  autoComplete="new-password"
+                  className="w-full pl-9 pr-16 py-2.5 text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPass(v => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-semibold text-slate-400 hover:text-slate-600"
+                >
+                  {showPass ? 'Sembunyi' : 'Lihat'}
+                </button>
+              </div>
+            </div>
+
+            {mode === 'create' && (
               <div>
                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-                  Frasa Sandi Vault *
+                  Konfirmasi Frasa Sandi *
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type={showPass ? 'text' : 'password'}
-                    value={passphrase}
-                    onChange={e => setPassphrase(e.target.value)}
-                    placeholder="Minimal 6 karakter"
+                    value={confirm}
+                    onChange={e => setConfirm(e.target.value)}
+                    placeholder="Ulangi frasa sandi"
                     autoComplete="new-password"
-                    className="w-full pl-9 pr-16 py-2.5 text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+                    className="w-full pl-9 pr-3.5 py-2.5 text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPass(v => !v)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-semibold text-slate-400 hover:text-slate-600"
-                  >
-                    {showPass ? 'Sembunyi' : 'Lihat'}
-                  </button>
                 </div>
               </div>
+            )}
 
-              {mode === 'create' && (
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-                    Konfirmasi Frasa Sandi *
-                  </label>
-                  <div className="relative">
-                    <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type={showPass ? 'text' : 'password'}
-                      value={confirm}
-                      onChange={e => setConfirm(e.target.value)}
-                      placeholder="Ulangi frasa sandi"
-                      autoComplete="new-password"
-                      className="w-full pl-9 pr-3.5 py-2.5 text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
-                    />
-                  </div>
-                </div>
-              )}
+            {error && (
+              <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
 
-              {error && (
-                <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{error}</span>
-                </div>
-              )}
+            <button
+              type="submit"
+              disabled={checking}
+              className="w-full py-2.5 px-4 rounded-xl text-sm font-bold bg-orange-600 hover:bg-orange-700 disabled:opacity-60 text-white shadow-xs transition"
+            >
+              {checking ? 'Memeriksa…' : mode === 'create' ? 'Buat & Aktifkan Sinkronisasi' : 'Buka & Selaraskan'}
+            </button>
 
-              <button
-                type="submit"
-                disabled={checking}
-                className="w-full py-2.5 px-4 rounded-xl text-sm font-bold bg-orange-600 hover:bg-orange-700 disabled:opacity-60 text-white shadow-xs transition"
-              >
-                {checking ? 'Memeriksa…' : mode === 'create' ? 'Buat & Aktifkan Sinkronisasi' : 'Buka Vault'}
-              </button>
-
-              <button
-                type="button"
-                onClick={dismiss}
-                className="w-full py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition"
-              >
-                Nanti Saja
-              </button>
-            </form>
-          )}
+            <button
+              type="button"
+              onClick={handleDismiss}
+              className="w-full py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition"
+            >
+              Nanti Saja
+            </button>
+          </form>
         </div>
       </div>
     </div>

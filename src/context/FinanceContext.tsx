@@ -19,7 +19,7 @@ import { generateVaultId, hashPassphrase, encryptData, decryptData } from '../se
 import { pushToCloudVault, pullFromCloudVault, exportEncryptedBackup, importEncryptedBackup, SyncPayload } from '../services/sync';
 import { isCloudEnabled } from '../services/firebase';
 import { getVaultDoc, pushVaultDoc, subscribeVaultDoc, getUserProfile, getDeviceId, type VaultData } from '../services/onlineSync';
-import { getVaultPassphrase } from '../services/vaultSession';
+import { getVaultPassphrase, setVaultSeen } from '../services/vaultSession';
 import { useVaultKey } from './VaultKeyContext';
 
 interface FinanceContextType {
@@ -347,6 +347,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     if (Array.isArray(data.billPayments)) setBillPayments(data.billPayments as BillPayment[]);
     if (data.reminderSettings) setReminderSettings(data.reminderSettings as ReminderSettings);
     persistBase(baseUpdatedAt);
+    try {
+      setVaultSeen(userId, baseUpdatedAt);
+    } catch {
+      /* abaikan */
+    }
     setLastSyncedAt(Date.now());
     setSyncStatus('synced');
     if (!silent) setSyncNotice('Data diperbarui dari perangkat lain.');
@@ -527,6 +532,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
           });
           lastPushedRef.current = updatedAt;
           persistBase(updatedAt);
+          try {
+            setVaultSeen(userId, updatedAt);
+          } catch {
+            /* abaikan */
+          }
           setLastSyncedAt(updatedAt);
           setSyncStatus('synced');
         } catch (e) {

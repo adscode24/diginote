@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard,
   Receipt,
@@ -167,6 +167,12 @@ function MainApp() {
 
 function GatedApp() {
   const { currentUser, mode, authReady } = useAuth();
+  const { restore } = useVaultKey();
+
+  // Pulihkan kunci vault tersimpan agar tidak ditanya ulang tiap refresh
+  useEffect(() => {
+    if (currentUser) restore(currentUser.id);
+  }, [currentUser, restore]);
 
   // Tunggu status sesi Firebase pulih agar pengguna login tidak melihat kedip login
   if (!authReady) {

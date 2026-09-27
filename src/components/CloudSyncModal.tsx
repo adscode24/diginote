@@ -42,7 +42,7 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose 
     cloudVaultId,
   } = useFinance();
   const { currentUser } = useAuth();
-  const { vaultKey, lock, reopen } = useVaultKey();
+  const { vaultKey, lock, requestOpen } = useVaultKey();
   const cloudMode = isCloudEnabled();
 
   const [passphrase, setPassphrase] = useState('');
@@ -231,14 +231,14 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose 
               )}
               <div className="flex items-center justify-between pt-1">
                 <span className="text-[11px] text-slate-400">
-                  {vaultKey ? 'Vault terbuka di tab ini' : 'Vault terkunci di tab ini'}
+                  {vaultKey ? 'Vault terbuka di perangkat ini' : 'Vault terkunci di perangkat ini'}
                 </span>
                 {vaultKey && currentUser ? (
                   <button
                     type="button"
                     onClick={() => {
                       lock(currentUser.id);
-                      setStatusMessage({ type: 'success', text: 'Vault dikunci di tab ini.' });
+                      setStatusMessage({ type: 'success', text: 'Vault dikunci di perangkat ini.' });
                     }}
                     className="text-[11px] font-semibold text-red-600 dark:text-red-400 hover:underline"
                   >
@@ -247,10 +247,10 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose 
                 ) : (
                   <button
                     type="button"
-                    onClick={reopen}
+                    onClick={requestOpen}
                     className="text-[11px] font-semibold text-orange-600 dark:text-orange-400 hover:underline"
                   >
-                    Buka Vault
+                    {cloudVaultId ? 'Buka Vault' : 'Aktifkan Sinkronisasi'}
                   </button>
                 )}
               </div>

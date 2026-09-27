@@ -19,8 +19,18 @@ function readConfig(): FirebaseConfig | null {
   const authDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined;
   const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined;
   const appId = import.meta.env.VITE_FIREBASE_APP_ID as string | undefined;
-  if (!apiKey || !authDomain || !projectId || !appId) return null;
-  return { apiKey, authDomain, projectId, appId };
+  if (apiKey && authDomain && projectId && appId) {
+    return { apiKey, authDomain, projectId, appId };
+  }
+  // Fallback: kunci klien publik Firebase (disengaja publik — keamanan
+  // ditegakkan oleh Auth + Firestore Rules, bukan oleh kunci ini).
+  // Env var selalu menang bila diisi (mis. Vercel/GitHub Secrets).
+  return {
+    apiKey: 'AIzaSyC4D17V7YKxFOnNaU8ZNzvaqilk-TYOuQ4',
+    authDomain: 'diginote-c9743.firebaseapp.com',
+    projectId: 'diginote-c9743',
+    appId: '1:128053779451:web:283a9ff7045695c44b895e',
+  };
 }
 
 /**

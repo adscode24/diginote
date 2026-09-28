@@ -49,6 +49,7 @@ function MainApp() {
   const navBarRef = useRef<HTMLElement | null>(null);
   const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [bubble, setBubble] = useState({ left: 0, width: 0, visible: false });
+  const [touchTab, setTouchTab] = useState<ActiveTab | null>(null);
 
   // Kaca interaktif: sorotan mengikuti kursor (web) / sentuhan (mobile)
   const updateGlassSpot = (clientX: number, clientY: number) => {
@@ -85,9 +86,11 @@ function MainApp() {
   const renderNavItem = (item: (typeof navItems)[number]) => {
     const Icon = item.icon;
     const isActive = activeTab === item.id;
+    const isTouched = touchTab === item.id && !isActive;
     return (
       <button
         key={item.id}
+        data-nav={item.id}
         ref={el => {
           itemRefs.current[item.id] = el;
         }}
@@ -95,14 +98,14 @@ function MainApp() {
           setActiveTab(item.id);
         }}
         className={`flex flex-col items-center justify-center flex-1 py-1.5 px-1 rounded-xl transition min-w-[44px] min-h-[44px] relative z-10 group ${
-          isActive
+          isActive || isTouched
             ? 'text-orange-600 dark:text-orange-400 font-bold'
             : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 font-medium'
         }`}
       >
         <Icon
           className={`w-5 h-5 transition-transform group-active:scale-95 ${
-            isActive ? 'stroke-[2.5]' : 'stroke-2'
+            isActive || isTouched ? 'stroke-[2.5]' : 'stroke-2'
           }`}
         />
         <span className="text-[10px] tracking-tight mt-1 truncate max-w-[68px]">
@@ -114,6 +117,37 @@ function MainApp() {
         )}
       </button>
     );
+  };
+
+  // Hold + geser di dock (mobile/APK): tiap tab dilewati menyala bergantian,
+  // lepas tepat di ikon -> halaman itu terbuka. Lepas di luar ikon -> diam.
+  // Tap biasa tidak berubah (klik). touchcancel sengaja tidak navigasi.
+  const navTouchId = useRef<number | null>(null);
+  const tabFromPoint = (clientX: number, clientY: number): ActiveTab | null => {
+    const el = document.elementFromPoint(clientX, clientY);
+    const btn = el?.closest?.('[data-nav]') as HTMLElement | null;
+    const id = btn?.dataset?.nav;
+    return navItems.some(n => n.id === id) ? (id as ActiveTab) : null;
+  };
+  const handleDockTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    navTouchId.current = t.identifier;
+  };
+  const handleDockTouchMove = (e: React.TouchEvent) => {
+    if (navTouchId.current === null) return;
+    const t = Array.from(e.touches).find(x => x.identifier === navTouchId.current) || e.touches[0];
+    if (!t) return;
+    updateGlassSpot(t.clientX, t.clientY);
+    setTouchTab(tabFromPoint(t.clientX, t.clientY));
+  };
+  const endDockTouch = (navigate: boolean) => (e: React.TouchEvent) => {
+    const t =
+      Array.from(e.changedTouches).find(x => x.identifier === navTouchId.current) ||
+      e.changedTouches[0];
+    navTouchId.current = null;
+    const target = t ? tabFromPoint(t.clientX, t.clientY) : null;
+    setTouchTab(null);
+    if (navigate && target) setActiveTab(target);
   };
 
   return (
@@ -184,8 +218,19 @@ function MainApp() {
         ref={navBarRef}
         aria-label="Navigasi Utama"
         onMouseMove={handleNavMouseMove}
-        onTouchStart={handleNavTouch}
-        onTouchMove={handleNavTouch}
+        onTouchStart={e => {
+          handleNavTouch(e);
+          handleDockTouchStart(e);
+        }}
+        onTouchMove={e => {
+          handleNavTouch(e);
+          handleDockTouchMove(e);
+        }}
+        onTouchEnd={endDockTouch(true)}
+        onTouchCancel={() => {
+          navTouchId.current = null;
+          setTouchTab(null);
+        }}
         className="fixed bottom-4 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[480px] z-40 rounded-[28px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl backdrop-saturate-150 border border-white/50 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.45)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.08)] overflow-hidden"
       >
         {/* Sorotan kaca mengikuti kursor/sentuhan */}

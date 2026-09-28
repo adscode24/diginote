@@ -301,7 +301,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
             <div className="flex items-center gap-2">
               <button
                 onClick={() => goCard(activeCardIdx - 1)}
-                className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-orange-600 hover:border-orange-500 transition shrink-0"
+                className="hidden sm:flex p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-orange-600 hover:border-orange-500 transition shrink-0 items-center justify-center"
                 title="Kartu sebelumnya"
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -396,7 +396,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
 
               <button
                 onClick={() => goCard(activeCardIdx + 1)}
-                className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-orange-600 hover:border-orange-500 transition shrink-0"
+                className="hidden sm:flex p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-orange-600 hover:border-orange-500 transition shrink-0 items-center justify-center"
                 title="Kartu berikutnya"
               >
                 <ChevronRight className="w-4 h-4" />

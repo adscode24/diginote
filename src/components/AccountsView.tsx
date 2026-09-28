@@ -27,6 +27,7 @@ import { CategoryIcon } from './CategoryIcon';
 import { AccountModal } from './AccountModal';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { useAmountPrivacy } from '../hooks/useAmountPrivacy';
+import { useToast } from './Toast';
 
 const TYPE_CONFIGS: { type: AccountType; label: string; icon: string }[] = [
   { type: 'bank', label: 'Rekening Bank', icon: 'Building2' },
@@ -42,6 +43,7 @@ export const AccountsView: React.FC<{ onNavigateTab?: (tab: ActiveTab) => void }
 }) => {
   const { isHidden, toggleHidden, masked } = useAmountPrivacy();
   const { accounts, transactions, deleteAccount, summary } = useFinance();
+  const { pushToast } = useToast();
 
   const [activeCategoryTab, setActiveCategoryTab] = useState<string>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -236,11 +238,10 @@ export const AccountsView: React.FC<{ onNavigateTab?: (tab: ActiveTab) => void }
       return;
     }
     if (
-      confirm(
-        `Hapus sumber dana "${account.name}"? Transaksi yang sudah tercatat dengan akun ini akan tetap tersimpan.`
-      )
+      confirm('Apakah Anda yakin untuk menghapus data ini?\n\nTransaksi yang sudah tercatat dengan akun ini akan tetap tersimpan.')
     ) {
       deleteAccount(account.id);
+      pushToast('Data berhasil dihapus.');
     }
   };
 

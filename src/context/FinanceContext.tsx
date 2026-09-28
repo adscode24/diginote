@@ -318,6 +318,23 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
   const [syncNotice, setSyncNotice] = useState<{ text: string; action: 'pull' | null } | null>(null);
   const [cloudVaultId, setCloudVaultId] = useState<string | null>(null);
   const [syncErrorMsg, setSyncErrorMsg] = useState<string | null>(null);
+  const justAppliedRef = React.useRef(false);
+  const pushTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const getStoredBase = () => {
+    try {
+      return localStorage.getItem(`diginote_${userId}_vault_base`) || '';
+    } catch {
+      return '';
+    }
+  };
+  const persistBase = (v: string) => {
+    try {
+      localStorage.setItem(`diginote_${userId}_vault_base`, v);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const vaultOwner = (email?: string | null): VaultOwner => ({
     uid: userId,
@@ -392,11 +409,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
 
   const currentEmail = (): string | null => getActiveEmail();
 
-  // Setup vault per akun Firebase asli (satu kali per login).
-  // TIDAK ada langganan realtime / push otomatis: seluruh sinkronisasi
-  // hanya terjadi lewat tombol di halaman Pengaturan (anti-freeze).
+  // Setup vault per akun Firebase asli (satu kali per login) + tarik terbaru saat buka aplikasi.
   // Akun lokal/offline (user_...) tetap offline-only dan tidak menyentuh cloud.
   useEffect(() => {
+    if (pushTimerRef.current) {
+      clearTimeout(pushTimerRef.current);
+      pushTimerRef.current = null;
+    }
+    justAppliedRef.current = false;
+
     if (!cloudEnabled || !isCloudCapableUid(userId)) {
       setCloudVaultId(null);
       setSyncStatus('offline');
@@ -436,7 +457,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
           if (legacy.accounts.length > 0) setAccounts(legacy.accounts);
           if (legacy.debts.length > 0) setDebts(legacy.debts);
           if (legacy.reminderSettings) setReminderSettings(legacy.reminderSettings);
-          setSyncNotice({ text: 'Data lama perangkat ini dimuat. Buka Pengaturan untuk sinkronisasi.', action: null });
+          setSyncNotice({ text: 'Data lama perangkat ini dimuat dan akan disinkronkan ke cloud.', action: null });
         }
 
         const owner = vaultOwner(currentEmail());
@@ -445,7 +466,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
         setCloudVaultId(vault.vaultCode || '');
         setLastSyncedAt(Date.now());
 
-        // Jika cloud punya data sedangkan lokal kosong, pakai cloud (sekali saja).
+        // Otomatis tersinkron ke data terbaru setiap buka aplikasi:
+        // bila cloud lebih baru dari terakhir yang kita selaraskan, pakai cloud.
+        const storedBase = getStoredBase();
         const localEmpty =
           localSnapshot.transactions.length === 0 &&
           localSnapshot.accounts.length === 0 &&
@@ -457,8 +480,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
           vault.debts.length > 0 ||
           vault.bills.length > 0 ||
           vault.billPayments.length > 0;
-        if (localEmpty && cloudHasData) {
+        if (cloudHasData && (localEmpty || (vault.updatedAt && vault.updatedAt > storedBase))) {
+          justAppliedRef.current = true;
           applyCloudVault(vault);
+          persistBase(vault.updatedAt || '');
+          if (!localEmpty) {
+            setSyncNotice({ text: 'Data terbaru dari cloud dimuat.', action: null });
+          }
+        } else {
+          persistBase(vault.updatedAt || storedBase);
         }
 
         setSyncStatus(navigator.onLine ? 'synced' : 'offline');
@@ -482,7 +512,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
   }, [userId]);
 
   /**
-   * Push manual: kirim seluruh data lokal ke cloud SEKARANG (hanya via Pengaturan).
+   * Push manual: kirim seluruh data lokal ke cloud SEKARANG (via Pengaturan).
    */
   const pushToVaultNow = useCallback(async (): Promise<boolean> => {
     if (!cloudEnabled || !isCloudCapableUid(userId) || !cloudVaultId) return false;
@@ -505,6 +535,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
       setSyncStatus('synced');
       setSyncErrorMsg(null);
       setSyncNotice({ text: 'Data berhasil disinkronkan ke cloud.', action: null });
+      persistBase(updatedAt);
       return true;
     } catch (err: unknown) {
       const msg = (err as Error)?.message || 'Gagal sinkron ke cloud.';
@@ -517,7 +548,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
   }, [cloudEnabled, userId, transactions, accounts, debts, categories, bills, billPayments, reminderSettings, cloudVaultId]);
 
   /**
-   * Pull manual: tarik data terbaru dari cloud SEKARANG (hanya via Pengaturan).
+   * Pull manual: tarik data terbaru dari cloud SEKARANG (via Pengaturan).
    */
   const pullFromVaultNow = useCallback(async (): Promise<boolean> => {
     if (!cloudEnabled || !isCloudCapableUid(userId)) return false;
@@ -545,6 +576,58 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
   }, [cloudEnabled, userId]);
 
   const clearSyncNotice = () => setSyncNotice(null);
+
+  // Otomatis menyimpan ke cloud setiap ada data baru (debounced, pola Fuel-Traxr).
+  // Aman dari freeze: payload terstruktur kecil (tanpa foto), tanpa listener realtime.
+  useEffect(() => {
+    if (!cloudEnabled || !isCloudCapableUid(userId)) return;
+    if (!cloudVaultId) return;
+    if (justAppliedRef.current) {
+      justAppliedRef.current = false;
+      return;
+    }
+    if (!navigator.onLine) {
+      setSyncStatus('offline');
+      return;
+    }
+    if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
+    pushTimerRef.current = setTimeout(async () => {
+      pushTimerRef.current = null;
+      if (!navigator.onLine) {
+        setSyncStatus('offline');
+        return;
+      }
+      setSyncStatus('syncing');
+      try {
+        const updatedAt = await pushVault(vaultOwner(currentEmail()), cloudVaultId, {
+          transactions,
+          categories,
+          accounts,
+          debts,
+          bills,
+          billPayments,
+          reminderSettings,
+        });
+        persistBase(updatedAt);
+        setLastSyncedAt(Date.now());
+        setSyncStatus('synced');
+        setSyncErrorMsg(null);
+      } catch (err: unknown) {
+        const msg = (err as Error)?.message || 'Gagal sinkron ke cloud.';
+        if (!navigator.onLine) {
+          setSyncStatus('offline');
+          setSyncErrorMsg(null);
+        } else {
+          setSyncStatus('error');
+          setSyncErrorMsg(msg);
+        }
+      }
+    }, 1500);
+    return () => {
+      if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions, accounts, debts, categories, bills, billPayments, reminderSettings, cloudVaultId, userId]);
 
   // Penyimpanan lokal: SATU effect debounce (anti-freeze).
   // Alasan: foto struk base64 membuat state bermegabyte; stringify + setItem

@@ -3,6 +3,7 @@ import { X, AlertCircle, Calendar, BellRing, Wallet } from 'lucide-react';
 import { Bill } from '../types';
 import { useFinance } from '../context/FinanceContext';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { useToast } from './Toast';
 import { formatRupiah } from '../utils/formatters';
 
 interface BillModalProps {
@@ -13,6 +14,7 @@ interface BillModalProps {
 
 export const BillModal: React.FC<BillModalProps> = ({ isOpen, onClose, billToEdit = null }) => {
   const { addBill, updateBill, categories, accounts } = useFinance();
+  const { pushToast } = useToast();
   useBodyScrollLock(isOpen);
 
   const [name, setName] = useState('');
@@ -89,6 +91,7 @@ export const BillModal: React.FC<BillModalProps> = ({ isOpen, onClose, billToEdi
     } else {
       addBill(payload);
     }
+    pushToast(isEditing ? 'Perubahan berhasil disimpan.' : 'Data berhasil disimpan.');
     onClose();
   };
 

@@ -21,9 +21,11 @@ import { CategoryIcon } from './CategoryIcon';
 import { TransactionModal } from './TransactionModal';
 import { CategoryManagerModal } from './CategoryManagerModal';
 import { ReceiptViewerModal } from './ReceiptViewerModal';
+import { useToast } from './Toast';
 
 export const TransactionsView: React.FC = () => {
   const { transactions, categories, deleteTransaction } = useFinance();
+  const { pushToast } = useToast();
 
   // Search & Type Toggle (No category, account, period, or date_desc filters as requested)
   const [search, setSearch] = useState('');
@@ -135,8 +137,9 @@ export const TransactionsView: React.FC = () => {
   };
 
   const handleDelete = (tx: Transaction) => {
-    if (confirm(`Hapus transaksi "${tx.categoryName} - ${formatRupiah(tx.amount)}"?`)) {
+    if (confirm('Apakah Anda yakin untuk menghapus data ini?')) {
       deleteTransaction(tx.id);
+      pushToast('Data berhasil dihapus.');
     }
   };
 

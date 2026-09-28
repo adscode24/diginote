@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Debt, DebtType, InstallmentCategory, TieredPeriod } from '../types';
 import { useFinance } from '../context/FinanceContext';
+import { useToast } from './Toast';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { formatRupiah, getTodayString, calculatePayoffDate, getNextDueDate } from '../utils/formatters';
 
@@ -31,6 +32,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
   debtToEdit = null,
 }) => {
   const { addDebt, updateDebt } = useFinance();
+  const { pushToast } = useToast();
 
   const [installmentCategory, setInstallmentCategory] = useState<InstallmentCategory>('non_installment');
   const [type, setType] = useState<DebtType>(defaultType);
@@ -228,6 +230,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
       });
     }
 
+    pushToast(isEditing ? 'Perubahan berhasil disimpan.' : 'Data berhasil disimpan.');
     onClose();
   };
 

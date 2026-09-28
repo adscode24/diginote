@@ -30,6 +30,7 @@ import { BillModal } from './BillModal';
 import { BillPayModal } from './BillPayModal';
 import { useBillCards } from '../hooks/useBillCards';
 import { useAmountPrivacy } from '../hooks/useAmountPrivacy';
+import { useToast } from './Toast';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 type DebtsTab = 'debts' | 'bills';
@@ -38,6 +39,7 @@ export const DebtsView: React.FC = () => {
   const { debts, deleteDebt, deleteDebtPayment, deleteBill } = useFinance();
   const billCards = useBillCards();
   const { isHidden, toggleHidden, masked } = useAmountPrivacy();
+  const { pushToast } = useToast();
 
   const [mainTab, setMainTab] = useState<DebtsTab>('debts');
   const [activeType, setActiveType] = useState<DebtType>('payable');
@@ -73,6 +75,7 @@ export const DebtsView: React.FC = () => {
     ) {
       deleteDebtPayment(debt.id, payment.id);
       setSelectedPaymentDetail(null);
+      pushToast('Data berhasil dihapus.');
     }
   };
 
@@ -354,7 +357,10 @@ export const DebtsView: React.FC = () => {
                   </button>
                   <button
                     onClick={() => {
-                      if (confirm(`Hapus tagihan rutin "${bill.name}"?`)) deleteBill(bill.id);
+                      if (confirm(`Hapus tagihan rutin "${bill.name}"?`)) {
+                        deleteBill(bill.id);
+                        pushToast('Data berhasil dihapus.');
+                      }
                     }}
                     className="p-2 text-slate-400 hover:text-red-600 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/40 transition"
                     title="Hapus tagihan"
@@ -531,8 +537,9 @@ export const DebtsView: React.FC = () => {
 
                       <button
                         onClick={() => {
-                          if (confirm(`Hapus catatan hutang "${debt.counterparty}"?`)) {
+                          if (confirm('Apakah Anda yakin untuk menghapus data ini?')) {
                             deleteDebt(debt.id);
+                            pushToast('Data berhasil dihapus.');
                           }
                         }}
                         className="p-2 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition"

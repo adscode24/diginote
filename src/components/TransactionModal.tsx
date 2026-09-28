@@ -8,6 +8,7 @@ import { CategoryIcon } from './CategoryIcon';
 import { CategoryManagerModal } from './CategoryManagerModal';
 import { AccountModal } from './AccountModal';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { useToast } from './Toast';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   transactionToEdit,
 }) => {
   const { categories, accounts, addTransaction, updateTransaction } = useFinance();
+  const { pushToast } = useToast();
 
   const [type, setType] = useState<TransactionType>(initialType);
   const [amountStr, setAmountStr] = useState('');
@@ -176,6 +178,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       });
     }
 
+    pushToast(transactionToEdit ? 'Perubahan berhasil disimpan.' : 'Data berhasil disimpan.');
     onClose();
   };
 

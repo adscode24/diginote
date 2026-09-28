@@ -5,6 +5,7 @@ import { useFinance } from '../context/FinanceContext';
 import { ACCOUNT_TYPES, COLOR_PALETTE } from '../utils/constants';
 import { CategoryIcon } from './CategoryIcon';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { useToast } from './Toast';
 import { formatRupiah } from '../utils/formatters';
 
 interface AccountModalProps {
@@ -23,6 +24,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   defaultType = 'bank',
 }) => {
   const { addAccount, updateAccount, adjustAccountBalance } = useFinance();
+  const { pushToast } = useToast();
 
   const [name, setName] = useState('');
   const [type, setType] = useState<AccountType>(defaultType);
@@ -89,6 +91,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         return;
       }
       adjustAccountBalance(accountToEdit.id, newBal);
+      pushToast('Data berhasil disimpan.');
       onClose();
       return;
     }
@@ -121,6 +124,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
       });
     }
 
+    pushToast(accountToEdit ? 'Perubahan berhasil disimpan.' : 'Data berhasil disimpan.');
     onClose();
   };
 

@@ -6,6 +6,8 @@ import {
   CreditCard,
   CalendarDays,
   Settings,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { FinanceProvider, useFinance } from './context/FinanceContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -19,9 +21,26 @@ import { SettingsView } from './components/SettingsView';
 import { AuthView } from './components/AuthView';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { PullToRefresh } from './components/PullToRefresh';
+import { ToastProvider } from './components/Toast';
 import { forceUnlockBodyScroll } from './hooks/useBodyScrollLock';
 
 import { ProfileView } from './components/ProfileView';
+
+/** Tombol toggle tema terang/gelap di header. */
+const ThemeToggleButton: React.FC = () => {
+  const { themeMode, setThemeMode } = useFinance();
+  const isDark = themeMode === 'dark';
+  return (
+    <button
+      onClick={() => setThemeMode(isDark ? 'light' : 'dark')}
+      className="flex items-center justify-center w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-amber-300 hover:text-orange-600 dark:hover:text-orange-400 hover:border-orange-300 transition"
+      title={isDark ? 'Ganti ke mode terang' : 'Ganti ke mode gelap'}
+      aria-label="Ganti tema tampilan"
+    >
+      {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+    </button>
+  );
+};
 
 function MainApp() {
   const { currentUser } = useAuth();
@@ -173,6 +192,8 @@ function MainApp() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Toggle Tema Terang/Gelap */}
+            <ThemeToggleButton />
             {/* Foto Profil -> Halaman Profile */}
             <button
               onClick={() => setActiveTab('profile')}
@@ -297,7 +318,9 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <GatedApp />
+        <ToastProvider>
+          <GatedApp />
+        </ToastProvider>
       </AuthProvider>
     </ErrorBoundary>
   );

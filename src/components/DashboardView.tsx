@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import {
-  Wallet,
   ArrowUpRight,
   ArrowDownLeft,
   Calendar,
@@ -17,6 +16,8 @@ import {
   Pencil,
   Trash2,
   Cloud,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { useAuth } from '../context/AuthContext';
@@ -110,16 +111,64 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
       .slice(0, 3);
   }, [debts]);
 
-  // Hitung total saldo semua sumber dana (kartu kredit = sumber dana biasa)
-  const liquidAccounts = useMemo(() => {
-    return accounts.filter(a => a.type === 'bank' || a.type === 'cash' || a.type === 'ewallet' || a.type === 'credit_card');
-  }, [accounts]);
+  // Privasi angka: eye-toggle per kartu (tersimpan di perangkat)
+  const [hiddenMap, setHiddenMap] = useState<Record<string, boolean>>(() => {
+    try {
+      const raw = localStorage.getItem('diginote_hide_amounts_v2');
+      if (raw) return JSON.parse(raw);
+    } catch {
+      /* abaikan */
+    }
+    return {};
+  });
+  const toggleHide = (id: string) => {
+    setHiddenMap(prev => {
+      const next = { ...prev, [id]: !prev[id] };
+      try {
+        localStorage.setItem('diginote_hide_amounts_v2', JSON.stringify(next));
+      } catch {
+        /* abaikan */
+      }
+      return next;
+    });
+  };
+  const masked = (id: string, amount: number) =>
+    hiddenMap[id] ? 'Rp••••••' : formatRupiah(amount);
 
-  const totalLiquidAccountsBalance = useMemo(() => {
-    return liquidAccounts.reduce((sum, a) => sum + (a.balance || 0), 0);
-  }, [liquidAccounts]);
+  const EyeToggle: React.FC<{ id: string; dark?: boolean }> = ({ id, dark }) => (
+    <button
+      onClick={e => {
+        e.stopPropagation();
+        toggleHide(id);
+      }}
+      className={`p-1.5 rounded-lg transition ${
+        dark
+          ? 'text-white/80 hover:text-white hover:bg-white/10'
+          : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+      }`}
+      title={hiddenMap[id] ? 'Tampilkan angka' : 'Sembunyikan angka'}
+    >
+      {hiddenMap[id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+    </button>
+  );
 
-  // Transaksi terbaru diurutkan berdasarkan tanggal transaksi (date), bukan tanggal dibuat
+  // Carousel kartu dana: pagination dots
+  const carouselRef = React.useRef<HTMLDivElement | null>(null);
+  const [activeCardIdx, setActiveCardIdx] = useState(0);
+  const handleCarouselScroll = () => {
+    const el = carouselRef.current;
+    if (!el || el.children.length === 0) return;
+    const first = el.children[0] as HTMLElement;
+    const step = first.offsetWidth + 12;
+    setActiveCardIdx(Math.min(el.children.length - 1, Math.max(0, Math.round(el.scrollLeft / step))));
+  };
+
+  const maskAccountNumber = (num?: string) => {
+    if (!num) return '•••• ••••';
+    const clean = num.replace(/\s/g, '');
+    if (clean.length <= 4) return '•••• ' + clean;
+    return clean.slice(0, 2) + '•• •••• ' + clean.slice(-2);
+  };
   const recentTransactions = useMemo(() => {
     return [...transactions]
       .sort((a, b) => {
@@ -251,35 +300,101 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
         </div>
       </div>
 
-      {/* Main KPI Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Total Saldo Sumber Dana */}
-        <div
-          onClick={() => onNavigateTab('accounts')}
-          className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between cursor-pointer hover:border-orange-500 transition group"
-        >
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition">
-                Total Saldo Sumber Dana
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-orange-50 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 flex items-center justify-center">
-                <Wallet className="w-4 h-4" />
-              </div>
-            </div>
-            <div
-              className={`text-2xl font-bold tabular-nums mt-3 ${
-                totalLiquidAccountsBalance >= 0 ? 'text-slate-900 dark:text-white' : 'text-red-600 dark:text-red-400'
-              }`}
-            >
-              {formatRupiah(totalLiquidAccountsBalance)}
-            </div>
-          </div>
-          <div className="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
-            <span>{liquidAccounts.length} Rekening, Tunai & Dompet Digital</span>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition shrink-0 ml-1" />
-          </div>
+      {/* Kartu Dana ala Mobile Banking (carousel geser + eye per kartu) */}
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white">
+            Sumber Dana Kamu
+          </h3>
+          <button
+            onClick={() => onNavigateTab('accounts')}
+            className="text-xs font-bold text-orange-600 dark:text-orange-400 underline underline-offset-2 hover:text-orange-700"
+          >
+            Lihat Semua
+          </button>
         </div>
+
+        {accounts.length === 0 ? (
+          <button
+            onClick={() => onNavigateTab('accounts')}
+            className="w-full p-6 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 hover:border-orange-500 hover:text-orange-600 transition"
+          >
+            Belum ada sumber dana. Klik untuk buat kartu dana pertama Anda.
+          </button>
+        ) : (
+          <>
+            <div
+              ref={carouselRef}
+              onScroll={handleCarouselScroll}
+              className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-none"
+              style={{ scrollbarWidth: 'none' }}
+            >
+              {accounts.map(acc => {
+                const hideId = `acc:${acc.id}`;
+                return (
+                  <div
+                    key={acc.id}
+                    onClick={() => onNavigateTab('accounts')}
+                    className="relative overflow-hidden rounded-2xl min-w-[250px] sm:min-w-[300px] snap-center cursor-pointer shadow-md shrink-0"
+                    style={{
+                      background: `linear-gradient(120deg, ${acc.color} 0%, ${acc.color} 55%, rgba(0,0,0,0.38) 135%)`,
+                    }}
+                  >
+                    {/* Lengkungan dekoratif */}
+                    <div className="absolute -right-10 -top-16 w-44 h-44 rounded-full bg-white/10 pointer-events-none" />
+                    <div className="absolute -right-4 top-6 w-28 h-28 rounded-full bg-white/10 pointer-events-none" />
+                    <div className="absolute -left-8 -bottom-14 w-36 h-36 rounded-full bg-black/10 pointer-events-none" />
+
+                    <div className="relative p-4 flex flex-col justify-between min-h-[168px]">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="text-[11px] font-semibold uppercase tracking-wider text-white/80 truncate">
+                            {acc.name}
+                          </div>
+                          <div className="text-lg font-extrabold tabular-nums text-white tracking-wide mt-0.5">
+                            {maskAccountNumber(acc.accountNumber)}
+                          </div>
+                        </div>
+                        {(acc.isDefault || accounts[0]?.id === acc.id) && (
+                          <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-white text-slate-900 shrink-0">
+                            Utama
+                          </span>
+                        )}
+                      </div>
+
+                      <div>
+                        <div className="text-[11px] text-white/80">Saldo efektif</div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xl font-extrabold tabular-nums text-white">
+                            {masked(hideId, acc.balance)}
+                          </span>
+                          <EyeToggle id={hideId} dark />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {accounts.length > 1 && (
+              <div className="flex items-center justify-center gap-1.5 pt-0.5">
+                {accounts.map((acc, i) => (
+                  <span
+                    key={acc.id}
+                    className={`h-1.5 rounded-full transition-all ${
+                      i === activeCardIdx ? 'w-4 bg-slate-900 dark:bg-white' : 'w-1.5 bg-slate-300 dark:bg-slate-700'
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Main KPI Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
 
         {/* Monthly Income Card (Clickable to view details) */}
         <div
@@ -293,12 +408,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                 <span>Pemasukan ({new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(new Date(selectedYear, selectedMonth - 1, 1))})</span>
                 <span className="text-[10px] text-orange-600 font-bold bg-orange-50 dark:bg-orange-950/60 px-1 rounded">Rincian ↗</span>
               </span>
-              <div className="w-8 h-8 rounded-xl bg-orange-50 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 flex items-center justify-center">
-                <ArrowDownLeft className="w-4 h-4" />
+              <div className="flex items-center gap-1">
+                <div className="w-8 h-8 rounded-xl bg-orange-50 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 flex items-center justify-center">
+                  <ArrowDownLeft className="w-4 h-4" />
+                </div>
+                <EyeToggle id="kpi-income" />
               </div>
             </div>
             <div className="text-2xl font-bold text-orange-600 dark:text-orange-400 tabular-nums mt-3">
-              +{formatRupiah(filteredIncome)}
+              +{masked('kpi-income', filteredIncome)}
             </div>
           </div>
           <div className="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
@@ -319,12 +437,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                 <span>Pengeluaran ({new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(new Date(selectedYear, selectedMonth - 1, 1))})</span>
                 <span className="text-[10px] text-red-600 font-bold bg-red-50 dark:bg-red-950/60 px-1 rounded">Rincian ↗</span>
               </span>
-              <div className="w-8 h-8 rounded-xl bg-red-50 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center">
-                <ArrowUpRight className="w-4 h-4" />
+              <div className="flex items-center gap-1">
+                <div className="w-8 h-8 rounded-xl bg-red-50 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center">
+                  <ArrowUpRight className="w-4 h-4" />
+                </div>
+                <EyeToggle id="kpi-expense" />
               </div>
             </div>
             <div className="text-2xl font-bold text-red-600 dark:text-red-400 tabular-nums mt-3">
-              -{formatRupiah(filteredExpense)}
+              -{masked('kpi-expense', filteredExpense)}
             </div>
           </div>
           <div className="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
@@ -343,72 +464,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
               <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-amber-600 transition">
                 Sisa Hutang Berjalan
               </span>
-              <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                <AlertCircle className="w-4 h-4" />
+              <div className="flex items-center gap-1">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                  <AlertCircle className="w-4 h-4" />
+                </div>
+                <EyeToggle id="kpi-debt" />
               </div>
             </div>
             <div className="text-2xl font-bold text-amber-600 dark:text-amber-400 tabular-nums mt-3">
-              {formatRupiah(summary.totalPayableDebt)}
+              {masked('kpi-debt', summary.totalPayableDebt)}
             </div>
           </div>
           <div className="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
-            <span>Piutang: {formatRupiah(summary.totalReceivableDebt)}</span>
+            <span>Piutang: {masked('kpi-debt', summary.totalReceivableDebt)}</span>
             <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition" />
           </div>
-        </div>
-      </div>
-
-      {/* Sumber Dana Row */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Wallet className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-            <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-              Sumber Dana Saya
-            </h3>
-          </div>
-          <button
-            onClick={() => onNavigateTab('accounts')}
-            className="text-xs font-semibold text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-0.5"
-          >
-            <span>Buka Halaman Dana</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          {accounts.length === 0 && (
-            <button
-              onClick={() => onNavigateTab('accounts')}
-              className="col-span-2 sm:col-span-4 p-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 hover:border-orange-500 hover:text-orange-600 transition"
-            >
-              Belum ada sumber dana. Klik untuk buat sumber dana pertama Anda.
-            </button>
-          )}
-          {accounts.map(acc => {
-            return (
-              <div
-                key={acc.id}
-                onClick={() => onNavigateTab('accounts')}
-                className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800 cursor-pointer hover:border-orange-500 transition"
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <div
-                    className="w-5 h-5 rounded-md flex items-center justify-center text-white shrink-0 text-[10px]"
-                    style={{ backgroundColor: acc.color }}
-                  >
-                    <CategoryIcon name={acc.icon} className="w-3 h-3" />
-                  </div>
-                  <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
-                    {acc.name}
-                  </span>
-                </div>
-                <div className="text-xs font-bold tabular-nums truncate text-slate-900 dark:text-white">
-                  {formatRupiah(acc.balance)}
-                </div>
-              </div>
-            );
-          })}
         </div>
       </div>
 

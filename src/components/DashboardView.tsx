@@ -29,7 +29,6 @@ import {
   getNextDueDate,
 } from '../utils/formatters';
 import { CategoryIcon } from './CategoryIcon';
-import { TransactionModal } from './TransactionModal';
 import { PayDebtModal } from './PayDebtModal';
 import { BillPayModal } from './BillPayModal';
 import { useBillCards } from '../hooks/useBillCards';
@@ -43,7 +42,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
   const { summary, transactions, debts, accounts, categories, reminderSettings, syncNotice, clearSyncNotice, syncStatus, pullFromVaultNow } = useFinance();
   const { currentUser } = useAuth();
 
-  const [isTxModalOpen, setIsTxModalOpen] = useState(false);
   const [selectedDebtToPay, setSelectedDebtToPay] = useState<Debt | null>(null);
   const [billToPay, setBillToPay] = useState<Bill | null>(null);
 
@@ -56,7 +54,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
   const [breakdownType, setBreakdownType] = useState<TransactionType | null>(null);
 
   // Kunci scroll halaman belakang saat bottom sheet / modal terbuka
-  useBodyScrollLock(breakdownType !== null || isTxModalOpen || selectedDebtToPay !== null || billToPay !== null);
+  useBodyScrollLock(breakdownType !== null || selectedDebtToPay !== null || billToPay !== null);
 
   const selectedMonthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
   const selectedMonthLabel = formatMonthYearIndo(selectedYear, selectedMonth);
@@ -221,7 +219,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
       )}
 
       {/* Kartu Ucapan Selamat Datang */}
-      <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-600 to-amber-700 text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-600 to-amber-700 text-white shadow-sm flex items-center gap-3">
         <div className="flex items-center gap-3">
           {currentUser?.photoURL ? (
             <img
@@ -242,12 +240,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
             </p>
           </div>
         </div>
-        <button
-          onClick={() => setIsTxModalOpen(true)}
-          className="self-start sm:self-auto px-4 py-2 text-xs font-bold rounded-xl bg-white text-orange-800 hover:bg-orange-50 transition shadow-xs whitespace-nowrap"
-        >
-          + Catat Sekarang
-        </button>
       </div>
 
       {/* Header Bar with Month Filter Selector */}
@@ -587,21 +579,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                   </div>
                 </div>
 
-                {bill.showCountdown ? (
-                  <button
-                    onClick={() => setBillToPay(bill)}
-                    className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-orange-600 hover:bg-orange-700 text-white transition shadow-xs shrink-0"
-                  >
-                    Bayar
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setBillToPay(bill)}
-                    className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-orange-500 hover:text-orange-600 transition shrink-0"
-                  >
-                    Bayar
-                  </button>
-                )}
+                <button
+                  onClick={() => setBillToPay(bill)}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-orange-600 hover:bg-orange-700 text-white transition shadow-xs shrink-0"
+                >
+                  Bayar
+                </button>
               </div>
             ))}
           </div>
@@ -929,12 +912,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
           </div>
         </div>
       )}
-
-      {/* Transaction Modal (Bottom Sheet) */}
-      <TransactionModal
-        isOpen={isTxModalOpen}
-        onClose={() => setIsTxModalOpen(false)}
-      />
 
       {/* Pay Debt Modal (Bottom Sheet) */}
       <PayDebtModal

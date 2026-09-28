@@ -92,7 +92,7 @@ interface FinanceContextType {
   deleteBillPayment: (paymentId: string) => void;
 
   // Integrasi DigiFuel (cermin satu arah -> transaksi keluar)
-  pullDigifuelNow: () => Promise<{ mirrored: number; removed: number }>;
+  pullDigifuelNow: () => Promise<{ mirrored: number; removed: number; diag: string }>;
 
   // Settings & Theme
   setThemeMode: (mode: ThemeMode) => void;
@@ -1346,11 +1346,21 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
    * dihapus di DigiFuel ikut dibersihkan. Akun pilihan pengguna dipertahankan
    * (hanya dipakai saat pembuatan).
    */
-  const pullDigifuelNow = async (): Promise<{ mirrored: number; removed: number }> => {
+  const pullDigifuelNow = async (): Promise<{
+    mirrored: number;
+    removed: number;
+    diag: string;
+  }> => {
     const link = getDigifuelLink(userId);
     if (!link) throw new Error('Hubungkan akun DigiFuel dulu di Pengaturan.');
     const vault = await fetchDigifuelVault(link.email);
-    if (!vault) throw new Error('Vault DigiFuel tidak ditemukan untuk email ini.');
+    if (!vault) {
+      throw new Error(
+        'Vault DigiFuel tidak ditemukan untuk email ini. Pastikan Anda pernah login di aplikasi DigiFuel (bukan mode tamu) dan Rules sudah di-publish.'
+      );
+    }
+    const fuelTotal = (vault.fuelRecords || []).length;
+    const svcTotal = (vault.serviceHistory || []).length;
 
     const vehicleName = new Map((vault.vehicles || []).map(v => [v.id, v.name]));
     const expenseCats = categories.filter(c => c.type === 'expense');
@@ -1448,7 +1458,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     });
 
     persistDigifuelLink(userId, { lastPulledAt: Date.now(), mirroredCount: upserts.length });
-    return { mirrored, removed };
+    const fuelQualified = (vault.fuelRecords || []).filter(r => r.totalCost && r.totalCost > 0).length;
+    const svcQualified = (vault.serviceHistory || []).filter(s => s.cost && s.cost > 0).length;
+    const diag =
+      `Vault: ${fuelTotal} bensin (${fuelQualified} bernominal), ` +
+      `${svcTotal} servis (${svcQualified} berbiaya).`;
+    return { mirrored, removed, diag };
   };
 
   const updateSyncSettings = (settings: Partial<SyncSettings>) => {

@@ -69,9 +69,22 @@ export const SettingsView: React.FC = () => {
         accountId: dfAccountId || undefined,
       });
       setDfPassword('');
+      // Verifikasi langsung: apakah vault email ini ada & berisi apa
+      const { fetchDigifuelVault } = await import('../services/digifuel');
+      const vault = await fetchDigifuelVault(dfEmail);
       refreshDfLink();
-      setFeedbackMessage('Akun DigiFuel terhubung. Tekan Tarik agar catatannya masuk.');
-      setTimeout(() => setFeedbackMessage(null), 3500);
+      if (vault) {
+        const nFuel = (vault.fuelRecords || []).length;
+        const nSvc = (vault.serviceHistory || []).length;
+        setFeedbackMessage(
+          `Terhubung! Vault ditemukan berisi ${nFuel} catatan bensin & ${nSvc} servis. Tekan Tarik agar masuk.`
+        );
+      } else {
+        setFeedbackMessage(
+          'Terhubung, tapi vault kosong/tidak ditemukan. Pastikan pernah login (bukan tamu) di DigiFuel dan Rules sudah di-publish.'
+        );
+      }
+      setTimeout(() => setFeedbackMessage(null), 6000);
     } catch (err: unknown) {
       setFeedbackMessage(err instanceof Error ? err.message : 'Gagal menghubungkan DigiFuel');
       setTimeout(() => setFeedbackMessage(null), 4000);
@@ -86,14 +99,12 @@ export const SettingsView: React.FC = () => {
       const res = await pullDigifuelNow();
       refreshDfLink();
       setFeedbackMessage(
-        res.mirrored > 0 || res.removed > 0
-          ? `Sinkron DigiFuel selesai: ${res.mirrored} baru, ${res.removed} dihapus.`
-          : 'Sudah sinkron — tidak ada catatan baru dari DigiFuel.'
+        `${res.diag} Hasil: ${res.mirrored} baru, ${res.removed} dihapus.`
       );
-      setTimeout(() => setFeedbackMessage(null), 4000);
+      setTimeout(() => setFeedbackMessage(null), 6000);
     } catch (err: unknown) {
       setFeedbackMessage(err instanceof Error ? err.message : 'Gagal menarik dari DigiFuel');
-      setTimeout(() => setFeedbackMessage(null), 4000);
+      setTimeout(() => setFeedbackMessage(null), 6000);
     } finally {
       setDfBusy(false);
     }
@@ -324,7 +335,7 @@ export const SettingsView: React.FC = () => {
       <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
         <div>
           <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <span className="w-4 h-4 rounded-full bg-orange-600 text-white text-[9px] font-extrabold flex items-center justify-center">F</span>
+            <img src="/digifuel-logo.svg" alt="Logo DigiFuel" className="w-5 h-5 rounded-md shadow-xs" />
             <span>Integrasi DigiFuel</span>
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">

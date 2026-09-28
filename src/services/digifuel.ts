@@ -162,20 +162,28 @@ export async function unlinkDigifuelAccount(): Promise<void> {
  *     allow read: if request.auth != null &&
  *       (request.auth.uid == uid || resource.data.ownerEmail == request.auth.token.email);
  *   }
+ *
+ * Perbandingan email case-sensitive di Firestore: coba versi lowercase dulu,
+ * lalu versi persis seperti diketik (jaga-jaga akun lama Halloween-case).
  */
 export async function fetchDigifuelVault(email: string): Promise<DigifuelVault | null> {
   const db = getDigifuelDb();
-  const cleanEmail = email.trim().toLowerCase();
-  const q = query(collection(db, 'fuelVaults'), where('ownerEmail', '==', cleanEmail));
-  const snap = await getDocs(q);
-  if (snap.empty) return null;
-  // Bila ada lebih dari satu (seharusnya tidak), pakai yang terbaru
-  let best: DigifuelVault | null = null;
-  snap.forEach(d => {
-    const v = d.data() as DigifuelVault;
-    if (!best || (v.updatedAt || '') > (best.updatedAt || '')) best = v;
-  });
-  return best;
+  const tries = [email.trim().toLowerCase()];
+  const asTyped = email.trim();
+  if (asTyped && asTyped !== tries[0]) tries.push(asTyped);
+  for (const candidate of tries) {
+    const q = query(collection(db, 'fuelVaults'), where('ownerEmail', '==', candidate));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      let best: DigifuelVault | null = null;
+      snap.forEach(d => {
+        const v = d.data() as DigifuelVault;
+        if (!best || (v.updatedAt || '') > (best.updatedAt || '')) best = v;
+      });
+      if (best) return best;
+    }
+  }
+  return null;
 }
 
 export function persistDigifuelLink(uid: string, patch: Partial<DigifuelLink>) {

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   ArrowUpRight,
   ArrowDownLeft,
@@ -8,13 +8,11 @@ import {
   CheckCircle2,
   ChevronRight,
   ChevronDown,
+  ChevronLeft,
   Receipt,
   BellRing,
   X,
   Tag,
-  Plus,
-  Pencil,
-  Trash2,
   Cloud,
   Eye,
   EyeOff,
@@ -33,8 +31,8 @@ import {
 import { CategoryIcon } from './CategoryIcon';
 import { TransactionModal } from './TransactionModal';
 import { PayDebtModal } from './PayDebtModal';
-import { BillModal } from './BillModal';
 import { BillPayModal } from './BillPayModal';
+import { useBillCards } from '../hooks/useBillCards';
 import { Debt, ActiveTab, Transaction, TransactionType, Bill } from '../types';
 
 interface DashboardViewProps {
@@ -42,13 +40,11 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) => {
-  const { summary, transactions, debts, accounts, categories, reminderSettings, bills, billPayments, deleteBill, syncNotice, clearSyncNotice, syncStatus, pullFromVaultNow } = useFinance();
+  const { summary, transactions, debts, accounts, categories, reminderSettings, syncNotice, clearSyncNotice, syncStatus, pullFromVaultNow } = useFinance();
   const { currentUser } = useAuth();
 
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
   const [selectedDebtToPay, setSelectedDebtToPay] = useState<Debt | null>(null);
-  const [isBillModalOpen, setIsBillModalOpen] = useState(false);
-  const [billToEdit, setBillToEdit] = useState<Bill | null>(null);
   const [billToPay, setBillToPay] = useState<Bill | null>(null);
 
   // Month filter state
@@ -60,7 +56,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
   const [breakdownType, setBreakdownType] = useState<TransactionType | null>(null);
 
   // Kunci scroll halaman belakang saat bottom sheet / modal terbuka
-  useBodyScrollLock(breakdownType !== null || isTxModalOpen || selectedDebtToPay !== null || isBillModalOpen || billToPay !== null);
+  useBodyScrollLock(breakdownType !== null || isTxModalOpen || selectedDebtToPay !== null || billToPay !== null);
 
   const selectedMonthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
   const selectedMonthLabel = formatMonthYearIndo(selectedYear, selectedMonth);
@@ -132,8 +128,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
       return next;
     });
   };
+  const isHidden = (id: string) => hiddenMap[id] ?? true;
   const masked = (id: string, amount: number) =>
-    hiddenMap[id] ? 'Rp••••••' : formatRupiah(amount);
+    isHidden(id) ? 'Rp••••••' : formatRupiah(amount);
 
   const EyeToggle: React.FC<{ id: string; dark?: boolean }> = ({ id, dark }) => (
     <button
@@ -146,22 +143,33 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
           ? 'text-white/80 hover:text-white hover:bg-white/10'
           : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
       }`}
-      title={hiddenMap[id] ? 'Tampilkan angka' : 'Sembunyikan angka'}
+      title={isHidden(id) ? 'Tampilkan angka' : 'Sembunyikan angka'}
     >
-      {hiddenMap[id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+      {isHidden(id) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
     </button>
   );
 
-  // Carousel kartu dana: pagination dots
-  const carouselRef = React.useRef<HTMLDivElement | null>(null);
+  // Carousel kartu dana: coverflow lingkaran (satu fokus, swipe memutar)
   const [activeCardIdx, setActiveCardIdx] = useState(0);
-  const handleCarouselScroll = () => {
-    const el = carouselRef.current;
-    if (!el || el.children.length === 0) return;
-    const first = el.children[0] as HTMLElement;
-    const step = first.offsetWidth + 12;
-    setActiveCardIdx(Math.min(el.children.length - 1, Math.max(0, Math.round(el.scrollLeft / step))));
+  const goCard = (idx: number) => {
+    if (accounts.length === 0) return;
+    setActiveCardIdx(((idx % accounts.length) + accounts.length) % accounts.length);
   };
+  const dragRef = React.useRef<{ startX: number; dragging: boolean }>({ startX: 0, dragging: false });
+  const handleDragStart = (clientX: number) => {
+    dragRef.current = { startX: clientX, dragging: true };
+  };
+  const handleDragEnd = (clientX: number) => {
+    if (!dragRef.current.dragging) return;
+    const dx = clientX - dragRef.current.startX;
+    dragRef.current.dragging = false;
+    if (dx <= -50) goCard(activeCardIdx + 1);
+    else if (dx >= 50) goCard(activeCardIdx - 1);
+  };
+  // Jaga index valid bila daftar akun berubah
+  useEffect(() => {
+    setActiveCardIdx(prev => (accounts.length === 0 ? 0 : prev % accounts.length));
+  }, [accounts.length]);
 
   const maskAccountNumber = (num?: string) => {
     if (!num) return '•••• ••••';
@@ -179,25 +187,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
       .slice(0, 5);
   }, [transactions]);
 
-  // Tagihan rutin bulan berjalan: status lunas / jatuh tempo
-  const currentMonthKey = today.substring(0, 7);
-  const billCards = useMemo(() => {
-    const [cy, cm] = currentMonthKey.split('-').map(Number);
-    const daysInMonth = new Date(cy, cm, 0).getDate();
-    return bills
-      .filter(b => b.isActive !== false)
-      .map(b => {
-        const paid = billPayments.some(p => p.billId === b.id && p.monthKey === currentMonthKey);
-        const dueDay = Math.min(Math.max(1, b.dueDayOfMonth || 1), daysInMonth);
-        const dueDateStr = `${currentMonthKey}-${String(dueDay).padStart(2, '0')}`;
-        const statusInfo = calculateDueDateStatus(dueDateStr);
-        return { ...b, paid, dueDateStr, statusInfo };
-      })
-      .sort((a, b) => {
-        if (a.paid !== b.paid) return a.paid ? 1 : -1;
-        return a.statusInfo.daysRemaining - b.statusInfo.daysRemaining;
-      });
-  }, [bills, billPayments, currentMonthKey]);
+  // Tagihan rutin bulan berjalan (read-only di Beranda; kelola di tab Hutang)
+  const billCards = useBillCards();
 
   return (
     <div className="space-y-6 pb-6">
@@ -323,65 +314,110 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
           </button>
         ) : (
           <>
-            <div
-              ref={carouselRef}
-              onScroll={handleCarouselScroll}
-              className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-none"
-              style={{ scrollbarWidth: 'none' }}
-            >
-              {accounts.map(acc => {
-                const hideId = `acc:${acc.id}`;
-                return (
-                  <div
-                    key={acc.id}
-                    onClick={() => onNavigateTab('accounts')}
-                    className="relative overflow-hidden rounded-2xl min-w-[250px] sm:min-w-[300px] snap-center cursor-pointer shadow-md shrink-0"
-                    style={{
-                      background: `linear-gradient(120deg, ${acc.color} 0%, ${acc.color} 55%, rgba(0,0,0,0.38) 135%)`,
-                    }}
-                  >
-                    {/* Lengkungan dekoratif */}
-                    <div className="absolute -right-10 -top-16 w-44 h-44 rounded-full bg-white/10 pointer-events-none" />
-                    <div className="absolute -right-4 top-6 w-28 h-28 rounded-full bg-white/10 pointer-events-none" />
-                    <div className="absolute -left-8 -bottom-14 w-36 h-36 rounded-full bg-black/10 pointer-events-none" />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => goCard(activeCardIdx - 1)}
+                className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-orange-600 hover:border-orange-500 transition shrink-0"
+                title="Kartu sebelumnya"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
 
-                    <div className="relative p-4 flex flex-col justify-between min-h-[168px]">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="text-[11px] font-semibold uppercase tracking-wider text-white/80 truncate">
-                            {acc.name}
-                          </div>
-                          <div className="text-lg font-extrabold tabular-nums text-white tracking-wide mt-0.5">
-                            {maskAccountNumber(acc.accountNumber)}
-                          </div>
-                        </div>
-                        {(acc.isDefault || accounts[0]?.id === acc.id) && (
-                          <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-white text-slate-900 shrink-0">
-                            Utama
-                          </span>
-                        )}
-                      </div>
+              {/* Panggung coverflow lingkaran: satu kartu fokus, swipe memutar */}
+              <div
+                className="relative flex-1 h-[196px] overflow-hidden"
+                style={{ perspective: '900px' }}
+                onTouchStart={e => handleDragStart(e.touches[0].clientX)}
+                onTouchEnd={e => handleDragEnd(e.changedTouches[0].clientX)}
+                onMouseDown={e => handleDragStart(e.clientX)}
+                onMouseUp={e => handleDragEnd(e.clientX)}
+                onMouseLeave={() => {
+                  dragRef.current.dragging = false;
+                }}
+              >
+                {accounts.map((acc, i) => {
+                  const hideId = `acc:${acc.id}`;
+                  // Jarak sirkular terpendek: geser kiri/kanan memutar lingkaran
+                  const n = accounts.length;
+                  let offset = (i - activeCardIdx) % n;
+                  if (offset > n / 2) offset -= n;
+                  if (offset < -n / 2) offset += n;
+                  const abs = Math.abs(offset);
+                  const visible = abs <= 2;
+                  return (
+                    <div
+                      key={acc.id}
+                      onClick={() => (offset === 0 ? onNavigateTab('accounts') : goCard(i))}
+                      className="absolute top-1 left-1/2 w-[78%] max-w-[320px] h-[188px] cursor-pointer"
+                      style={{
+                        transform: `translateX(-50%) translateX(${offset * 62}%) translateZ(${-abs * 120}px) rotateY(${offset * -32}deg) scale(${1 - abs * 0.1})`,
+                        opacity: visible ? 1 - abs * 0.35 : 0,
+                        zIndex: 10 - abs,
+                        pointerEvents: visible ? 'auto' : 'none',
+                        transition: 'transform 0.45s cubic-bezier(0.22, 0.9, 0.3, 1.2), opacity 0.35s',
+                        transformStyle: 'preserve-3d',
+                      }}
+                    >
+                      <div
+                        className="relative overflow-hidden rounded-2xl w-full h-full shadow-lg"
+                        style={{
+                          background: `linear-gradient(120deg, ${acc.color} 0%, ${acc.color} 55%, rgba(0,0,0,0.38) 135%)`,
+                        }}
+                      >
+                        {/* Lengkungan dekoratif */}
+                        <div className="absolute -right-10 -top-16 w-44 h-44 rounded-full bg-white/10 pointer-events-none" />
+                        <div className="absolute -right-4 top-6 w-28 h-28 rounded-full bg-white/10 pointer-events-none" />
+                        <div className="absolute -left-8 -bottom-14 w-36 h-36 rounded-full bg-black/10 pointer-events-none" />
 
-                      <div>
-                        <div className="text-[11px] text-white/80">Saldo efektif</div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xl font-extrabold tabular-nums text-white">
-                            {masked(hideId, acc.balance)}
-                          </span>
-                          <EyeToggle id={hideId} dark />
+                        <div className="relative p-4 flex flex-col justify-between h-full">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="text-[11px] font-semibold uppercase tracking-wider text-white/80 truncate">
+                                {acc.name}
+                              </div>
+                              <div className="text-lg font-extrabold tabular-nums text-white tracking-wide mt-0.5">
+                                {maskAccountNumber(acc.accountNumber)}
+                              </div>
+                            </div>
+                            {(acc.isDefault || accounts[0]?.id === acc.id) && (
+                              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-white text-slate-900 shrink-0">
+                                Utama
+                              </span>
+                            )}
+                          </div>
+
+                          <div>
+                            <div className="text-[11px] text-white/80">Saldo efektif</div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xl font-extrabold tabular-nums text-white">
+                                {masked(hideId, acc.balance)}
+                              </span>
+                              <EyeToggle id={hideId} dark />
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={() => goCard(activeCardIdx + 1)}
+                className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-orange-600 hover:border-orange-500 transition shrink-0"
+                title="Kartu berikutnya"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
 
             {accounts.length > 1 && (
               <div className="flex items-center justify-center gap-1.5 pt-0.5">
                 {accounts.map((acc, i) => (
-                  <span
+                  <button
                     key={acc.id}
+                    onClick={() => goCard(i)}
+                    aria-label={`Ke kartu ${i + 1}`}
                     className={`h-1.5 rounded-full transition-all ${
                       i === activeCardIdx ? 'w-4 bg-slate-900 dark:bg-white' : 'w-1.5 bg-slate-300 dark:bg-slate-700'
                     }`}
@@ -482,7 +518,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
         </div>
       </div>
 
-      {/* Tagihan Rutin */}
+      {/* Tagihan Rutin (read-only: kelola di tab Hutang > Tagihan Rutin) */}
       <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -492,20 +528,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
             </h3>
           </div>
           <button
-            onClick={() => {
-              setBillToEdit(null);
-              setIsBillModalOpen(true);
-            }}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold rounded-lg bg-orange-600 hover:bg-orange-700 text-white transition"
+            onClick={() => onNavigateTab('debts')}
+            className="text-xs font-semibold text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-0.5"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Tambah Tagihan</span>
+            <span>Kelola Tagihan</span>
+            <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
         {billCards.length === 0 ? (
           <p className="text-xs text-slate-400 text-center py-4">
-            Belum ada tagihan rutin. Tambahkan tagihan seperti WiFi, listrik, atau air agar diingatkan tiap bulan.
+            Belum ada tagihan rutin. Tambahkan di halaman Hutang tab Tagihan Rutin.
           </p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -543,37 +576,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                   </div>
                 </div>
 
-                <div className="flex flex-col items-end gap-1.5 shrink-0">
-                  {!bill.paid && (
-                    <button
-                      onClick={() => setBillToPay(bill)}
-                      className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-orange-600 hover:bg-orange-700 text-white transition shadow-xs"
-                    >
-                      Bayar
-                    </button>
-                  )}
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => {
-                        setBillToEdit(bill);
-                        setIsBillModalOpen(true);
-                      }}
-                      className="p-1.5 text-slate-400 hover:text-orange-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-                      title="Edit tagihan"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (confirm(`Hapus tagihan rutin "${bill.name}"?`)) deleteBill(bill.id);
-                      }}
-                      className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 transition"
-                      title="Hapus tagihan"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
+                {!bill.paid && (
+                  <button
+                    onClick={() => setBillToPay(bill)}
+                    className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-orange-600 hover:bg-orange-700 text-white transition shadow-xs shrink-0"
+                  >
+                    Bayar
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -897,16 +907,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
         isOpen={!!selectedDebtToPay}
         onClose={() => setSelectedDebtToPay(null)}
         debt={selectedDebtToPay}
-      />
-
-      {/* Bill Modal (Create / Edit Tagihan Rutin) */}
-      <BillModal
-        isOpen={isBillModalOpen}
-        onClose={() => {
-          setIsBillModalOpen(false);
-          setBillToEdit(null);
-        }}
-        billToEdit={billToEdit}
       />
 
       {/* Bill Pay Modal */}

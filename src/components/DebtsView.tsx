@@ -16,18 +16,26 @@ import {
   X,
   Layers,
   Sparkles,
+  BellRing,
 } from 'lucide-react';
-import { Debt, DebtType, DebtPayment } from '../types';
+import { Debt, DebtType, DebtPayment, Bill } from '../types';
 import { useFinance } from '../context/FinanceContext';
 import { formatRupiah, formatDateIndo, calculateDueDateStatus, getNextDueDate } from '../utils/formatters';
 import { AddDebtModal } from './AddDebtModal';
 import { PayDebtModal } from './PayDebtModal';
 import { ReceiptViewerModal } from './ReceiptViewerModal';
+import { BillModal } from './BillModal';
+import { BillPayModal } from './BillPayModal';
+import { useBillCards } from '../hooks/useBillCards';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
-export const DebtsView: React.FC = () => {
-  const { debts, deleteDebt, deleteDebtPayment } = useFinance();
+type DebtsTab = 'debts' | 'bills';
 
+export const DebtsView: React.FC = () => {
+  const { debts, deleteDebt, deleteDebtPayment, deleteBill } = useFinance();
+  const billCards = useBillCards();
+
+  const [mainTab, setMainTab] = useState<DebtsTab>('debts');
   const [activeType, setActiveType] = useState<DebtType>('payable');
   const [statusFilter, setStatusFilter] = useState<'all' | 'unpaid' | 'paid'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -38,7 +46,10 @@ export const DebtsView: React.FC = () => {
   const [selectedReceipt, setSelectedReceipt] = useState<{ url: string; title: string } | null>(null);
   const [expandedDebtId, setExpandedDebtId] = useState<string | null>(null);
   const [selectedPaymentDetail, setSelectedPaymentDetail] = useState<{ debt: Debt; payment: DebtPayment } | null>(null);
-  useBodyScrollLock(isAddModalOpen || selectedDebtForPay !== null || selectedReceipt !== null || selectedPaymentDetail !== null);
+  const [isBillModalOpen, setIsBillModalOpen] = useState(false);
+  const [billToEdit, setBillToEdit] = useState<Bill | null>(null);
+  const [billToPay, setBillToPay] = useState<Bill | null>(null);
+  useBodyScrollLock(isAddModalOpen || selectedDebtForPay !== null || selectedReceipt !== null || selectedPaymentDetail !== null || isBillModalOpen || billToPay !== null);
 
   const handleOpenAdd = () => {
     setDebtToEdit(null);
@@ -102,11 +113,18 @@ export const DebtsView: React.FC = () => {
         </div>
 
         <button
-          onClick={handleOpenAdd}
+          onClick={() => {
+            if (mainTab === 'bills') {
+              setBillToEdit(null);
+              setIsBillModalOpen(true);
+            } else {
+              handleOpenAdd();
+            }
+          }}
           className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl bg-orange-600 hover:bg-orange-700 text-white shadow-sm transition"
         >
           <Plus className="w-4 h-4" />
-          <span>Tambah Catatan Hutang</span>
+          <span>{mainTab === 'bills' ? 'Tambah Tagihan Rutin' : 'Tambah Catatan Hutang'}</span>
         </button>
       </div>
 
@@ -170,11 +188,14 @@ export const DebtsView: React.FC = () => {
 
       {/* Type Switcher Tabs & Filters */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-        <div className="flex items-center gap-1 p-1 bg-slate-200/60 dark:bg-slate-800 rounded-xl">
+        <div className="flex items-center gap-1 p-1 bg-slate-200/60 dark:bg-slate-800 rounded-xl overflow-x-auto">
           <button
-            onClick={() => setActiveType('payable')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
-              activeType === 'payable'
+            onClick={() => {
+              setMainTab('debts');
+              setActiveType('payable');
+            }}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap ${
+              mainTab === 'debts' && activeType === 'payable'
                 ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400'
             }`}
@@ -182,38 +203,150 @@ export const DebtsView: React.FC = () => {
             Hutang Saya ({debts.filter(d => d.type === 'payable').length})
           </button>
           <button
-            onClick={() => setActiveType('receivable')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
-              activeType === 'receivable'
+            onClick={() => {
+              setMainTab('debts');
+              setActiveType('receivable');
+            }}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap ${
+              mainTab === 'debts' && activeType === 'receivable'
                 ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400'
             }`}
           >
             Piutang Saya ({debts.filter(d => d.type === 'receivable').length})
           </button>
+          <button
+            onClick={() => setMainTab('bills')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap flex items-center gap-1.5 ${
+              mainTab === 'bills'
+                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400'
+            }`}
+          >
+            <BellRing className="w-3.5 h-3.5" />
+            <span>Tagihan Rutin ({billCards.filter(b => !b.paid).length})</span>
+          </button>
         </div>
 
-        {/* Status segmented filters */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800/60 rounded-xl">
-            {(['all', 'unpaid', 'paid'] as const).map(f => (
-              <button
-                key={f}
-                onClick={() => setStatusFilter(f)}
-                className={`px-3 py-1 text-xs font-medium rounded-lg transition ${
-                  statusFilter === f
-                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-semibold'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
-                }`}
-              >
-                {f === 'all' ? 'Semua' : f === 'unpaid' ? 'Belum Lunas' : 'Sudah Lunas'}
-              </button>
-            ))}
+        {/* Status segmented filters (khusus hutang/piutang) */}
+        {mainTab === 'debts' && (
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800/60 rounded-xl">
+              {(['all', 'unpaid', 'paid'] as const).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setStatusFilter(f)}
+                  className={`px-3 py-1 text-xs font-medium rounded-lg transition ${
+                    statusFilter === f
+                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-semibold'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+                  }`}
+                >
+                  {f === 'all' ? 'Semua' : f === 'unpaid' ? 'Belum Lunas' : 'Sudah Lunas'}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
+      {/* Bills List (diurut jatuh tempo terdekat) */}
+      {mainTab === 'bills' && (
+        <div className="space-y-3">
+          {billCards.length === 0 ? (
+            <div className="p-12 text-center rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
+              <BellRing className="w-10 h-10 mx-auto text-slate-400 dark:text-slate-600 mb-3" />
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                Belum Ada Tagihan Rutin
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
+                Buat daftar tagihan (WiFi, listrik, air) beserta nominal dan tanggal jatuh tempo
+                tiap bulan. Kartu pengingatnya muncul otomatis di Beranda.
+              </p>
+              <button
+                onClick={() => {
+                  setBillToEdit(null);
+                  setIsBillModalOpen(true);
+                }}
+                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-orange-600 hover:bg-orange-700 text-white transition"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Tambah Tagihan Sekarang</span>
+              </button>
+            </div>
+          ) : (
+            billCards.map(bill => (
+              <div
+                key={bill.id}
+                className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between gap-3"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                      {bill.name}
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                        bill.paid
+                          ? 'bg-orange-100 text-orange-700 dark:bg-orange-950/80 dark:text-orange-300'
+                          : bill.statusInfo.isOverdue
+                          ? 'bg-red-100 text-red-700 dark:bg-red-950/80 dark:text-red-300'
+                          : bill.statusInfo.isDueSoon
+                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300'
+                          : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      {bill.paid ? 'Lunas' : bill.statusInfo.label}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                    <strong className="tabular-nums">{formatRupiah(bill.amount)}</strong>
+                    <span className="text-[11px] text-slate-400"> · Tgl {bill.dueDayOfMonth} tiap bulan</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    Jatuh tempo: {formatDateIndo(bill.dueDateStr)}
+                    {bill.categoryName && ` · ${bill.categoryName}`}
+                    {bill.notes && ` · ${bill.notes}`}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {!bill.paid && (
+                    <button
+                      onClick={() => setBillToPay(bill)}
+                      className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-orange-600 hover:bg-orange-700 text-white transition shadow-xs"
+                    >
+                      Bayar
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setBillToEdit(bill);
+                      setIsBillModalOpen(true);
+                    }}
+                    className="p-2 text-slate-400 hover:text-orange-600 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                    title="Edit tagihan"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm(`Hapus tagihan rutin "${bill.name}"?`)) deleteBill(bill.id);
+                    }}
+                    className="p-2 text-slate-400 hover:text-red-600 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/40 transition"
+                    title="Hapus tagihan"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
       {/* Debt Cards List */}
+      {mainTab === 'debts' && (
       <div className="space-y-3">
         {filteredDebts.length === 0 ? (
           <div className="p-12 text-center rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
@@ -514,6 +647,7 @@ export const DebtsView: React.FC = () => {
           })
         )}
       </div>
+      )}
 
       {/* Payment Detail Modal */}
       {selectedPaymentDetail && (
@@ -659,6 +793,23 @@ export const DebtsView: React.FC = () => {
         onClose={() => setSelectedReceipt(null)}
         imageUrl={selectedReceipt?.url}
         title={selectedReceipt?.title}
+      />
+
+      {/* Bill Modal (Create / Edit Tagihan Rutin) */}
+      <BillModal
+        isOpen={isBillModalOpen}
+        onClose={() => {
+          setIsBillModalOpen(false);
+          setBillToEdit(null);
+        }}
+        billToEdit={billToEdit}
+      />
+
+      {/* Bill Pay Modal */}
+      <BillPayModal
+        isOpen={!!billToPay}
+        onClose={() => setBillToPay(null)}
+        bill={billToPay}
       />
     </div>
   );

@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   Check,
   X,
-  Camera,
   Pencil,
   Cloud,
   Smartphone,
@@ -66,48 +65,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack }) => {
     }
   };
 
-  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setMessage({ type: 'error', text: 'Hanya file gambar yang diperbolehkan' });
-      return;
-    }
+  const AVATAR_CHOICES = ['👨', '👩', '🧑', '👦', '👧', '👴', '👵', '🧔', '👱‍♀️', '👱', '🧕', '👳'];
+
+  const handleSelectAvatar = async (emoji: string) => {
     setPhotoBusy(true);
     setMessage(null);
-    const reader = new FileReader();
-    reader.onload = event => {
-      const img = new Image();
-      img.onload = async () => {
-        try {
-          // Kompres ke 256px agar ringan dan tersinkron antar perangkat
-          const MAX = 256;
-          let width = img.width;
-          let height = img.height;
-          const scale = Math.min(1, MAX / Math.max(width, height));
-          width = Math.max(1, Math.round(width * scale));
-          height = Math.max(1, Math.round(height * scale));
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          canvas.getContext('2d')?.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-          await updateProfileInfo({ photoURL: dataUrl });
-          setMessage({ type: 'success', text: 'Foto profil berhasil disimpan.' });
-        } catch (err: unknown) {
-          setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Gagal menyimpan foto' });
-        } finally {
-          setPhotoBusy(false);
-        }
-      };
-      img.onerror = () => {
-        setPhotoBusy(false);
-        setMessage({ type: 'error', text: 'File gambar tidak dapat dibaca' });
-      };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
+    try {
+      await updateProfileInfo({ photoURL: emoji });
+      setMessage({ type: 'success', text: 'Avatar profil berhasil disimpan.' });
+    } catch (err: unknown) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Gagal menyimpan avatar' });
+    } finally {
+      setPhotoBusy(false);
+    }
   };
 
   const handleRemovePhoto = async () => {
@@ -176,27 +146,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack }) => {
       </div>
 
       {/* Identity Card */}
-      <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center gap-4">
-        <div className="relative shrink-0">
-          {photoURL ? (
-            <img
-              src={photoURL}
-              alt="Foto profil"
-              className="w-16 h-16 rounded-full object-cover shadow-md border border-slate-200 dark:border-slate-700"
-            />
-          ) : (
-            <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 text-white flex items-center justify-center text-2xl font-extrabold shadow-md">
-              {initial}
-            </div>
-          )}
-          <label
-            className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-orange-600 hover:bg-orange-700 text-white flex items-center justify-center cursor-pointer shadow transition"
-            title="Ubah foto profil"
-          >
-            <Camera className="w-3.5 h-3.5" />
-            <input type="file" accept="image/*" onChange={handlePhotoSelect} className="hidden" />
-          </label>
-        </div>
+      <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 text-white flex items-center justify-center text-3xl shadow-md shrink-0">
+            {photoURL && !photoURL.startsWith('data:') && !photoURL.startsWith('http') ? (
+              photoURL
+            ) : photoURL ? (
+              <img src={photoURL} alt="Foto profil" className="w-16 h-16 rounded-full object-cover" />
+            ) : (
+              <span className="text-2xl font-extrabold">{initial}</span>
+            )}
+          </div>
         <div className="min-w-0 flex-1">
           {editingName ? (
             <div className="flex items-center gap-1.5">
@@ -261,13 +221,42 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack }) => {
               </span>
             )}
           </div>
-          <div className="mt-1.5 flex items-center gap-2 text-[11px]">
-            <span className="text-slate-400">
-              {photoBusy ? 'Memproses foto…' : photoURL ? 'Klik ikon kamera untuk ganti foto' : 'Tambahkan foto profil'}
-            </span>
-            {photoURL && (
-              <button onClick={handleRemovePhoto} className="font-semibold text-red-500 hover:underline">
-                Hapus
+          <div className="mt-1.5 text-[11px] text-slate-400">
+            {photoBusy ? 'Menyimpan avatar…' : 'Pilih avatar di bawah'}
+          </div>
+        </div>
+        </div>
+
+        {/* Pilihan Avatar Emoji */}
+        <div>
+          <div className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
+            Avatar Karakter
+          </div>
+          <div className="grid grid-cols-6 gap-2">
+            {AVATAR_CHOICES.map(emoji => {
+              const selected = photoURL === emoji;
+              return (
+                <button
+                  key={emoji}
+                  onClick={() => handleSelectAvatar(emoji)}
+                  disabled={photoBusy}
+                  className={`aspect-square rounded-2xl text-2xl flex items-center justify-center border-2 transition disabled:opacity-60 ${
+                    selected
+                      ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/40 ring-2 ring-orange-500/30'
+                      : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 hover:border-orange-400'
+                  }`}
+                  title={`Pilih ${emoji}`}
+                >
+                  {emoji}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-2 flex items-center justify-between">
+            <span className="text-[11px] text-slate-400">Laki-laki & perempuan tersedia di atas</span>
+            {photoURL && !AVATAR_CHOICES.includes(photoURL) && (
+              <button onClick={handleRemovePhoto} className="text-[11px] font-semibold text-red-500 hover:underline">
+                Hapus foto lama
               </button>
             )}
           </div>

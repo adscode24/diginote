@@ -44,8 +44,23 @@ function MainApp() {
 
   // Bubble highlight meluncur ke tab aktif (efek ala video): ukur posisi tombol
   const navTrackRef = useRef<HTMLDivElement | null>(null);
+  const navBarRef = useRef<HTMLElement | null>(null);
   const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [bubble, setBubble] = useState({ left: 0, width: 0, visible: false });
+
+  // Kaca interaktif: sorotan mengikuti kursor (web) / sentuhan (mobile)
+  const updateGlassSpot = (clientX: number, clientY: number) => {
+    const bar = navBarRef.current;
+    if (!bar) return;
+    const rect = bar.getBoundingClientRect();
+    bar.style.setProperty('--gx', `${clientX - rect.left}px`);
+    bar.style.setProperty('--gy', `${clientY - rect.top}px`);
+  };
+  const handleNavMouseMove = (e: React.MouseEvent) => updateGlassSpot(e.clientX, e.clientY);
+  const handleNavTouch = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    if (t) updateGlassSpot(t.clientX, t.clientY);
+  };
 
   useLayoutEffect(() => {
     const update = () => {
@@ -122,35 +137,6 @@ function MainApp() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Summary Button in Top Right Header */}
-            <button
-              onClick={() => setActiveTab('summary')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
-                activeTab === 'summary'
-                  ? 'bg-orange-600 text-white border-orange-600 shadow-xs'
-                  : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-              }`}
-              title="Buka Summary (Kalender & Laporan)"
-              aria-label="Summary"
-            >
-              <CalendarDays className={`w-4 h-4 ${activeTab === 'summary' ? 'text-white' : 'text-orange-600 dark:text-orange-400'}`} />
-              <span>Summary</span>
-            </button>
-
-            {/* Pengaturan -> di header, sebelah profil */}
-            <button
-              onClick={() => setActiveTab('settings')}
-              className={`flex items-center justify-center w-8 h-8 rounded-xl border text-slate-500 dark:text-slate-400 transition ${
-                activeTab === 'settings'
-                  ? 'bg-orange-600 text-white border-orange-600 shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:text-orange-600 dark:hover:text-orange-400 hover:border-orange-300'
-              }`}
-              title="Pengaturan"
-              aria-label="Pengaturan"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-
             {/* Foto Profil -> Halaman Profile */}
             <button
               onClick={() => setActiveTab('profile')}
@@ -162,7 +148,11 @@ function MainApp() {
               title={currentUser?.name || 'Profil'}
               aria-label="Profil pengguna"
             >
-              {currentUser?.photoURL ? (
+              {currentUser?.photoURL && !currentUser.photoURL.startsWith('data:') && !currentUser.photoURL.startsWith('http') ? (
+                <span className="flex items-center justify-center w-8 h-8 rounded-full text-lg bg-gradient-to-tr from-orange-600 to-amber-500">
+                  {currentUser.photoURL}
+                </span>
+              ) : currentUser?.photoURL ? (
                 <img src={currentUser.photoURL} alt="Foto profil" className="w-8 h-8 rounded-full object-cover" />
               ) : (
                 <span className="flex items-center justify-center w-8 h-8 rounded-full text-xs font-extrabold text-white bg-gradient-to-tr from-orange-600 to-amber-500">
@@ -187,10 +177,23 @@ function MainApp() {
 
       {/* Floating Glass Bottom Navigation (iOS style, kaca gençet) */}
       <nav
+        ref={navBarRef}
         aria-label="Navigasi Utama"
-        className="fixed bottom-4 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[480px] z-40 rounded-[28px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl backdrop-saturate-150 border border-white/50 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.45)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.08)]"
+        onMouseMove={handleNavMouseMove}
+        onTouchStart={handleNavTouch}
+        onTouchMove={handleNavTouch}
+        className="fixed bottom-4 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[480px] z-40 rounded-[28px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl backdrop-saturate-150 border border-white/50 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.45)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.08)] overflow-hidden"
       >
-        <div className="px-2 sm:px-3">
+        {/* Sorotan kaca mengikuti kursor/sentuhan */}
+        <span
+          aria-hidden
+          className="absolute inset-0 pointer-events-none transition-opacity duration-300"
+          style={{
+            background:
+              'radial-gradient(140px circle at var(--gx, 50%) var(--gy, 50%), rgba(255,255,255,0.28), transparent 70%)',
+          }}
+        />
+        <div className="px-2 sm:px-3 relative">
           <div ref={navTrackRef} className="flex items-center justify-between h-[68px] relative">
             {/* Bubble highlight meluncur ke tab aktif */}
             <span

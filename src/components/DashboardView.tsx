@@ -230,7 +230,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
       {/* Kartu Ucapan Selamat Datang */}
       <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-600 to-amber-700 text-white shadow-sm flex items-center gap-3">
         <div className="flex items-center gap-3">
-          {currentUser?.photoURL ? (
+          {currentUser?.photoURL && !currentUser.photoURL.startsWith('data:') && !currentUser.photoURL.startsWith('http') ? (
+            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0 text-2xl shadow-xs">
+              {currentUser.photoURL}
+            </div>
+          ) : currentUser?.photoURL ? (
             <img
               src={currentUser.photoURL}
               alt="Foto profil"

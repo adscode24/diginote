@@ -16,6 +16,7 @@ import {
   Cloud,
   Eye,
   EyeOff,
+  Plus,
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { useAuth } from '../context/AuthContext';
@@ -29,6 +30,7 @@ import {
   getNextDueDate,
 } from '../utils/formatters';
 import { CategoryIcon } from './CategoryIcon';
+import { TransactionModal } from './TransactionModal';
 import { PayDebtModal } from './PayDebtModal';
 import { BillPayModal } from './BillPayModal';
 import { useBillCards } from '../hooks/useBillCards';
@@ -44,6 +46,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
 
   const [selectedDebtToPay, setSelectedDebtToPay] = useState<Debt | null>(null);
   const [billToPay, setBillToPay] = useState<Bill | null>(null);
+  const [fabOpen, setFabOpen] = useState(false);
+  const [txModal, setTxModal] = useState<{ open: boolean; type: 'income' | 'expense' }>({
+    open: false,
+    type: 'expense',
+  });
 
   // Month filter state
   const today = getTodayString();
@@ -54,7 +61,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
   const [breakdownType, setBreakdownType] = useState<TransactionType | null>(null);
 
   // Kunci scroll halaman belakang saat bottom sheet / modal terbuka
-  useBodyScrollLock(breakdownType !== null || selectedDebtToPay !== null || billToPay !== null);
+  useBodyScrollLock(
+    breakdownType !== null || selectedDebtToPay !== null || billToPay !== null || txModal.open
+  );
 
   const selectedMonthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
   const selectedMonthLabel = formatMonthYearIndo(selectedYear, selectedMonth);
@@ -925,6 +934,59 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
         isOpen={!!billToPay}
         onClose={() => setBillToPay(null)}
         bill={billToPay}
+      />
+
+      {/* Floating Action Button (kanan halaman) + pilihan wraparound */}
+      <div className="fixed right-4 bottom-[120px] z-40 flex flex-col items-center gap-2">
+        <button
+          onClick={() => {
+            setFabOpen(false);
+            setTxModal({ open: true, type: 'income' });
+          }}
+          aria-label="Catat pemasukan"
+          className={`flex flex-col items-center gap-1 transition-all duration-300 ${
+            fabOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-50 translate-y-4 pointer-events-none'
+          }`}
+        >
+          <span className="w-12 h-12 rounded-full bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center shadow-lg">
+            <ArrowDownLeft className="w-5 h-5" />
+          </span>
+          <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 bg-white/80 dark:bg-slate-900/80 px-2 py-0.5 rounded-full backdrop-blur shadow">
+            Masuk
+          </span>
+        </button>
+        <button
+          onClick={() => {
+            setFabOpen(false);
+            setTxModal({ open: true, type: 'expense' });
+          }}
+          aria-label="Catat pengeluaran"
+          className={`flex flex-col items-center gap-1 transition-all duration-300 ${
+            fabOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-50 translate-y-4 pointer-events-none'
+          }`}
+          style={{ transitionDelay: fabOpen ? '70ms' : '0ms' }}
+        >
+          <span className="w-12 h-12 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg">
+            <ArrowUpRight className="w-5 h-5" />
+          </span>
+          <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 bg-white/80 dark:bg-slate-900/80 px-2 py-0.5 rounded-full backdrop-blur shadow">
+            Keluar
+          </span>
+        </button>
+        <button
+          onClick={() => setFabOpen(v => !v)}
+          aria-label={fabOpen ? 'Tutup' : 'Catat transaksi'}
+          className="w-14 h-14 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 hover:from-orange-700 hover:to-amber-600 text-white flex items-center justify-center shadow-xl transition-all active:scale-95"
+        >
+          {fabOpen ? <X className="w-6 h-6" /> : <Plus className="w-7 h-7 stroke-[2.5]" />}
+        </button>
+      </div>
+
+      {/* Transaction Modal */}
+      <TransactionModal
+        isOpen={txModal.open}
+        onClose={() => setTxModal(prev => ({ ...prev, open: false }))}
+        initialType={txModal.type}
       />
     </div>
   );

@@ -6,16 +6,10 @@ import {
   CreditCard,
   CalendarDays,
   Settings,
-  Plus,
-  ArrowDownLeft,
-  ArrowUpRight,
-  X,
 } from 'lucide-react';
 import { FinanceProvider } from './context/FinanceContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ActiveTab } from './types';
-import { TransactionModal } from './components/TransactionModal';
-import { useBodyScrollLock } from './hooks/useBodyScrollLock';
 import { DashboardView } from './components/DashboardView';
 import { TransactionsView } from './components/TransactionsView';
 import { AccountsView } from './components/AccountsView';
@@ -31,12 +25,6 @@ import { ProfileView } from './components/ProfileView';
 function MainApp() {
   const { currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
-  const [fabOpen, setFabOpen] = useState(false);
-  const [txModal, setTxModal] = useState<{ open: boolean; type: 'income' | 'expense' }>({
-    open: false,
-    type: 'expense',
-  });
-  useBodyScrollLock(txModal.open);
   const profileInitial = ((currentUser?.name || 'D').trim()[0] || 'D').toUpperCase();
 
   // Penyembuhan otomatis: tidak ada modal yang bisa terbuka saat pindah halaman,
@@ -50,9 +38,9 @@ function MainApp() {
     { id: 'transactions', label: 'Transaksi', shortLabel: 'Transaksi', icon: Receipt },
     { id: 'accounts', label: 'Sumber Dana', shortLabel: 'Dana', icon: Wallet },
     { id: 'debts', label: 'Hutang Piutang', shortLabel: 'Hutang', icon: CreditCard },
+    { id: 'summary', label: 'Summary', shortLabel: 'Summary', icon: CalendarDays },
+    { id: 'settings', label: 'Pengaturan', shortLabel: 'Setelan', icon: Settings },
   ];
-  const leftItems = navItems.slice(0, 2);
-  const rightItems = navItems.slice(2);
 
   // Bubble highlight meluncur ke tab aktif (efek ala video): ukur posisi tombol
   const navTrackRef = useRef<HTMLDivElement | null>(null);
@@ -77,11 +65,6 @@ function MainApp() {
     return () => window.removeEventListener('resize', update);
   }, [activeTab]);
 
-  const openTxModal = (type: 'income' | 'expense') => {
-    setFabOpen(false);
-    setTxModal({ open: true, type });
-  };
-
   const renderNavItem = (item: (typeof navItems)[number]) => {
     const Icon = item.icon;
     const isActive = activeTab === item.id;
@@ -92,7 +75,6 @@ function MainApp() {
           itemRefs.current[item.id] = el;
         }}
         onClick={() => {
-          setFabOpen(false);
           setActiveTab(item.id);
         }}
         className={`flex flex-col items-center justify-center flex-1 py-1.5 px-1 rounded-xl transition min-w-[44px] min-h-[44px] relative z-10 group ${
@@ -203,83 +185,27 @@ function MainApp() {
         {activeTab === 'profile' && <ProfileView onBack={() => setActiveTab('dashboard')} />}
       </main>
 
-      {/* Floating Glass Bottom Navigation (iOS style) dengan tombol + tengah */}
+      {/* Floating Glass Bottom Navigation (iOS style, kaca gençet) */}
       <nav
         aria-label="Navigasi Utama"
-        className="fixed bottom-4 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[420px] z-40 rounded-3xl bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white/40 dark:border-slate-700/60 shadow-2xl"
+        className="fixed bottom-4 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[480px] z-40 rounded-[28px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl backdrop-saturate-150 border border-white/50 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.45)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.08)]"
       >
-        <div className="px-2 sm:px-4">
-          <div ref={navTrackRef} className="flex items-end justify-between h-[72px] relative">
+        <div className="px-2 sm:px-3">
+          <div ref={navTrackRef} className="flex items-center justify-between h-[68px] relative">
             {/* Bubble highlight meluncur ke tab aktif */}
             <span
               aria-hidden
-              className="absolute top-1 bottom-1 rounded-2xl bg-orange-500/15 dark:bg-white/10 border border-orange-500/20 dark:border-white/10 transition-all duration-300 ease-out pointer-events-none"
+              className="absolute top-1.5 bottom-1.5 rounded-2xl bg-orange-500/15 dark:bg-white/10 border border-orange-500/20 dark:border-white/10 transition-all duration-300 ease-out pointer-events-none"
               style={{
                 left: bubble.left,
                 width: bubble.width,
                 opacity: bubble.visible ? 1 : 0,
               }}
             />
-            <div className="flex items-center justify-around flex-1">
-              {leftItems.map(renderNavItem)}
-            </div>
-
-            {/* Tombol + */}
-            <div className="relative flex flex-col items-center justify-end w-[76px] shrink-0">
-              {/* Pilihan wraparound: Masuk / Keluar */}
-              <button
-                onClick={() => openTxModal('income')}
-                aria-label="Catat pemasukan"
-                className={`absolute left-0 bottom-[74px] flex flex-col items-center gap-1 transition-all duration-300 ${
-                  fabOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-50 translate-y-4 pointer-events-none'
-                }`}
-                style={{ transitionDelay: fabOpen ? '90ms' : '0ms' }}
-              >
-                <span className="w-12 h-12 rounded-full bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center shadow-lg">
-                  <ArrowDownLeft className="w-5 h-5" />
-                </span>
-                <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 bg-white/80 dark:bg-slate-900/80 px-2 py-0.5 rounded-full backdrop-blur">
-                  Masuk
-                </span>
-              </button>
-              <button
-                onClick={() => openTxModal('expense')}
-                aria-label="Catat pengeluaran"
-                className={`absolute right-0 bottom-[74px] flex flex-col items-center gap-1 transition-all duration-300 ${
-                  fabOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-50 translate-y-4 pointer-events-none'
-                }`}
-                style={{ transitionDelay: fabOpen ? '0ms' : '90ms' }}
-              >
-                <span className="w-12 h-12 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg">
-                  <ArrowUpRight className="w-5 h-5" />
-                </span>
-                <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 bg-white/80 dark:bg-slate-900/80 px-2 py-0.5 rounded-full backdrop-blur">
-                  Keluar
-                </span>
-              </button>
-
-              <button
-                onClick={() => setFabOpen(v => !v)}
-                aria-label={fabOpen ? 'Tutup' : 'Catat transaksi'}
-                className="w-14 h-14 -mt-7 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 hover:from-orange-700 hover:to-amber-600 text-white flex items-center justify-center shadow-xl transition-all active:scale-95"
-              >
-                {fabOpen ? <X className="w-6 h-6" /> : <Plus className="w-7 h-7 stroke-[2.5]" />}
-              </button>
-            </div>
-
-            <div className="flex items-center justify-around flex-1">
-              {rightItems.map(renderNavItem)}
-            </div>
+            {navItems.map(renderNavItem)}
           </div>
         </div>
       </nav>
-
-      {/* Modal catat transaksi global */}
-      <TransactionModal
-        isOpen={txModal.open}
-        onClose={() => setTxModal(prev => ({ ...prev, open: false }))}
-        initialType={txModal.type}
-      />
     </div>
   );
 }

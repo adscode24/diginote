@@ -7,7 +7,7 @@ import {
   CalendarDays,
   Settings,
 } from 'lucide-react';
-import { FinanceProvider } from './context/FinanceContext';
+import { FinanceProvider, useFinance } from './context/FinanceContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ActiveTab } from './types';
 import { DashboardView } from './components/DashboardView';
@@ -18,12 +18,14 @@ import { SummaryView } from './components/SummaryView';
 import { SettingsView } from './components/SettingsView';
 import { AuthView } from './components/AuthView';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { PullToRefresh } from './components/PullToRefresh';
 import { forceUnlockBodyScroll } from './hooks/useBodyScrollLock';
 
 import { ProfileView } from './components/ProfileView';
 
 function MainApp() {
   const { currentUser } = useAuth();
+  const { pullFromVaultNow } = useFinance();
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const profileInitial = ((currentUser?.name || 'D').trim()[0] || 'D').toUpperCase();
 
@@ -166,13 +168,15 @@ function MainApp() {
 
       {/* Main Content Viewport with generous bottom padding for floating dock */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 pb-36">
-        {activeTab === 'dashboard' && <DashboardView onNavigateTab={tab => setActiveTab(tab)} />}
-        {activeTab === 'transactions' && <TransactionsView />}
-        {activeTab === 'accounts' && <AccountsView onNavigateTab={tab => setActiveTab(tab)} />}
-        {activeTab === 'debts' && <DebtsView />}
-        {activeTab === 'summary' && <SummaryView />}
-        {activeTab === 'settings' && <SettingsView />}
-        {activeTab === 'profile' && <ProfileView onBack={() => setActiveTab('dashboard')} />}
+        <PullToRefresh onRefresh={() => pullFromVaultNow().catch(() => {})}>
+          {activeTab === 'dashboard' && <DashboardView onNavigateTab={tab => setActiveTab(tab)} />}
+          {activeTab === 'transactions' && <TransactionsView />}
+          {activeTab === 'accounts' && <AccountsView onNavigateTab={tab => setActiveTab(tab)} />}
+          {activeTab === 'debts' && <DebtsView />}
+          {activeTab === 'summary' && <SummaryView />}
+          {activeTab === 'settings' && <SettingsView />}
+          {activeTab === 'profile' && <ProfileView onBack={() => setActiveTab('dashboard')} />}
+        </PullToRefresh>
       </main>
 
       {/* Floating Glass Bottom Navigation (iOS style, kaca gençet) */}

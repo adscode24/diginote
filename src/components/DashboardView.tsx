@@ -34,6 +34,7 @@ import { TransactionModal } from './TransactionModal';
 import { PayDebtModal } from './PayDebtModal';
 import { BillPayModal } from './BillPayModal';
 import { useBillCards } from '../hooks/useBillCards';
+import { useAmountPrivacy } from '../hooks/useAmountPrivacy';
 import { Debt, ActiveTab, Transaction, TransactionType, Bill } from '../types';
 
 interface DashboardViewProps {
@@ -114,30 +115,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
       .slice(0, 3);
   }, [debts]);
 
-  // Privasi angka: eye-toggle per kartu (tersimpan di perangkat)
-  const [hiddenMap, setHiddenMap] = useState<Record<string, boolean>>(() => {
-    try {
-      const raw = localStorage.getItem('diginote_hide_amounts_v2');
-      if (raw) return JSON.parse(raw);
-    } catch {
-      /* abaikan */
-    }
-    return {};
-  });
-  const toggleHide = (id: string) => {
-    setHiddenMap(prev => {
-      const next = { ...prev, [id]: !prev[id] };
-      try {
-        localStorage.setItem('diginote_hide_amounts_v2', JSON.stringify(next));
-      } catch {
-        /* abaikan */
-      }
-      return next;
-    });
-  };
-  const isHidden = (id: string) => hiddenMap[id] ?? true;
-  const masked = (id: string, amount: number) =>
-    isHidden(id) ? 'Rp••••••' : formatRupiah(amount);
+  // Privasi angka: eye-toggle per kartu (default tertutup, tersimpan di perangkat)
+  const { isHidden, toggleHidden: toggleHide, masked } = useAmountPrivacy();
 
   const EyeToggle: React.FC<{ id: string; dark?: boolean }> = ({ id, dark }) => (
     <button

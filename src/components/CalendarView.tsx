@@ -8,14 +8,18 @@ import {
   Calendar as CalendarIcon,
   AlertCircle,
   Clock,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { formatRupiah, formatDateIndo, formatMonthYearIndo, getTodayString } from '../utils/formatters';
+import { useAmountPrivacy } from '../hooks/useAmountPrivacy';
 import { TransactionModal } from './TransactionModal';
 import { CategoryIcon } from './CategoryIcon';
 
 export const CalendarView: React.FC = () => {
   const { transactions, debts, categories } = useFinance();
+  const { isHidden, toggleHidden, masked } = useAmountPrivacy();
 
   // Current viewed month and year
   const today = getTodayString();
@@ -206,8 +210,17 @@ export const CalendarView: React.FC = () => {
           <span className="text-xs font-bold text-slate-900 dark:text-white">
             Evaluasi Progres Mingguan ({formatMonthYearIndo(currentYear, currentMonth)})
           </span>
-          <span className="text-[11px] text-slate-500 dark:text-slate-400">
-            Arus Kas Bersih (Pemasukan - Pengeluaran)
+          <span className="flex items-center gap-1.5">
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">
+              Arus Kas Bersih (Pemasukan - Pengeluaran)
+            </span>
+            <button
+              onClick={() => toggleHidden('kal:week')}
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              title={isHidden('kal:week') ? 'Tampilkan angka' : 'Sembunyikan angka'}
+            >
+              {isHidden('kal:week') ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            </button>
           </span>
         </div>
 
@@ -230,18 +243,18 @@ export const CalendarView: React.FC = () => {
                       isPositive ? 'text-orange-600 dark:text-orange-400' : 'text-red-600 dark:text-red-400'
                     }`}
                   >
-                    {isPositive ? '+' : ''}{formatRupiah(net)}
+                    {isPositive ? '+' : ''}{masked('kal:week', net)}
                   </div>
                 </div>
 
                 <div className="mt-2 pt-2 border-t border-slate-200/40 dark:border-slate-700/40 text-[10px] space-y-0.5 text-slate-500 dark:text-slate-400 tabular-nums">
                   <div className="flex justify-between">
                     <span>Masuk:</span>
-                    <span className="text-orange-600 font-medium">+{formatRupiah(w.income, false)}</span>
+                    <span className="text-orange-600 font-medium">+{masked('kal:week', w.income)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Keluar:</span>
-                    <span className="text-red-600 font-medium">-{formatRupiah(w.expense, false)}</span>
+                    <span className="text-red-600 font-medium">-{masked('kal:week', w.expense)}</span>
                   </div>
                 </div>
               </div>
@@ -375,13 +388,22 @@ export const CalendarView: React.FC = () => {
               <div>
                 <span className="text-[11px] text-slate-400">Total Masuk</span>
                 <div className="font-bold text-orange-600 dark:text-orange-400 tabular-nums">
-                  +{formatRupiah(selectedDayTotals.inc)}
+                  +{masked('kal:day', selectedDayTotals.inc)}
                 </div>
               </div>
               <div>
-                <span className="text-[11px] text-slate-400">Total Keluar</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-slate-400">Total Keluar</span>
+                  <button
+                    onClick={() => toggleHidden('kal:day')}
+                    className="p-0.5 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition"
+                    title={isHidden('kal:day') ? 'Tampilkan angka' : 'Sembunyikan angka'}
+                  >
+                    {isHidden('kal:day') ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                  </button>
+                </div>
                 <div className="font-bold text-red-600 dark:text-red-400 tabular-nums">
-                  -{formatRupiah(selectedDayTotals.exp)}
+                  -{masked('kal:day', selectedDayTotals.exp)}
                 </div>
               </div>
             </div>
@@ -399,7 +421,7 @@ export const CalendarView: React.FC = () => {
                     className="flex justify-between items-center text-xs text-amber-900 dark:text-amber-200"
                   >
                     <span>{d.counterparty} ({d.type === 'payable' ? 'Hutang' : 'Piutang'})</span>
-                    <strong className="tabular-nums">{formatRupiah(d.remainingAmount)}</strong>
+                    <strong className="tabular-nums">{masked('kal:day', d.remainingAmount)}</strong>
                   </div>
                 ))}
               </div>
@@ -447,7 +469,7 @@ export const CalendarView: React.FC = () => {
                             isIncome ? 'text-orange-600 dark:text-orange-400' : 'text-slate-900 dark:text-white'
                           }`}
                         >
-                          {isIncome ? '+' : '-'}{formatRupiah(tx.amount)}
+                          {isIncome ? '+' : '-'}{masked('kal:day', tx.amount)}
                         </div>
                       </div>
                     );

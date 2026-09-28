@@ -26,6 +26,7 @@ import { formatRupiah, formatDateIndo, formatMonthYearIndo } from '../utils/form
 import { CategoryIcon } from './CategoryIcon';
 import { AccountModal } from './AccountModal';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { useAmountPrivacy } from '../hooks/useAmountPrivacy';
 
 const TYPE_CONFIGS: { type: AccountType; label: string; icon: string }[] = [
   { type: 'bank', label: 'Rekening Bank', icon: 'Building2' },
@@ -39,6 +40,7 @@ const TYPE_CONFIGS: { type: AccountType; label: string; icon: string }[] = [
 export const AccountsView: React.FC<{ onNavigateTab?: (tab: ActiveTab) => void }> = ({
   onNavigateTab,
 }) => {
+  const { isHidden, toggleHidden, masked } = useAmountPrivacy();
   const { accounts, transactions, deleteAccount, summary } = useFinance();
 
   const [activeCategoryTab, setActiveCategoryTab] = useState<string>('all');
@@ -275,8 +277,15 @@ export const AccountsView: React.FC<{ onNavigateTab?: (tab: ActiveTab) => void }
             Real-time
           </span>
         </div>
-        <div className="text-2xl sm:text-3xl font-extrabold tabular-nums tracking-tight mt-2 text-white">
-          {formatRupiah(summary.totalAccountBalance)}
+        <div className="text-2xl sm:text-3xl font-extrabold tabular-nums tracking-tight mt-2 text-white flex items-center gap-2">
+          {masked('dana:total', summary.totalAccountBalance)}
+          <button
+            onClick={() => toggleHidden('dana:total')}
+            className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition"
+            title={isHidden('dana:total') ? 'Tampilkan angka' : 'Sembunyikan angka'}
+          >
+            {isHidden('dana:total') ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
         </div>
 
         {/* Breakdown of Assets */}
@@ -298,8 +307,17 @@ export const AccountsView: React.FC<{ onNavigateTab?: (tab: ActiveTab) => void }
           <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             Tab Jenis Sumber Dana
           </span>
-          <span className="text-[11px] text-slate-400">
-            Urutan alfabet berdasarkan jenis
+          <span className="flex items-center gap-1">
+            <span className="text-[11px] text-slate-400">
+              Urutan alfabet berdasarkan jenis
+            </span>
+            <button
+              onClick={() => toggleHidden('dana:tabs')}
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              title={isHidden('dana:tabs') ? 'Tampilkan angka tab' : 'Sembunyikan angka tab'}
+            >
+              {isHidden('dana:tabs') ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            </button>
           </span>
         </div>
 
@@ -331,7 +349,7 @@ export const AccountsView: React.FC<{ onNavigateTab?: (tab: ActiveTab) => void }
                   ? 'text-orange-100'
                   : 'text-slate-500 dark:text-slate-400'
               }`}>
-                {formatRupiah(summary.totalAccountBalance)}
+                {masked('dana:tabs', summary.totalAccountBalance)}
               </div>
             </div>
           </button>
@@ -376,7 +394,7 @@ export const AccountsView: React.FC<{ onNavigateTab?: (tab: ActiveTab) => void }
                       ? 'text-red-600 dark:text-red-400'
                       : 'text-orange-600 dark:text-orange-400'
                   }`}>
-                    {formatRupiah(tab.totalBalance)}
+                    {masked('dana:tabs', tab.totalBalance)}
                   </div>
                 </div>
               </button>
@@ -395,15 +413,22 @@ export const AccountsView: React.FC<{ onNavigateTab?: (tab: ActiveTab) => void }
             ({displayedAccounts.length} akun terdaftar, terurut alfabet A-Z)
           </span>
         </div>
-        <div className="text-xs font-medium text-slate-500 dark:text-slate-400">
+        <div className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
           Sisa Total Dana Kategori:{' '}
           <strong className={`font-bold tabular-nums ml-1 ${
             currentTabMeta.totalBalance < 0
               ? 'text-red-600 dark:text-red-400'
               : 'text-orange-600 dark:text-orange-400'
           }`}>
-            {formatRupiah(currentTabMeta.totalBalance)}
+            {masked('dana:cat', currentTabMeta.totalBalance)}
           </strong>
+          <button
+            onClick={() => toggleHidden('dana:cat')}
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+            title={isHidden('dana:cat') ? 'Tampilkan angka' : 'Sembunyikan angka'}
+          >
+            {isHidden('dana:cat') ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+          </button>
         </div>
       </div>
 
@@ -495,8 +520,18 @@ export const AccountsView: React.FC<{ onNavigateTab?: (tab: ActiveTab) => void }
 
                   {/* Balance Display */}
                   <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80">
-                    <div className="text-[11px] text-slate-400 font-medium">
-                      Saldo Saat Ini
+                    <div className="text-[11px] text-slate-400 font-medium flex items-center justify-between">
+                      <span>Saldo Saat Ini</span>
+                      <button
+                        onClick={e => {
+                          e.stopPropagation();
+                          toggleHidden(`dana:acc:${acc.id}`);
+                        }}
+                        className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                        title={isHidden(`dana:acc:${acc.id}`) ? 'Tampilkan angka' : 'Sembunyikan angka'}
+                      >
+                        {isHidden(`dana:acc:${acc.id}`) ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
                     </div>
                     <div
                       className={`text-xl font-bold tabular-nums tracking-tight mt-0.5 ${
@@ -505,11 +540,11 @@ export const AccountsView: React.FC<{ onNavigateTab?: (tab: ActiveTab) => void }
                           : 'text-red-600 dark:text-red-400'
                       }`}
                     >
-                      {formatRupiah(acc.balance)}
+                      {masked(`dana:acc:${acc.id}`, acc.balance)}
                     </div>
 
                     <div className="text-[10px] text-slate-400 mt-1">
-                      Saldo Awal: {formatRupiah(acc.initialBalance)}
+                      Saldo Awal: {masked(`dana:acc:${acc.id}`, acc.initialBalance)}
                     </div>
                   </div>
                 </div>

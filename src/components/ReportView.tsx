@@ -10,14 +10,18 @@ import {
   Download,
   CheckCircle2,
   AlertTriangle,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { formatRupiah, formatMonthYearIndo, getTodayString } from '../utils/formatters';
+import { useAmountPrivacy } from '../hooks/useAmountPrivacy';
 import { exportToPDF, exportToXLSX } from '../utils/exportReport';
 import { CategoryIcon } from './CategoryIcon';
 
 export const ReportView: React.FC = () => {
   const { transactions, debts, categories } = useFinance();
+  const { isHidden, toggleHidden, masked } = useAmountPrivacy();
 
   const today = getTodayString();
   const [selectedYear, setSelectedYear] = useState(() => Number(today.split('-')[0]));
@@ -173,6 +177,13 @@ export const ReportView: React.FC = () => {
           <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-orange-600 dark:text-orange-400" />
             <span>Laporan Keuangan Bulanan</span>
+            <button
+              onClick={() => toggleHidden('lap:kpi')}
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              title={isHidden('lap:kpi') ? 'Tampilkan angka' : 'Sembunyikan angka'}
+            >
+              {isHidden('lap:kpi') ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Analisis arus kas, visualisasi grafik pengeluaran, dan ekspor laporan resmi
@@ -243,7 +254,7 @@ export const ReportView: React.FC = () => {
             Total Pemasukan
           </span>
           <div className="text-lg sm:text-xl font-bold text-orange-600 dark:text-orange-400 tabular-nums mt-1">
-            +{formatRupiah(summary.totalIncome)}
+            +{masked('lap:kpi', summary.totalIncome)}
           </div>
           <span className="text-[10px] text-slate-400 mt-1 block">
             {monthlyTransactions.filter(t => t.type === 'income').length} transaksi masuk
@@ -255,10 +266,10 @@ export const ReportView: React.FC = () => {
             Total Pengeluaran
           </span>
           <div className="text-lg sm:text-xl font-bold text-red-600 dark:text-red-400 tabular-nums mt-1">
-            -{formatRupiah(summary.totalExpense)}
+            -{masked('lap:kpi', summary.totalExpense)}
           </div>
           <span className="text-[10px] text-slate-400 mt-1 block">
-            Rata-rata: {formatRupiah(summary.dailyAverageExpense)}/hari
+            Rata-rata: {masked('lap:kpi', summary.dailyAverageExpense)}/hari
           </span>
         </div>
 
@@ -273,7 +284,7 @@ export const ReportView: React.FC = () => {
                 : 'text-red-600 dark:text-red-400'
             }`}
           >
-            {summary.netBalance >= 0 ? '+' : ''}{formatRupiah(summary.netBalance)}
+            {summary.netBalance >= 0 ? '+' : ''}{masked('lap:kpi', summary.netBalance)}
           </div>
           <span className="text-[10px] text-slate-400 mt-1 block">
             {summary.netBalance >= 0 ? 'Kondisi surplus positif' : 'Pengeluaran melebihi pemasukan'}
@@ -402,7 +413,7 @@ export const ReportView: React.FC = () => {
                           </span>
                         </div>
                         <div className="font-semibold text-slate-900 dark:text-white tabular-nums">
-                          {formatRupiah(cat.amount)} ({pct.toFixed(1)}%)
+                          {masked('lap:cat', cat.amount)} ({pct.toFixed(1)}%)
                         </div>
                       </div>
 
@@ -465,7 +476,7 @@ export const ReportView: React.FC = () => {
                   </div>
 
                   <div className="text-xs font-bold text-orange-600 dark:text-orange-400 tabular-nums">
-                    +{formatRupiah(cat.amount)}
+                    +{masked('lap:cat', cat.amount)}
                   </div>
                 </div>
               );

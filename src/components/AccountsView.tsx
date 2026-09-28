@@ -20,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { Account, AccountType } from '../types';
+import { ActiveTab } from '../types';
 import { useFinance } from '../context/FinanceContext';
 import { formatRupiah, formatDateIndo, formatMonthYearIndo } from '../utils/formatters';
 import { CategoryIcon } from './CategoryIcon';
@@ -35,7 +36,9 @@ const TYPE_CONFIGS: { type: AccountType; label: string; icon: string }[] = [
   { type: 'other', label: 'Lainnya', icon: 'Wallet' },
 ];
 
-export const AccountsView: React.FC = () => {
+export const AccountsView: React.FC<{ onNavigateTab?: (tab: ActiveTab) => void }> = ({
+  onNavigateTab,
+}) => {
   const { accounts, transactions, deleteAccount, summary } = useFinance();
 
   const [activeCategoryTab, setActiveCategoryTab] = useState<string>('all');
@@ -51,7 +54,8 @@ export const AccountsView: React.FC = () => {
     setSheetHiddenMap(prev => ({ ...prev, [id]: !(prev[id] ?? true) }));
   };
 
-  // Fokus dari Beranda (klik kartu carousel): buka bottom sheet + mutasi otomatis
+  // Fokus dari Beranda (klik kartu carousel): buka bottom sheet + mutasi otomatis.
+  // Saat sheet ditutup, kembali ke halaman asal (dashboard vs sumber dana).
   useEffect(() => {
     try {
       const focusId = sessionStorage.getItem('diginote_focus_account');
@@ -63,6 +67,18 @@ export const AccountsView: React.FC = () => {
       /* abaikan */
     }
   }, []);
+
+  const closeSheet = () => {
+    setSheetAccountId(null);
+    try {
+      if (sessionStorage.getItem('diginote_focus_back') === 'dashboard') {
+        sessionStorage.removeItem('diginote_focus_back');
+        onNavigateTab?.('dashboard');
+      }
+    } catch {
+      /* abaikan */
+    }
+  };
 
   // Current month string for default accordion collapse logic (YYYY-MM)
   const currentMonthKey = useMemo(() => {
@@ -537,7 +553,7 @@ export const AccountsView: React.FC = () => {
         return (
           <div
             className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
-            onClick={() => setSheetAccountId(null)}
+            onClick={closeSheet}
           >
             <div
               className="w-full max-w-lg max-h-[88vh] flex flex-col rounded-t-3xl sm:rounded-2xl bg-white dark:bg-slate-900 shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-200"
@@ -574,7 +590,7 @@ export const AccountsView: React.FC = () => {
                       </div>
                     </div>
                     <button
-                      onClick={() => setSheetAccountId(null)}
+                      onClick={closeSheet}
                       className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition shrink-0"
                       title="Tutup"
                     >

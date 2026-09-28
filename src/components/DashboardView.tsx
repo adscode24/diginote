@@ -350,6 +350,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                       onClick={() => {
                         try {
                           sessionStorage.setItem('diginote_focus_account', acc.id);
+                          sessionStorage.setItem('diginote_focus_back', 'dashboard');
                         } catch {
                           /* abaikan */
                         }
@@ -586,10 +587,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                   </div>
                 </div>
 
-                {bill.showCountdown && (
+                {bill.showCountdown ? (
                   <button
                     onClick={() => setBillToPay(bill)}
                     className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-orange-600 hover:bg-orange-700 text-white transition shadow-xs shrink-0"
+                  >
+                    Bayar
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setBillToPay(bill)}
+                    className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-orange-500 hover:text-orange-600 transition shrink-0"
                   >
                     Bayar
                   </button>

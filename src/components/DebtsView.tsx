@@ -311,14 +311,16 @@ export const DebtsView: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
-                  {!bill.paid && (
-                    <button
-                      onClick={() => setBillToPay(bill)}
-                      className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-orange-600 hover:bg-orange-700 text-white transition shadow-xs"
-                    >
-                      Bayar
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setBillToPay(bill)}
+                    className={`px-3.5 py-2 text-xs font-semibold rounded-xl transition shadow-xs ${
+                      !bill.paid && bill.showCountdown
+                        ? 'bg-orange-600 hover:bg-orange-700 text-white'
+                        : 'border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-orange-500 hover:text-orange-600'
+                    }`}
+                  >
+                    Bayar
+                  </button>
                   <button
                     onClick={() => {
                       setBillToEdit(bill);
@@ -651,8 +653,15 @@ export const DebtsView: React.FC = () => {
 
       {/* Payment Detail Modal */}
       {selectedPaymentDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 dark:border-slate-800 space-y-4">
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => setSelectedPaymentDetail(null)}
+        >
+          <div
+            className="w-full max-w-md max-h-[88vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-xl border-t sm:border border-slate-200 dark:border-slate-800 space-y-4 animate-in slide-in-from-bottom duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto -mt-2 mb-1 sm:hidden shrink-0" />
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-orange-100 dark:bg-orange-950 text-orange-600 dark:text-orange-400 flex items-center justify-center">

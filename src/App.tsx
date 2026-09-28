@@ -107,7 +107,7 @@ function MainApp() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 pb-28">
         {activeTab === 'dashboard' && <DashboardView onNavigateTab={tab => setActiveTab(tab)} />}
         {activeTab === 'transactions' && <TransactionsView />}
-        {activeTab === 'accounts' && <AccountsView />}
+        {activeTab === 'accounts' && <AccountsView onNavigateTab={tab => setActiveTab(tab)} />}
         {activeTab === 'debts' && <DebtsView />}
         {activeTab === 'summary' && <SummaryView />}
         {activeTab === 'settings' && <SettingsView />}

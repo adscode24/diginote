@@ -561,14 +561,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                     </span>
                     <span
                       className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                        bill.statusInfo.isOverdue
-                          ? 'bg-red-100 text-red-700 dark:bg-red-950/80 dark:text-red-300'
-                          : bill.statusInfo.isDueSoon
-                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300'
+                        bill.showCountdown
+                          ? bill.statusInfo.isOverdue
+                            ? 'bg-red-100 text-red-700 dark:bg-red-950/80 dark:text-red-300'
+                            : 'bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300'
                           : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
                       }`}
                     >
-                      {bill.statusInfo.label}
+                      {bill.badgeLabel}
                     </span>
                   </div>
                   <div className="text-xs text-slate-600 dark:text-slate-300 mt-1">
@@ -586,7 +586,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                   </div>
                 </div>
 
-                {!bill.paid && bill.statusInfo.daysRemaining <= 7 && (
+                {bill.showCountdown && (
                   <button
                     onClick={() => setBillToPay(bill)}
                     className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-orange-600 hover:bg-orange-700 text-white transition shadow-xs shrink-0"

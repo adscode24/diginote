@@ -15,6 +15,8 @@ import {
   Layers,
   ChevronDown,
   ChevronUp,
+  Eye,
+  EyeOff,
   X,
 } from 'lucide-react';
 import { Account, AccountType } from '../types';
@@ -42,6 +44,12 @@ export const AccountsView: React.FC = () => {
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [sheetAccountId, setSheetAccountId] = useState<string | null>(null);
   useBodyScrollLock(sheetAccountId !== null);
+
+  // Mata bottom sheet: default tertutup (sembunyikan saldo + isi mutasi)
+  const [sheetHiddenMap, setSheetHiddenMap] = useState<Record<string, boolean>>({});
+  const toggleSheetHidden = (id: string) => {
+    setSheetHiddenMap(prev => ({ ...prev, [id]: !(prev[id] ?? true) }));
+  };
 
   // Fokus dari Beranda (klik kartu carousel): buka bottom sheet + mutasi otomatis
   useEffect(() => {
@@ -519,11 +527,13 @@ export const AccountsView: React.FC = () => {
         </div>
       )}
 
-      {/* Bottom Sheet: Preview Kartu + Mutasi Terbuka */}
+      {/* Bottom Sheet: Preview Kartu + Mutasi (mata default tertutup) */}
       {(() => {
         const sheetAcc = accounts.find(a => a.id === sheetAccountId);
         if (!sheetAcc) return null;
         const monthGroups = getAccountGroupedTx(sheetAcc.id);
+        const sheetHidden = sheetHiddenMap[sheetAcc.id] ?? true;
+        const sheetMasked = (amount: number) => (sheetHidden ? 'Rp••••••' : formatRupiah(amount));
         return (
           <div
             className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
@@ -550,11 +560,17 @@ export const AccountsView: React.FC = () => {
                       <div className="text-[11px] font-semibold uppercase tracking-wider text-white/80 truncate">
                         {sheetAcc.name}
                       </div>
-                      <div className="text-xl font-extrabold tabular-nums text-white mt-0.5">
-                        {formatRupiah(sheetAcc.balance)}
-                      </div>
-                      <div className="text-[11px] text-white/70 mt-0.5">
-                        Saldo Awal: {formatRupiah(sheetAcc.initialBalance)}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xl font-extrabold tabular-nums text-white mt-0.5">
+                          {sheetMasked(sheetAcc.balance)}
+                        </span>
+                        <button
+                          onClick={() => toggleSheetHidden(sheetAcc.id)}
+                          className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition"
+                          title={sheetHidden ? 'Tampilkan data' : 'Sembunyikan data'}
+                        >
+                          {sheetHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
                       </div>
                     </div>
                     <button
@@ -605,12 +621,12 @@ export const AccountsView: React.FC = () => {
                             <div className="text-right text-[11px] tabular-nums font-semibold">
                               {group.totalIncome > 0 && (
                                 <div className="text-orange-600 dark:text-orange-400">
-                                  +{formatRupiah(group.totalIncome, false)}
+                                  +{sheetHidden ? '••••••' : formatRupiah(group.totalIncome, false)}
                                 </div>
                               )}
                               {group.totalExpense > 0 && (
                                 <div className="text-slate-600 dark:text-slate-400">
-                                  -{formatRupiah(group.totalExpense, false)}
+                                  -{sheetHidden ? '••••••' : formatRupiah(group.totalExpense, false)}
                                 </div>
                               )}
                             </div>
@@ -645,7 +661,7 @@ export const AccountsView: React.FC = () => {
                                         : 'text-slate-900 dark:text-white'
                                     }`}
                                   >
-                                    {isIncome ? '+' : '-'}{formatRupiah(tx.amount)}
+                                    {isIncome ? '+' : '-'}{sheetMasked(tx.amount)}
                                   </div>
                                 </div>
                               );

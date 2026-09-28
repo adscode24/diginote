@@ -8,6 +8,10 @@ export interface BillCard extends Bill {
   dueDateStr: string;
   statusInfo: ReturnType<typeof calculateDueDateStatus>;
   lastPayment: { paymentDate: string; amount: number } | null;
+  /** True bila hitung mundur perlu ditampilkan (<8 hari atau lewat tempo & belum bayar). */
+  showCountdown: boolean;
+  /** Teks badge: hitung mundur, atau netral bila masih jauh. */
+  badgeLabel: string;
 }
 
 /**
@@ -28,7 +32,23 @@ export function useBillCards(): BillCard[] {
         const paid = billPayments.some(p => p.billId === b.id && p.monthKey === currentMonthKey);
         const dueDay = Math.min(Math.max(1, b.dueDayOfMonth || 1), daysInMonth);
         const dueDateStr = `${currentMonthKey}-${String(dueDay).padStart(2, '0')}`;
-        const statusInfo = calculateDueDateStatus(dueDateStr);
+        const current = calculateDueDateStatus(dueDateStr);
+        // Sudah dibayar bulan ini -> tidak dianggap lewat; hitung mundur ke siklus depan.
+        let statusInfo = current;
+        if (paid) {
+          const ny = cm === 12 ? cy + 1 : cy;
+          const nm = cm === 12 ? 1 : cm + 1;
+          const nextDays = new Date(ny, nm, 0).getDate();
+          const nextDay = Math.min(dueDay, nextDays);
+          const nextStr = `${ny}-${String(nm).padStart(2, '0')}-${String(nextDay).padStart(2, '0')}`;
+          statusInfo = calculateDueDateStatus(nextStr);
+        }
+        const showCountdown = !paid && (statusInfo.isOverdue || statusInfo.daysRemaining < 8);
+        const badgeLabel = showCountdown
+          ? statusInfo.label
+          : paid
+          ? `Jatuh tempo ${statusInfo.daysRemaining} hari lagi`
+          : `Tgl ${dueDay} tiap bulan`;
         const history = billPayments
           .filter(p => p.billId === b.id)
           .sort((x, y) => (x.paymentDate < y.paymentDate ? 1 : -1));
@@ -38,6 +58,8 @@ export function useBillCards(): BillCard[] {
           paid,
           dueDateStr,
           statusInfo,
+          showCountdown,
+          badgeLabel,
           lastPayment: last ? { paymentDate: last.paymentDate, amount: last.amount } : null,
         };
       })

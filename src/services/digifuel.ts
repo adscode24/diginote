@@ -15,7 +15,9 @@ import {
   query,
   where,
   getDocs,
+  onSnapshot,
   type Firestore,
+  type Unsubscribe,
 } from 'firebase/firestore';
 
 // Konfigurasi klien PUBLIK project DigiFuel (Fuel-Traxr) — disengaja publik,
@@ -189,4 +191,35 @@ export async function fetchDigifuelVault(email: string): Promise<DigifuelVault |
 export function persistDigifuelLink(uid: string, patch: Partial<DigifuelLink>) {
   const current = getDigifuelLink(uid) || { email: '', lastPulledAt: null, mirroredCount: 0 };
   saveDigifuelLink(uid, { ...current, ...patch });
+}
+
+/**
+ * Langganan realtime vault DigiFuel (read-only, tanpa perlu aplikasi DigiFuel
+ * terinstal — cukup akun terhubung). Setiap ada doc cocok, kembalikan yang terbaru.
+ * Query di-subscribe langsung sehingga vault yang baru dibuat pun terdeteksi.
+ */
+export function subscribeDigifuelVault(
+  email: string,
+  onData: (vault: DigifuelVault | null) => void,
+  onError: (err: Error) => void
+): Unsubscribe {
+  const db = getDigifuelDb();
+  const candidate = email.trim().toLowerCase();
+  const q = query(collection(db, 'fuelVaults'), where('ownerEmail', '==', candidate));
+  return onSnapshot(
+    q,
+    snap => {
+      if (snap.empty) {
+        onData(null);
+        return;
+      }
+      let best: DigifuelVault | null = null;
+      snap.forEach(d => {
+        const v = d.data() as DigifuelVault;
+        if (!best || (v.updatedAt || '') > (best.updatedAt || '')) best = v;
+      });
+      onData(best);
+    },
+    err => onError(err instanceof Error ? err : new Error(String(err)))
+  );
 }

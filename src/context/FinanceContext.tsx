@@ -31,6 +31,7 @@ import {
   getDigifuelLink,
   fetchDigifuelVault,
   persistDigifuelLink,
+  subscribeDigifuelVault,
 } from '../services/digifuel';
 
 interface FinanceContextType {
@@ -1346,19 +1347,16 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
    * dihapus di DigiFuel ikut dibersihkan. Akun pilihan pengguna dipertahankan
    * (hanya dipakai saat pembuatan).
    */
-  const pullDigifuelNow = async (): Promise<{
-    mirrored: number;
-    removed: number;
-    diag: string;
-  }> => {
-    const link = getDigifuelLink(userId);
-    if (!link) throw new Error('Hubungkan akun DigiFuel dulu di Pengaturan.');
-    const vault = await fetchDigifuelVault(link.email);
-    if (!vault) {
-      throw new Error(
-        'Vault DigiFuel tidak ditemukan untuk email ini. Pastikan Anda pernah login di aplikasi DigiFuel (bukan mode tamu) dan Rules sudah di-publish.'
-      );
-    }
+  const lastDigifuelAtRef = React.useRef<string>('');
+
+  /**
+   * Inti pencerminan DigiFuel -> transaksi keluar (dipakai tarik manual & auto-realtime).
+   * Mengembalikan {mirrored, removed, diag}.
+   */
+  const applyDigifuelVault = (
+    vault: import('../services/digifuel').DigifuelVault,
+    linkAccountId?: string
+  ): { mirrored: number; removed: number; diag: string } => {
     const fuelTotal = (vault.fuelRecords || []).length;
     const svcTotal = (vault.serviceHistory || []).length;
 
@@ -1369,7 +1367,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
       expenseCats.find(c => c.id === 'cat_other_exp') ||
       expenseCats[0];
     if (!fuelCat) throw new Error('Tidak ada kategori pengeluaran di DigiNote.');
-    const mappedAccount = accounts.find(a => a.id === link.accountId);
+    const mappedAccount = accounts.find(a => a.id === linkAccountId);
     const targetAccount = mappedAccount || accounts.find(a => a.type === 'bank' || a.type === 'cash' || a.type === 'ewallet') || accounts[0];
 
     let mirrored = 0;
@@ -1457,7 +1455,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
       });
     });
 
-    persistDigifuelLink(userId, { lastPulledAt: Date.now(), mirroredCount: upserts.length });
     const fuelQualified = (vault.fuelRecords || []).filter(r => r.totalCost && r.totalCost > 0).length;
     const svcQualified = (vault.serviceHistory || []).filter(s => s.cost && s.cost > 0).length;
     const diag =
@@ -1465,6 +1462,76 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
       `${svcTotal} servis (${svcQualified} berbiaya).`;
     return { mirrored, removed, diag };
   };
+
+  const pullDigifuelNow = async (): Promise<{
+    mirrored: number;
+    removed: number;
+    diag: string;
+  }> => {
+    const link = getDigifuelLink(userId);
+    if (!link) throw new Error('Hubungkan akun DigiFuel dulu di Pengaturan.');
+    const vault = await fetchDigifuelVault(link.email);
+    if (!vault) {
+      throw new Error(
+        'Vault DigiFuel tidak ditemukan untuk email ini. Pastikan Anda pernah login di aplikasi DigiFuel (bukan mode tamu) dan Rules sudah di-publish.'
+      );
+    }
+    const res = applyDigifuelVault(vault, link.accountId);
+    persistDigifuelLink(userId, { lastPulledAt: Date.now(), mirroredCount: res.mirrored });
+    lastDigifuelAtRef.current = vault.updatedAt || '';
+    return res;
+  };
+
+  // Realtime DigiFuel: setiap ada catatan bensin/biaya baru di cloud,
+  // otomatis tercermin di DigiNote (debounced, tanpa perlu aplikasi DigiFuel).
+  // Tombol "Tarik dari DigiFuel" tetap ada untuk penarikan manual paksa.
+  useEffect(() => {
+    const link = getDigifuelLink(userId);
+    if (!link) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let unsub: (() => void) | null = null;
+    try {
+      unsub = subscribeDigifuelVault(
+        link.email,
+        vault => {
+          if (cancelled || !vault) return;
+          if (vault.updatedAt && vault.updatedAt === lastDigifuelAtRef.current) return;
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(() => {
+            timer = null;
+            if (cancelled) return;
+            try {
+              const freshLink = getDigifuelLink(userId);
+              const res = applyDigifuelVault(vault, freshLink?.accountId);
+              lastDigifuelAtRef.current = vault.updatedAt || '';
+              persistDigifuelLink(userId, {
+                lastPulledAt: Date.now(),
+                mirroredCount: res.mirrored,
+              });
+              if (res.mirrored > 0) {
+                setSyncNotice({
+                  text: `DigiFuel: ${res.mirrored} catatan baru masuk sebagai pengeluaran.`,
+                  action: null,
+                });
+              }
+            } catch (e) {
+              console.error(e);
+            }
+          }, 2000);
+        },
+        err => console.error('DigiFuel subscribe error:', err)
+      );
+    } catch (e) {
+      console.error(e);
+    }
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      if (unsub) unsub();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   const updateSyncSettings = (settings: Partial<SyncSettings>) => {
     setSyncSettings(prev => ({ ...prev, ...settings }));

@@ -183,9 +183,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
       {/* Kartu Ucapan Selamat Datang */}
       <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-600 to-amber-700 text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0 text-lg font-extrabold">
-            {((currentUser?.name || 'D').trim()[0] || 'D').toUpperCase()}
-          </div>
+          {currentUser?.photoURL ? (
+            <img
+              src={currentUser.photoURL}
+              alt="Foto profil"
+              className="w-10 h-10 rounded-xl object-cover shrink-0 shadow-xs"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0 text-lg font-extrabold">
+              {((currentUser?.name || 'D').trim()[0] || 'D').toUpperCase()}
+            </div>
+          )}
           <div>
             <h4 className="text-sm font-bold">Selamat Datang, {currentUser?.name || 'Pengguna'}!</h4>
             <p className="text-xs text-orange-100 mt-0.5">

@@ -15,6 +15,7 @@ export interface AppUser {
   name: string; // email pada mode online, nama pada mode offline
   email?: string;
   passwordHash?: string; // hanya mode offline
+  photoURL?: string | null; // foto profil (tersinkron antar perangkat di mode cloud)
   createdAt: number;
 }
 
@@ -26,6 +27,8 @@ interface AuthContextType {
   login: (identifier: string, password: string) => Promise<void>;
   register: (identifier: string, password: string) => Promise<AppUser>;
   logout: () => void;
+  /** Perbarui nama tampilan dan/atau foto profil (tersinkron antar perangkat). */
+  updateProfileInfo: (data: { name?: string; photoURL?: string | null }) => Promise<void>;
   /** Mode online: kirim email reset password ke email akun saat ini. */
   sendPasswordReset: () => Promise<void>;
   /** Mode offline: ubah kata sandi dengan verifikasi kata sandi lama. */
@@ -117,6 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           id: fb.uid,
           name: fb.displayName || fb.email || 'Pengguna',
           email: fb.email || undefined,
+          photoURL: fb.photoURL,
           createdAt: Date.now(),
         });
       } else {
@@ -268,6 +272,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [online, localUser]
   );
 
+  const updateProfileInfo = useCallback(
+    async (data: { name?: string; photoURL?: string | null }): Promise<void> => {
+      const trimmedName = data.name !== undefined ? data.name.trim() : undefined;
+      if (trimmedName !== undefined && !trimmedName) throw new Error('Nama pengguna wajib diisi');
+      if (online) {
+        const auth = getFirebaseAuth();
+        if (!auth?.currentUser) throw new Error('Tidak ada pengguna aktif');
+        const updates: { displayName?: string; photoURL?: string | null } = {};
+        if (trimmedName !== undefined) updates.displayName = trimmedName;
+        if (data.photoURL !== undefined) updates.photoURL = data.photoURL;
+        const { updateProfile } = await import('firebase/auth');
+        await updateProfile(auth.currentUser, updates);
+        await auth.currentUser.reload().catch(() => {});
+        const fb = auth.currentUser;
+        setFbProfile({
+          id: fb.uid,
+          name: fb.displayName || fb.email || 'Pengguna',
+          email: fb.email || undefined,
+          photoURL: fb.photoURL,
+          createdAt: fbProfile?.createdAt || Date.now(),
+        });
+        if (trimmedName) setActiveEmail(fb.email || trimmedName);
+      } else {
+        if (!localUser) throw new Error('Tidak ada pengguna aktif');
+        const updated: AppUser = {
+          ...localUser,
+          ...(trimmedName !== undefined ? { name: trimmedName } : {}),
+          ...(data.photoURL !== undefined ? { photoURL: data.photoURL } : {}),
+        };
+        persistLocalUsers(loadLocalUsers().map(u => (u.id === updated.id ? updated : u)));
+        setLocalUser(updated);
+      }
+    },
+    [online, localUser, fbProfile]
+  );
+
   return (
     <AuthContext.Provider
       value={{
@@ -280,6 +320,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
         sendPasswordReset,
         changeOfflinePassword,
+        updateProfileInfo,
       }}
     >
       {children}

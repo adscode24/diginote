@@ -5,6 +5,10 @@ import {
   KeyRound,
   AlertCircle,
   CheckCircle2,
+  Check,
+  X,
+  Camera,
+  Pencil,
   Cloud,
   Smartphone,
   Mail,
@@ -19,24 +23,105 @@ interface ProfileViewProps {
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({ onBack }) => {
-  const { currentUser, mode, logout, sendPasswordReset, changeOfflinePassword } = useAuth();
+  const { currentUser, mode, logout, sendPasswordReset, changeOfflinePassword, updateProfileInfo } = useAuth();
   const { cloudVaultId } = useFinance();
   useBodyScrollLock(false);
 
+  const [editName, setEditName] = useState('');
+  const [editingName, setEditingName] = useState(false);
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const displayName = currentUser?.name || 'Pengguna';
   const email = currentUser?.email || '';
+  const photoURL = currentUser?.photoURL || null;
   const initial = (displayName.trim()[0] || 'D').toUpperCase();
 
   const handleLogout = () => {
     if (confirm(`Keluar dari akun "${displayName}"?`)) {
       logout();
+    }
+  };
+
+  const handleSaveName = async () => {
+    if (!editName.trim()) {
+      setMessage({ type: 'error', text: 'Nama pengguna wajib diisi' });
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      await updateProfileInfo({ name: editName });
+      setEditingName(false);
+      setMessage({ type: 'success', text: 'Nama pengguna berhasil diubah.' });
+    } catch (err: unknown) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Gagal mengubah nama' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setMessage({ type: 'error', text: 'Hanya file gambar yang diperbolehkan' });
+      return;
+    }
+    setPhotoBusy(true);
+    setMessage(null);
+    const reader = new FileReader();
+    reader.onload = event => {
+      const img = new Image();
+      img.onload = async () => {
+        try {
+          // Kompres ke 256px agar ringan dan tersinkron antar perangkat
+          const MAX = 256;
+          let width = img.width;
+          let height = img.height;
+          const scale = Math.min(1, MAX / Math.max(width, height));
+          width = Math.max(1, Math.round(width * scale));
+          height = Math.max(1, Math.round(height * scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          canvas.getContext('2d')?.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          await updateProfileInfo({ photoURL: dataUrl });
+          setMessage({ type: 'success', text: 'Foto profil berhasil disimpan.' });
+        } catch (err: unknown) {
+          setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Gagal menyimpan foto' });
+        } finally {
+          setPhotoBusy(false);
+        }
+      };
+      img.onerror = () => {
+        setPhotoBusy(false);
+        setMessage({ type: 'error', text: 'File gambar tidak dapat dibaca' });
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemovePhoto = async () => {
+    if (!photoURL) return;
+    if (!confirm('Hapus foto profil?')) return;
+    setPhotoBusy(true);
+    setMessage(null);
+    try {
+      await updateProfileInfo({ photoURL: null });
+      setMessage({ type: 'success', text: 'Foto profil dihapus.' });
+    } catch (err: unknown) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Gagal menghapus foto' });
+    } finally {
+      setPhotoBusy(false);
     }
   };
 
@@ -92,15 +177,70 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack }) => {
 
       {/* Identity Card */}
       <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center gap-4">
-        <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 text-white flex items-center justify-center text-2xl font-extrabold shrink-0 shadow-md">
-          {initial}
+        <div className="relative shrink-0">
+          {photoURL ? (
+            <img
+              src={photoURL}
+              alt="Foto profil"
+              className="w-16 h-16 rounded-full object-cover shadow-md border border-slate-200 dark:border-slate-700"
+            />
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 text-white flex items-center justify-center text-2xl font-extrabold shadow-md">
+              {initial}
+            </div>
+          )}
+          <label
+            className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-orange-600 hover:bg-orange-700 text-white flex items-center justify-center cursor-pointer shadow transition"
+            title="Ubah foto profil"
+          >
+            <Camera className="w-3.5 h-3.5" />
+            <input type="file" accept="image/*" onChange={handlePhotoSelect} className="hidden" />
+          </label>
         </div>
-        <div className="min-w-0">
-          <div className="text-base font-bold text-slate-900 dark:text-white truncate">
-            {displayName}
-          </div>
+        <div className="min-w-0 flex-1">
+          {editingName ? (
+            <div className="flex items-center gap-1.5">
+              <input
+                type="text"
+                value={editName}
+                onChange={e => setEditName(e.target.value)}
+                className="flex-1 min-w-0 px-2.5 py-1.5 text-sm font-bold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+              />
+              <button
+                onClick={handleSaveName}
+                disabled={busy}
+                className="p-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 disabled:opacity-60 text-white transition"
+                title="Simpan nama"
+              >
+                <Check className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setEditingName(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                title="Batal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <span className="text-base font-bold text-slate-900 dark:text-white truncate">
+                {displayName}
+              </span>
+              <button
+                onClick={() => {
+                  setEditName(displayName);
+                  setEditingName(true);
+                }}
+                className="p-1 rounded-lg text-slate-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/40 transition"
+                title="Edit nama pengguna"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
           {email && (
-            <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 truncate">
+            <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 truncate mt-0.5">
               <Mail className="w-3 h-3 shrink-0" />
               <span className="truncate">{email}</span>
             </div>
@@ -121,8 +261,35 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack }) => {
               </span>
             )}
           </div>
+          <div className="mt-1.5 flex items-center gap-2 text-[11px]">
+            <span className="text-slate-400">
+              {photoBusy ? 'Memproses foto…' : photoURL ? 'Klik ikon kamera untuk ganti foto' : 'Tambahkan foto profil'}
+            </span>
+            {photoURL && (
+              <button onClick={handleRemovePhoto} className="font-semibold text-red-500 hover:underline">
+                Hapus
+              </button>
+            )}
+          </div>
         </div>
       </div>
+
+      {message && (
+        <div
+          className={`p-2.5 rounded-xl text-xs flex items-center gap-2 ${
+            message.type === 'success'
+              ? 'bg-orange-50 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800'
+              : 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800'
+          }`}
+        >
+          {message.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+          ) : (
+            <AlertCircle className="w-4 h-4 shrink-0" />
+          )}
+          <span>{message.text}</span>
+        </div>
+      )}
 
       {/* Account Details */}
       <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">

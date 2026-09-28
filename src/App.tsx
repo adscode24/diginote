@@ -6,12 +6,9 @@ import {
   CreditCard,
   CalendarDays,
   Settings,
-  Cloud,
-  CloudOff,
 } from 'lucide-react';
 import { FinanceProvider } from './context/FinanceContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { isCloudEnabled } from './services/firebase';
 import { ActiveTab } from './types';
 import { DashboardView } from './components/DashboardView';
 import { TransactionsView } from './components/TransactionsView';
@@ -68,19 +65,6 @@ function MainApp() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Status Cloud */}
-            <span
-              className={`hidden sm:flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold ${
-                isCloudEnabled()
-                  ? 'bg-orange-50 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
-              }`}
-              title={isCloudEnabled() ? 'Sinkronisasi cloud aktif' : 'Mode lokal perangkat'}
-            >
-              {isCloudEnabled() ? <Cloud className="w-3 h-3" /> : <CloudOff className="w-3 h-3" />}
-              <span>{isCloudEnabled() ? 'Cloud' : 'Lokal'}</span>
-            </span>
-
             {/* Summary Button in Top Right Header */}
             <button
               onClick={() => setActiveTab('summary')}
@@ -99,15 +83,21 @@ function MainApp() {
             {/* Foto Profil -> Halaman Profile */}
             <button
               onClick={() => setActiveTab('profile')}
-              className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-extrabold text-white transition shadow-xs ${
+              className={`flex items-center justify-center w-8 h-8 rounded-full transition shadow-xs overflow-hidden ${
                 activeTab === 'profile'
-                  ? 'bg-gradient-to-tr from-orange-700 to-amber-600 ring-2 ring-orange-500/40'
-                  : 'bg-gradient-to-tr from-orange-600 to-amber-500 hover:ring-2 hover:ring-orange-500/30'
+                  ? 'ring-2 ring-orange-500/40'
+                  : 'hover:ring-2 hover:ring-orange-500/30'
               }`}
               title={currentUser?.name || 'Profil'}
               aria-label="Profil pengguna"
             >
-              {profileInitial}
+              {currentUser?.photoURL ? (
+                <img src={currentUser.photoURL} alt="Foto profil" className="w-8 h-8 rounded-full object-cover" />
+              ) : (
+                <span className="flex items-center justify-center w-8 h-8 rounded-full text-xs font-extrabold text-white bg-gradient-to-tr from-orange-600 to-amber-500">
+                  {profileInitial}
+                </span>
+              )}
             </button>
           </div>
         </div>

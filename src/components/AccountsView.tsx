@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Plus,
   Wallet,
@@ -15,12 +15,14 @@ import {
   Layers,
   ChevronDown,
   ChevronUp,
+  X,
 } from 'lucide-react';
 import { Account, AccountType } from '../types';
 import { useFinance } from '../context/FinanceContext';
 import { formatRupiah, formatDateIndo, formatMonthYearIndo } from '../utils/formatters';
 import { CategoryIcon } from './CategoryIcon';
 import { AccountModal } from './AccountModal';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 const TYPE_CONFIGS: { type: AccountType; label: string; icon: string }[] = [
   { type: 'bank', label: 'Rekening Bank', icon: 'Building2' },
@@ -38,7 +40,21 @@ export const AccountsView: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create_or_edit' | 'adjust_balance'>('create_or_edit');
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
-  const [activeAccountFilter, setActiveAccountFilter] = useState<string | null>(null);
+  const [sheetAccountId, setSheetAccountId] = useState<string | null>(null);
+  useBodyScrollLock(sheetAccountId !== null);
+
+  // Fokus dari Beranda (klik kartu carousel): buka bottom sheet + mutasi otomatis
+  useEffect(() => {
+    try {
+      const focusId = sessionStorage.getItem('diginote_focus_account');
+      if (focusId) {
+        sessionStorage.removeItem('diginote_focus_account');
+        setSheetAccountId(focusId);
+      }
+    } catch {
+      /* abaikan */
+    }
+  }, []);
 
   // Current month string for default accordion collapse logic (YYYY-MM)
   const currentMonthKey = useMemo(() => {
@@ -199,9 +215,6 @@ export const AccountsView: React.FC = () => {
       )
     ) {
       deleteAccount(account.id);
-      if (activeAccountFilter === account.id) {
-        setActiveAccountFilter(null);
-      }
     }
   };
 
@@ -391,16 +404,11 @@ export const AccountsView: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
           {displayedAccounts.map(acc => {
-            const isSelected = activeAccountFilter === acc.id;
-
             return (
               <div
                 key={acc.id}
-                className={`p-5 rounded-2xl bg-white dark:bg-slate-900 border transition shadow-xs flex flex-col justify-between ${
-                  isSelected
-                    ? 'border-orange-500 ring-2 ring-orange-500/20'
-                    : 'border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
-                }`}
+                onClick={() => setSheetAccountId(acc.id)}
+                className="p-5 rounded-2xl bg-white dark:bg-slate-900 border transition shadow-xs flex flex-col justify-between cursor-pointer border-slate-200/80 dark:border-slate-800 hover:border-orange-500"
               >
                 <div>
                   {/* Top Row: Icon, Name & Type */}
@@ -437,7 +445,10 @@ export const AccountsView: React.FC = () => {
 
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => handleOpenEdit(acc)}
+                        onClick={e => {
+                          e.stopPropagation();
+                          handleOpenEdit(acc);
+                        }}
                         className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
                         title="Edit"
                       >
@@ -445,7 +456,10 @@ export const AccountsView: React.FC = () => {
                       </button>
                       {!acc.isDefault && (
                         <button
-                          onClick={() => handleDelete(acc)}
+                          onClick={e => {
+                            e.stopPropagation();
+                            handleDelete(acc);
+                          }}
                           className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 transition"
                           title="Hapus"
                         >
@@ -479,7 +493,10 @@ export const AccountsView: React.FC = () => {
                 {/* Action Buttons */}
                 <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-2">
                   <button
-                    onClick={() => handleOpenAdjust(acc)}
+                    onClick={e => {
+                      e.stopPropagation();
+                      handleOpenAdjust(acc);
+                    }}
                     className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 transition"
                   >
                     <SlidersHorizontal className="w-3 h-3 text-slate-500" />
@@ -487,134 +504,163 @@ export const AccountsView: React.FC = () => {
                   </button>
 
                   <button
-                    onClick={() => setActiveAccountFilter(isSelected ? null : acc.id)}
-                    className={`text-[11px] font-semibold transition px-2.5 py-1.5 rounded-lg ${
-                      isSelected
-                        ? 'text-red-500 bg-red-50 dark:bg-red-950/40 hover:bg-red-100'
-                        : 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100'
-                    }`}
+                    onClick={e => {
+                      e.stopPropagation();
+                      setSheetAccountId(acc.id);
+                    }}
+                    className="text-[11px] font-semibold transition px-2.5 py-1.5 rounded-lg text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100"
                   >
-                    {isSelected ? 'Tutup Mutasi' : 'Lihat Mutasi'}
+                    Lihat Mutasi
                   </button>
                 </div>
-
-                {/* Detail Mutasi langsung di bawah kartu yang diklik (dengan accordion bulan default tertutup jika lewat bulan) */}
-                {isSelected && (
-                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                        <span>Mutasi {acc.name}</span>
-                      </div>
-                      <button
-                        onClick={() => setActiveAccountFilter(null)}
-                        className="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition"
-                      >
-                        Tutup
-                      </button>
-                    </div>
-
-                    {(() => {
-                      const monthGroups = getAccountGroupedTx(acc.id);
-                      if (monthGroups.length === 0) {
-                        return (
-                          <p className="text-xs text-slate-400 dark:text-slate-500 italic py-3 text-center bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-100 dark:border-slate-800">
-                            Belum ada riwayat transaksi pada sumber dana ini.
-                          </p>
-                        );
-                      }
-
-                      return (
-                        <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                          {monthGroups.map(group => {
-                            const accordionKey = `${acc.id}_${group.monthKey}`;
-                            const isExpanded = isAccountMonthExpanded(accordionKey, group.monthKey);
-
-                            return (
-                              <div
-                                key={group.monthKey}
-                                className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 overflow-hidden"
-                              >
-                                {/* Month Accordion Header */}
-                                <button
-                                  type="button"
-                                  onClick={() => toggleAccountMonth(accordionKey, group.monthKey)}
-                                  className="w-full p-2.5 flex items-center justify-between text-left hover:bg-slate-100/70 dark:hover:bg-slate-900/60 transition gap-2"
-                                >
-                                  <div className="min-w-0">
-                                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
-                                      {group.label}
-                                    </div>
-                                    <div className="text-[10px] text-slate-400">
-                                      {group.transactions.length} transaksi
-                                    </div>
-                                  </div>
-
-                                  <div className="flex items-center gap-2 shrink-0">
-                                    <div className="text-right text-[11px] tabular-nums font-semibold">
-                                      {group.totalIncome > 0 && (
-                                        <div className="text-orange-600 dark:text-orange-400">
-                                          +{formatRupiah(group.totalIncome, false)}
-                                        </div>
-                                      )}
-                                      {group.totalExpense > 0 && (
-                                        <div className="text-slate-600 dark:text-slate-400">
-                                          -{formatRupiah(group.totalExpense, false)}
-                                        </div>
-                                      )}
-                                    </div>
-                                    {isExpanded ? (
-                                      <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
-                                    ) : (
-                                      <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                                    )}
-                                  </div>
-                                </button>
-
-                                {/* Transactions in this Month */}
-                                {isExpanded && (
-                                  <div className="p-2 pt-0 space-y-1.5 border-t border-slate-200/60 dark:border-slate-800 mt-1">
-                                    {group.transactions.map(tx => {
-                                      const isIncome = tx.type === 'income';
-                                      return (
-                                        <div
-                                          key={tx.id}
-                                          className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 text-[11px]"
-                                        >
-                                          <div className="min-w-0 pr-2">
-                                            <div className="font-semibold text-slate-800 dark:text-slate-200 truncate">
-                                              {tx.categoryName}
-                                            </div>
-                                            <div className="text-[10px] text-slate-400 truncate">
-                                              {formatDateIndo(tx.date)} {tx.description && `· ${tx.description}`}
-                                            </div>
-                                          </div>
-                                          <div
-                                            className={`font-bold tabular-nums shrink-0 ${
-                                              isIncome
-                                                ? 'text-orange-600 dark:text-orange-400'
-                                                : 'text-slate-900 dark:text-white'
-                                            }`}
-                                          >
-                                            {isIncome ? '+' : '-'}{formatRupiah(tx.amount)}
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                )}
               </div>
             );
           })}
         </div>
       )}
+
+      {/* Bottom Sheet: Preview Kartu + Mutasi Terbuka */}
+      {(() => {
+        const sheetAcc = accounts.find(a => a.id === sheetAccountId);
+        if (!sheetAcc) return null;
+        const monthGroups = getAccountGroupedTx(sheetAcc.id);
+        return (
+          <div
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
+            onClick={() => setSheetAccountId(null)}
+          >
+            <div
+              className="w-full max-w-lg max-h-[88vh] flex flex-col rounded-t-3xl sm:rounded-2xl bg-white dark:bg-slate-900 shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-200"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mt-3 mb-1 sm:hidden shrink-0" />
+
+              {/* Preview Kartu */}
+              <div className="p-4 pb-3 shrink-0">
+                <div
+                  className="relative overflow-hidden rounded-2xl shadow-md"
+                  style={{
+                    background: `linear-gradient(120deg, ${sheetAcc.color} 0%, ${sheetAcc.color} 55%, rgba(0,0,0,0.38) 135%)`,
+                  }}
+                >
+                  <div className="absolute -right-10 -top-16 w-44 h-44 rounded-full bg-white/10 pointer-events-none" />
+                  <div className="absolute -right-4 top-6 w-28 h-28 rounded-full bg-white/10 pointer-events-none" />
+                  <div className="relative p-4 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-white/80 truncate">
+                        {sheetAcc.name}
+                      </div>
+                      <div className="text-xl font-extrabold tabular-nums text-white mt-0.5">
+                        {formatRupiah(sheetAcc.balance)}
+                      </div>
+                      <div className="text-[11px] text-white/70 mt-0.5">
+                        Saldo Awal: {formatRupiah(sheetAcc.initialBalance)}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setSheetAccountId(null)}
+                      className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition shrink-0"
+                      title="Tutup"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Mutasi (terbuka) */}
+              <div className="px-4 pb-2 shrink-0">
+                <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  Mutasi {sheetAcc.name}
+                </div>
+              </div>
+              <div className="overflow-y-auto flex-1 px-4 pb-4 space-y-2">
+                {monthGroups.length === 0 ? (
+                  <p className="text-xs text-slate-400 dark:text-slate-500 italic py-3 text-center bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-100 dark:border-slate-800">
+                    Belum ada riwayat transaksi pada sumber dana ini.
+                  </p>
+                ) : (
+                  monthGroups.map(group => {
+                    const accordionKey = `${sheetAcc.id}_${group.monthKey}`;
+                    const isExpanded = isAccountMonthExpanded(accordionKey, group.monthKey);
+                    return (
+                      <div
+                        key={group.monthKey}
+                        className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 overflow-hidden"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => toggleAccountMonth(accordionKey, group.monthKey)}
+                          className="w-full p-2.5 flex items-center justify-between text-left hover:bg-slate-100/70 dark:hover:bg-slate-900/60 transition gap-2"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                              {group.label}
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                              {group.transactions.length} transaksi
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="text-right text-[11px] tabular-nums font-semibold">
+                              {group.totalIncome > 0 && (
+                                <div className="text-orange-600 dark:text-orange-400">
+                                  +{formatRupiah(group.totalIncome, false)}
+                                </div>
+                              )}
+                              {group.totalExpense > 0 && (
+                                <div className="text-slate-600 dark:text-slate-400">
+                                  -{formatRupiah(group.totalExpense, false)}
+                                </div>
+                              )}
+                            </div>
+                            {isExpanded ? (
+                              <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                            ) : (
+                              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                            )}
+                          </div>
+                        </button>
+                        {isExpanded && (
+                          <div className="p-2 pt-0 space-y-1.5 border-t border-slate-200/60 dark:border-slate-800 mt-1">
+                            {group.transactions.map(tx => {
+                              const isIncome = tx.type === 'income';
+                              return (
+                                <div
+                                  key={tx.id}
+                                  className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 text-[11px]"
+                                >
+                                  <div className="min-w-0 pr-2">
+                                    <div className="font-semibold text-slate-800 dark:text-slate-200 truncate">
+                                      {tx.categoryName}
+                                    </div>
+                                    <div className="text-[10px] text-slate-400 truncate">
+                                      {formatDateIndo(tx.date)} {tx.description && `· ${tx.description}`}
+                                    </div>
+                                  </div>
+                                  <div
+                                    className={`font-bold tabular-nums shrink-0 ${
+                                      isIncome
+                                        ? 'text-orange-600 dark:text-orange-400'
+                                        : 'text-slate-900 dark:text-white'
+                                    }`}
+                                  >
+                                    {isIncome ? '+' : '-'}{formatRupiah(tx.amount)}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Account Modal */}
       <AccountModal

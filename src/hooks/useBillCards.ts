@@ -7,6 +7,7 @@ export interface BillCard extends Bill {
   paid: boolean;
   dueDateStr: string;
   statusInfo: ReturnType<typeof calculateDueDateStatus>;
+  lastPayment: { paymentDate: string; amount: number } | null;
 }
 
 /**
@@ -28,7 +29,17 @@ export function useBillCards(): BillCard[] {
         const dueDay = Math.min(Math.max(1, b.dueDayOfMonth || 1), daysInMonth);
         const dueDateStr = `${currentMonthKey}-${String(dueDay).padStart(2, '0')}`;
         const statusInfo = calculateDueDateStatus(dueDateStr);
-        return { ...b, paid, dueDateStr, statusInfo };
+        const history = billPayments
+          .filter(p => p.billId === b.id)
+          .sort((x, y) => (x.paymentDate < y.paymentDate ? 1 : -1));
+        const last = history[0];
+        return {
+          ...b,
+          paid,
+          dueDateStr,
+          statusInfo,
+          lastPayment: last ? { paymentDate: last.paymentDate, amount: last.amount } : null,
+        };
       })
       .sort((a, b) => {
         if (a.paid !== b.paid) return a.paid ? 1 : -1;

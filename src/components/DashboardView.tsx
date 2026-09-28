@@ -347,7 +347,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                   return (
                     <div
                       key={acc.id}
-                      onClick={() => (offset === 0 ? onNavigateTab('accounts') : goCard(i))}
+                      onClick={() => {
+                        try {
+                          sessionStorage.setItem('diginote_focus_account', acc.id);
+                        } catch {
+                          /* abaikan */
+                        }
+                        onNavigateTab('accounts');
+                      }}
                       className="absolute top-1 left-1/2 w-[78%] max-w-[320px] h-[188px] cursor-pointer"
                       style={{
                         transform: `translateX(-50%) translateX(${offset * 62}%) translateZ(${-abs * 120}px) rotateY(${offset * -32}deg) scale(${1 - abs * 0.1})`,
@@ -554,16 +561,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                     </span>
                     <span
                       className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                        bill.paid
-                          ? 'bg-orange-100 text-orange-700 dark:bg-orange-950/80 dark:text-orange-300'
-                          : bill.statusInfo.isOverdue
+                        bill.statusInfo.isOverdue
                           ? 'bg-red-100 text-red-700 dark:bg-red-950/80 dark:text-red-300'
                           : bill.statusInfo.isDueSoon
                           ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300'
                           : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
                       }`}
                     >
-                      {bill.paid ? 'Lunas' : bill.statusInfo.label}
+                      {bill.statusInfo.label}
                     </span>
                   </div>
                   <div className="text-xs text-slate-600 dark:text-slate-300 mt-1">
@@ -574,9 +579,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                     Jatuh tempo: {formatDateIndo(bill.dueDateStr)}
                     {bill.categoryName && ` · ${bill.categoryName}`}
                   </div>
+                  <div className="text-[11px] mt-0.5 font-medium text-slate-500 dark:text-slate-400">
+                    {bill.lastPayment
+                      ? `Terakhir dibayar: ${formatDateIndo(bill.lastPayment.paymentDate)} (${formatRupiah(bill.lastPayment.amount)})`
+                      : 'Belum pernah dibayar'}
+                  </div>
                 </div>
 
-                {!bill.paid && (
+                {!bill.paid && bill.statusInfo.daysRemaining <= 7 && (
                   <button
                     onClick={() => setBillToPay(bill)}
                     className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-orange-600 hover:bg-orange-700 text-white transition shadow-xs shrink-0"
@@ -621,6 +631,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                 urgentDebts.map(debt => {
                   const status = debt.statusInfo || calculateDueDateStatus(debt.effectiveDueDate || debt.dueDate);
                   const isInstallment = debt.installmentCategory && debt.installmentCategory !== 'non_installment';
+                  const lastPay = [...(debt.payments || [])].sort((a, b) =>
+                    a.paymentDate < b.paymentDate ? 1 : -1
+                  )[0];
+                  const showPay = status.daysRemaining <= 7;
                   return (
                     <div
                       key={debt.id}
@@ -665,6 +679,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                                 <span>· Tgl {debt.dueDayOfMonth}</span>
                               )}
                             </div>
+                            <div className="text-[11px] mt-0.5 font-medium text-slate-500 dark:text-slate-400">
+                              {lastPay
+                                ? `Terakhir dibayar: ${formatDateIndo(lastPay.paymentDate)} (${formatRupiah(lastPay.amount)})`
+                                : 'Belum pernah dibayar'}
+                            </div>
                           </div>
                         ) : (
                           <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -675,16 +694,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                             {debt.dueDayOfMonth && (
                               <span className="ml-2 text-slate-400">· Siklus tgl {debt.dueDayOfMonth}</span>
                             )}
+                            <div className="text-[11px] mt-0.5 font-medium">
+                              {lastPay
+                                ? `Terakhir dibayar: ${formatDateIndo(lastPay.paymentDate)} (${formatRupiah(lastPay.amount)})`
+                                : 'Belum pernah dibayar'}
+                            </div>
                           </div>
                         )}
                       </div>
 
-                      <button
-                        onClick={() => setSelectedDebtToPay(debt)}
-                        className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-orange-600 hover:bg-orange-700 text-white transition shadow-xs shrink-0"
-                      >
-                        Bayar
-                      </button>
+                      {showPay && (
+                        <button
+                          onClick={() => setSelectedDebtToPay(debt)}
+                          className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-orange-600 hover:bg-orange-700 text-white transition shadow-xs shrink-0"
+                        >
+                          Bayar
+                        </button>
+                      )}
                     </div>
                   );
                 })

@@ -14,6 +14,13 @@ import {
 import { useFinance } from '../context/FinanceContext';
 import { useAuth } from '../context/AuthContext';
 import { ThemeMode } from '../types';
+import {
+  getDigifuelLink,
+  linkDigifuelAccount,
+  unlinkDigifuelAccount,
+  persistDigifuelLink,
+  fetchDigifuelVault,
+} from '../services/digifuel';
 import { requestNotificationPermission, sendDailyReminderNotification, isNotificationSupported } from '../services/notifications';
 import { CloudSyncModal } from './CloudSyncModal';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
@@ -35,6 +42,75 @@ export const SettingsView: React.FC = () => {
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   useBodyScrollLock(showClearConfirm || isSyncModalOpen);
   const { currentUser, mode: authMode } = useAuth();
+  const { accounts, pullDigifuelNow } = useFinance();
+
+  // Integrasi DigiFuel
+  const [dfEmail, setDfEmail] = useState('');
+  const [dfPassword, setDfPassword] = useState('');
+  const [dfAccountId, setDfAccountId] = useState('');
+  const [dfBusy, setDfBusy] = useState(false);
+  const [dfLink, setDfLink] = useState(() =>
+    currentUser ? getDigifuelLink(currentUser.id) : null
+  );
+
+  const refreshDfLink = () => {
+    setDfLink(currentUser ? getDigifuelLink(currentUser.id) : null);
+  };
+
+  const handleDfLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
+    setDfBusy(true);
+    setFeedbackMessage(null);
+    try {
+      await linkDigifuelAccount(dfEmail, dfPassword);
+      persistDigifuelLink(currentUser.id, {
+        email: dfEmail.trim().toLowerCase(),
+        accountId: dfAccountId || undefined,
+      });
+      setDfPassword('');
+      refreshDfLink();
+      setFeedbackMessage('Akun DigiFuel terhubung. Tekan Tarik agar catatannya masuk.');
+      setTimeout(() => setFeedbackMessage(null), 3500);
+    } catch (err: unknown) {
+      setFeedbackMessage(err instanceof Error ? err.message : 'Gagal menghubungkan DigiFuel');
+      setTimeout(() => setFeedbackMessage(null), 4000);
+    } finally {
+      setDfBusy(false);
+    }
+  };
+
+  const handleDfPull = async () => {
+    setDfBusy(true);
+    try {
+      const res = await pullDigifuelNow();
+      refreshDfLink();
+      setFeedbackMessage(
+        res.mirrored > 0 || res.removed > 0
+          ? `Sinkron DigiFuel selesai: ${res.mirrored} baru, ${res.removed} dihapus.`
+          : 'Sudah sinkron — tidak ada catatan baru dari DigiFuel.'
+      );
+      setTimeout(() => setFeedbackMessage(null), 4000);
+    } catch (err: unknown) {
+      setFeedbackMessage(err instanceof Error ? err.message : 'Gagal menarik dari DigiFuel');
+      setTimeout(() => setFeedbackMessage(null), 4000);
+    } finally {
+      setDfBusy(false);
+    }
+  };
+
+  const handleDfUnlink = async () => {
+    if (!currentUser) return;
+    if (!confirm('Putuskan hubungan DigiFuel? Transaksi cerminan yang sudah ada tetap tersimpan.')) return;
+    await unlinkDigifuelAccount();
+    try {
+      const { clearDigifuelLink } = await import('../services/digifuel');
+      clearDigifuelLink(currentUser.id);
+    } catch {
+      /* abaikan */
+    }
+    refreshDfLink();
+  };
 
   const handleToggleReminder = async (enabled: boolean) => {
     if (enabled && isNotificationSupported()) {
@@ -242,6 +318,130 @@ export const SettingsView: React.FC = () => {
             <span>Vault Pribadi</span>
           </div>
         </div>
+      </div>
+
+      {/* Integrasi DigiFuel: catatan bensin & biaya -> transaksi keluar */}
+      <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
+        <div>
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <span className="w-4 h-4 rounded-full bg-orange-600 text-white text-[9px] font-extrabold flex items-center justify-center">F</span>
+            <span>Integrasi DigiFuel</span>
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Catatan bensin & biaya servis di DigiFuel otomatis tercatat sebagai transaksi keluar di sini (satu arah).
+          </p>
+        </div>
+
+        {!dfLink ? (
+          <form onSubmit={handleDfLink} className="space-y-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <input
+                type="email"
+                value={dfEmail}
+                onChange={e => setDfEmail(e.target.value)}
+                placeholder="Email DigiFuel (sama)"
+                className="px-3.5 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+              />
+              <input
+                type="password"
+                value={dfPassword}
+                onChange={e => setDfPassword(e.target.value)}
+                placeholder="Kata sandi DigiFuel"
+                autoComplete="current-password"
+                className="px-3.5 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                Sumber dana untuk catatan cerminan (opsional)
+              </label>
+              <select
+                value={dfAccountId}
+                onChange={e => setDfAccountId(e.target.value)}
+                className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+              >
+                <option value="">Otomatis (rekening/tunai pertama)</option>
+                {accounts.map(a => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="submit"
+              disabled={dfBusy}
+              className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-orange-600 hover:bg-orange-700 disabled:opacity-60 text-white transition"
+            >
+              {dfBusy ? 'Menghubungkan…' : 'Hubungkan Akun DigiFuel'}
+            </button>
+            <p className="text-[11px] text-slate-400">
+              Akun DigiFuel terdaftar terpisah — gunakan email yang sama agar datanya cocok.
+            </p>
+          </form>
+        ) : (
+          <div className="space-y-2.5">
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800 text-xs space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-slate-400">Terhubung:</span>
+                <strong className="text-slate-900 dark:text-white">{dfLink.email}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-slate-400">Tercermin:</span>
+                <strong className="text-slate-900 dark:text-white tabular-nums">{dfLink.mirroredCount} transaksi</strong>
+              </div>
+              {dfLink.lastPulledAt && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500 dark:text-slate-400">Terakhir ditarik:</span>
+                  <strong className="text-slate-900 dark:text-white">
+                    {new Date(dfLink.lastPulledAt).toLocaleString('id-ID', {
+                      day: 'numeric',
+                      month: 'short',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </strong>
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                Sumber dana untuk catatan cerminan
+              </label>
+              <select
+                value={dfLink.accountId || ''}
+                onChange={e => {
+                  if (!currentUser) return;
+                  persistDigifuelLink(currentUser.id, { accountId: e.target.value || undefined });
+                  refreshDfLink();
+                }}
+                className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+              >
+                <option value="">Otomatis (rekening/tunai pertama)</option>
+                {accounts.map(a => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={handleDfPull}
+                disabled={dfBusy}
+                className="py-2.5 px-4 rounded-xl text-xs font-bold bg-orange-600 hover:bg-orange-700 disabled:opacity-60 text-white transition"
+              >
+                {dfBusy ? 'Menarik…' : 'Tarik dari DigiFuel'}
+              </button>
+              <button
+                onClick={handleDfUnlink}
+                className="py-2.5 px-4 rounded-xl text-xs font-semibold border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition"
+              >
+                Putuskan
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 4. Data Management: Reset & Delete All Data */}

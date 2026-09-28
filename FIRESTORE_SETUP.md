@@ -56,3 +56,28 @@ dan APK langsung mode Cloud setelah deploy.
 | `Database does not exist` | Database Firestore belum dibuat (langkah 2) |
 | `auth/operation-not-allowed` | Provider Email/Password belum diaktifkan |
 | Data tidak tersinkron | Periksa status di Pengaturan → Sinkronisasi Cloud |
+
+## Integrasi DigiFuel (catatan BBM & biaya -> transaksi keluar)
+
+Satu arah, project tetap terpisah. Di DigiNote: **Pengaturan → Integrasi DigiFuel** →
+masukkan email + kata sandi DigiFuel (akun terdaftar terpisah di sana, idealnya
+email yang sama) → pilih sumber dana → **Tarik dari DigiFuel**.
+
+- Catatan bensin (`totalCost > 0`) dan riwayat servis (`cost > 0`) menjadi transaksi
+  keluar berlabel **DigiFuel**, idempoten via `sourceId` (edit/hapus di DigiFuel
+  menular saat penarikan berikutnya).
+- Akun sumber dana pilihan Anda dipertahankan (hanya dipakai saat pembuatan).
+
+Satu langkah wajib di **project Firebase DigiFuel** (Console → Firestore → Rules →
+tambahkan blok ini sejajar `match /fuelVaults/{uid}` yang sudah ada, lalu Publish):
+
+```
+match /fuelVaults/{uid} {
+  allow read: if request.auth != null &&
+    (request.auth.uid == uid || resource.data.ownerEmail == request.auth.token.email);
+  allow write: if request.auth != null && request.auth.uid == uid;
+}
+```
+
+Ganti blok `fuelVaults` lama bila isinya hanya `allow read, write: ... uid == uid`.
+Tanpa ini DigiNote tidak bisa membaca vault DigiFuel (permission-denied).

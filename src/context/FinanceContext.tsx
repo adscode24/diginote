@@ -27,6 +27,11 @@ import {
   type VaultPayload,
   type VaultOwner,
 } from '../services/cloudSync';
+import {
+  getDigifuelLink,
+  fetchDigifuelVault,
+  persistDigifuelLink,
+} from '../services/digifuel';
 
 interface FinanceContextType {
   transactions: Transaction[];
@@ -85,6 +90,9 @@ interface FinanceContextType {
   deleteBill: (id: string) => void;
   payBill: (billId: string, payment: { monthKey: string; amount: number; accountId?: string; categoryId: string; paymentDate: string }) => BillPayment;
   deleteBillPayment: (paymentId: string) => void;
+
+  // Integrasi DigiFuel (cermin satu arah -> transaksi keluar)
+  pullDigifuelNow: () => Promise<{ mirrored: number; removed: number }>;
 
   // Settings & Theme
   setThemeMode: (mode: ThemeMode) => void;
@@ -1332,6 +1340,117 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     setReminderSettings(prev => ({ ...prev, ...settings }));
   };
 
+  /**
+   * Cermin DigiFuel -> DigiNote (satu arah): catatan bensin & biaya di DigiFuel
+   * menjadi transaksi keluar di DigiNote. Idempoten via sourceId; data yang
+   * dihapus di DigiFuel ikut dibersihkan. Akun pilihan pengguna dipertahankan
+   * (hanya dipakai saat pembuatan).
+   */
+  const pullDigifuelNow = async (): Promise<{ mirrored: number; removed: number }> => {
+    const link = getDigifuelLink(userId);
+    if (!link) throw new Error('Hubungkan akun DigiFuel dulu di Pengaturan.');
+    const vault = await fetchDigifuelVault(link.email);
+    if (!vault) throw new Error('Vault DigiFuel tidak ditemukan untuk email ini.');
+
+    const vehicleName = new Map((vault.vehicles || []).map(v => [v.id, v.name]));
+    const expenseCats = categories.filter(c => c.type === 'expense');
+    const fuelCat =
+      expenseCats.find(c => c.id === 'cat_transport') ||
+      expenseCats.find(c => c.id === 'cat_other_exp') ||
+      expenseCats[0];
+    if (!fuelCat) throw new Error('Tidak ada kategori pengeluaran di DigiNote.');
+    const mappedAccount = accounts.find(a => a.id === link.accountId);
+    const targetAccount = mappedAccount || accounts.find(a => a.type === 'bank' || a.type === 'cash' || a.type === 'ewallet') || accounts[0];
+
+    let mirrored = 0;
+    const seenSourceIds = new Set<string>();
+    const upserts: Transaction[] = [];
+
+    for (const r of vault.fuelRecords || []) {
+      if (!r.totalCost || r.totalCost <= 0) continue;
+      const sourceId = `fuel:${r.id}`;
+      seenSourceIds.add(sourceId);
+      const existing = transactions.find(t => t.sourceType === 'digifuel' && t.sourceId === sourceId);
+      const vName = vehicleName.get(r.vehicleId) || '';
+      const base = {
+        type: 'expense' as const,
+        amount: Math.round(r.totalCost),
+        categoryId: fuelCat.id,
+        categoryName: fuelCat.name,
+        date: r.date,
+        description: `BBM ${vName ? vName + ' · ' : ''}${r.liters}L ${r.fuelType}${r.stationName ? ` · ${r.stationName}` : ''}`.trim(),
+        paymentMethod: 'transfer' as const,
+        sourceType: 'digifuel',
+        sourceId,
+        createdAt: existing?.createdAt || Date.now(),
+        updatedAt: Date.now(),
+      };
+      if (existing) {
+        // Mirror menang untuk isi, tapi akun pilihan pengguna dipertahankan
+        upserts.push({ ...existing, ...base, id: existing.id, accountId: existing.accountId, accountName: existing.accountName });
+      } else {
+        upserts.push({
+          ...base,
+          id: `tx_dfuel_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`,
+          accountId: targetAccount?.id,
+          accountName: targetAccount?.name,
+        });
+        mirrored++;
+      }
+    }
+
+    for (const s of vault.serviceHistory || []) {
+      if (!s.cost || s.cost <= 0) continue;
+      const sourceId = `svc:${s.id}`;
+      seenSourceIds.add(sourceId);
+      const existing = transactions.find(t => t.sourceType === 'digifuel' && t.sourceId === sourceId);
+      const vName = vehicleName.get(s.vehicleId) || '';
+      const base = {
+        type: 'expense' as const,
+        amount: Math.round(s.cost),
+        categoryId: fuelCat.id,
+        categoryName: fuelCat.name,
+        date: s.date,
+        description: `Servis ${vName ? vName + ' · ' : ''}${s.title}${s.workshop ? ` · ${s.workshop}` : ''}`.trim(),
+        paymentMethod: 'transfer' as const,
+        sourceType: 'digifuel',
+        sourceId,
+        createdAt: existing?.createdAt || Date.now(),
+        updatedAt: Date.now(),
+      };
+      if (existing) {
+        upserts.push({ ...existing, ...base, id: existing.id, accountId: existing.accountId, accountName: existing.accountName });
+      } else {
+        upserts.push({
+          ...base,
+          id: `tx_dfuel_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`,
+          accountId: targetAccount?.id,
+          accountName: targetAccount?.name,
+        });
+        mirrored++;
+      }
+    }
+
+    // Terapkan upsert + prune cerminan yang sumbernya sudah tidak ada
+    const removed = transactions.filter(
+      t => t.sourceType === 'digifuel' && t.sourceId && !seenSourceIds.has(t.sourceId)
+    ).length;
+    setTransactions(prev => {
+      const kept = prev.filter(
+        t => t.sourceType !== 'digifuel' || !t.sourceId || seenSourceIds.has(t.sourceId)
+      );
+      const byId = new Map(kept.map(t => [t.id, t]));
+      for (const u of upserts) byId.set(u.id, u);
+      return [...byId.values()].sort((a, b) => {
+        const d = b.date.localeCompare(a.date);
+        return d !== 0 ? d : (b.createdAt || 0) - (a.createdAt || 0);
+      });
+    });
+
+    persistDigifuelLink(userId, { lastPulledAt: Date.now(), mirroredCount: upserts.length });
+    return { mirrored, removed };
+  };
+
   const updateSyncSettings = (settings: Partial<SyncSettings>) => {
     setSyncSettings(prev => ({ ...prev, ...settings }));
   };
@@ -1427,6 +1546,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
         deleteBill,
         payBill,
         deleteBillPayment,
+        pullDigifuelNow,
         setThemeMode,
         updateReminderSettings,
         updateSyncSettings,

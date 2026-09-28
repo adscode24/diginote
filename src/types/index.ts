@@ -42,6 +42,8 @@ export interface Transaction {
   receiptUrl?: string; // base64 or image url
   createdAt: number;
   updatedAt: number;
+  sourceType?: string; // mis. 'digifuel' untuk transaksi cerminan otomatis
+  sourceId?: string; // id unik sumber (mis. 'fuel:<id>' / 'svc:<id>')
 }
 
 export type DebtType = 'payable' | 'receivable'; // payable = Hutang Saya, receivable = Piutang Orang Lain

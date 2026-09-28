@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import {
   LayoutDashboard,
   Receipt,
@@ -50,10 +50,32 @@ function MainApp() {
     { id: 'transactions', label: 'Transaksi', shortLabel: 'Transaksi', icon: Receipt },
     { id: 'accounts', label: 'Sumber Dana', shortLabel: 'Dana', icon: Wallet },
     { id: 'debts', label: 'Hutang Piutang', shortLabel: 'Hutang', icon: CreditCard },
-    { id: 'settings', label: 'Pengaturan', shortLabel: 'Setelan', icon: Settings },
   ];
   const leftItems = navItems.slice(0, 2);
   const rightItems = navItems.slice(2);
+
+  // Bubble highlight meluncur ke tab aktif (efek ala video): ukur posisi tombol
+  const navTrackRef = useRef<HTMLDivElement | null>(null);
+  const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [bubble, setBubble] = useState({ left: 0, width: 0, visible: false });
+
+  useLayoutEffect(() => {
+    const update = () => {
+      const track = navTrackRef.current;
+      const btn = itemRefs.current[activeTab];
+      if (!track || !btn) return;
+      const trackRect = track.getBoundingClientRect();
+      const btnRect = btn.getBoundingClientRect();
+      setBubble({
+        left: btnRect.left - trackRect.left,
+        width: btnRect.width,
+        visible: true,
+      });
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, [activeTab]);
 
   const openTxModal = (type: 'income' | 'expense') => {
     setFabOpen(false);
@@ -66,19 +88,19 @@ function MainApp() {
     return (
       <button
         key={item.id}
+        ref={el => {
+          itemRefs.current[item.id] = el;
+        }}
         onClick={() => {
           setFabOpen(false);
           setActiveTab(item.id);
         }}
-        className={`flex flex-col items-center justify-center flex-1 py-1.5 px-1 rounded-xl transition min-w-[44px] min-h-[44px] relative group ${
+        className={`flex flex-col items-center justify-center flex-1 py-1.5 px-1 rounded-xl transition min-w-[44px] min-h-[44px] relative z-10 group ${
           isActive
             ? 'text-orange-600 dark:text-orange-400 font-bold'
             : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 font-medium'
         }`}
       >
-        {isActive && (
-          <span className="absolute -top-1 w-8 h-1 bg-orange-600 dark:bg-orange-400 rounded-full" />
-        )}
         <Icon
           className={`w-5 h-5 transition-transform group-active:scale-95 ${
             isActive ? 'stroke-[2.5]' : 'stroke-2'
@@ -88,6 +110,9 @@ function MainApp() {
           <span className="sm:hidden">{item.shortLabel}</span>
           <span className="hidden sm:inline">{item.label}</span>
         </span>
+        {isActive && (
+          <span className="w-1 h-1 mt-0.5 rounded-full bg-orange-600 dark:bg-orange-400" />
+        )}
       </button>
     );
   };
@@ -130,6 +155,20 @@ function MainApp() {
               <span>Summary</span>
             </button>
 
+            {/* Pengaturan -> di header, sebelah profil */}
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`flex items-center justify-center w-8 h-8 rounded-xl border text-slate-500 dark:text-slate-400 transition ${
+                activeTab === 'settings'
+                  ? 'bg-orange-600 text-white border-orange-600 shadow-xs'
+                  : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:text-orange-600 dark:hover:text-orange-400 hover:border-orange-300'
+              }`}
+              title="Pengaturan"
+              aria-label="Pengaturan"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+
             {/* Foto Profil -> Halaman Profile */}
             <button
               onClick={() => setActiveTab('profile')}
@@ -170,7 +209,17 @@ function MainApp() {
         className="fixed bottom-4 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[420px] z-40 rounded-3xl bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white/40 dark:border-slate-700/60 shadow-2xl"
       >
         <div className="px-2 sm:px-4">
-          <div className="flex items-end justify-between h-[72px] relative">
+          <div ref={navTrackRef} className="flex items-end justify-between h-[72px] relative">
+            {/* Bubble highlight meluncur ke tab aktif */}
+            <span
+              aria-hidden
+              className="absolute top-1 bottom-1 rounded-2xl bg-orange-500/15 dark:bg-white/10 border border-orange-500/20 dark:border-white/10 transition-all duration-300 ease-out pointer-events-none"
+              style={{
+                left: bubble.left,
+                width: bubble.width,
+                opacity: bubble.visible ? 1 : 0,
+              }}
+            />
             <div className="flex items-center justify-around flex-1">
               {leftItems.map(renderNavItem)}
             </div>

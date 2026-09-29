@@ -249,36 +249,54 @@ public class ShareReceiverPlugin extends Plugin {
         if (text == null || text.trim().isEmpty()) return data;
         String t = text;
 
-        // --- Nominal: prioritaskan pola Rp/IDR, fallback angka terbesar >= 1000 ---
-        long best = 0;
-        Matcher mRp = Pattern.compile("(?i)(?:Rp\\.?|IDR)\\s*([\\d.,]+)").matcher(t);
+        // --- Nominal: total = nominal transfer + biaya (bila keduanya terdeteksi) ---
+        long transfer = 0;
+        long fee = 0;
+        long biggestRp = 0;
+        Matcher mRp = Pattern.compile("(?i)(?:Rp\\.?|IDR)\\s*(\\d[\\d.,]*\\d|\\d)").matcher(t);
         while (mRp.find()) {
-            long v = digitsToLong(mRp.group(1));
-            if (v > best) best = v;
-        }
-        if (best > 0) {
-            data.amount = best;
-        } else {
-            Matcher mNum = Pattern.compile("(?<!\\d)(\\d[\\d.,]{3,})(?!\\d)").matcher(t);
-            while (mNum.find()) {
-                long v = digitsToLong(mNum.group(1));
-                if (v > best) best = v;
+            long v = parseReceiptAmount(mRp.group(1));
+            if (v <= 0) continue;
+            if (v > biggestRp) biggestRp = v;
+            int start = Math.max(0, mRp.start() - 50);
+            String ctx = t.substring(start, mRp.start()).toLowerCase(Locale.getDefault());
+            if (containsAny(ctx, "biaya", "admin", "fee", "charge")) {
+                if (v > fee) fee = v;
+            } else if (containsAny(ctx, "nominal transfer", "top up amount", "topup amount",
+                    "jumlah", "nominal", "total", "bayar", "pembayaran", "payment",
+                    "amount", "transfer", "topup", "top up")) {
+                if (v > transfer) transfer = v;
             }
-            if (best >= 1000) data.amount = best;
+        }
+        long amount = transfer > 0 ? transfer : biggestRp;
+        if (fee > 0 && fee != transfer) amount += fee;
+        if (amount > 0) {
+            data.amount = amount;
+        } else {
+            // Fallback: angka terbesar yang wajar (bukan pecahan tanggal/waktu/ID)
+            long best = 0;
+            Matcher mNum = Pattern.compile("(?<![\\d/:.\\-])(\\d[\\d.,]{3,})(?![\\d/:.\\-])").matcher(t);
+            while (mNum.find()) {
+                long v = parseReceiptAmount(mNum.group(1));
+                if (v >= 1000 && v <= 9999999999999L && v > best) best = v;
+            }
+            if (best > 0) data.amount = best;
         }
 
-        // --- Jenis transaksi ---
+        // --- Jenis transaksi (top up / qris / transfer keluar = pengeluaran) ---
         String lower = t.toLowerCase(Locale.getDefault());
         boolean inKw = lower.contains("diterima") || lower.contains("masuk") || lower.contains("pemasukan")
-                || lower.contains("credit") || lower.contains("top up") || lower.contains("topup")
+                || lower.contains("credit")
                 || lower.contains("gajian") || lower.contains("gaji") || lower.contains("refund")
                 || lower.contains("cashback") || lower.contains("dana masuk");
         boolean outKw = lower.contains("bayar") || lower.contains("pembayaran") || lower.contains("keluar")
                 || lower.contains("pengeluaran") || lower.contains("debit") || lower.contains("tagihan")
-                || lower.contains("transfer keluar") || lower.contains("tarik tunai") || lower.contains("belanja");
+                || lower.contains("tarik tunai") || lower.contains("belanja")
+                || lower.contains("transfer") || lower.contains("top up") || lower.contains("topup")
+                || lower.contains("qris") || lower.contains("merchant");
         data.type = (inKw && !outKw) ? "income" : "expense";
 
-        // --- Tanggal: dd/MM/yyyy, dd-MM-yyyy, dd MMM yyyy (Indonesia) ---
+        // --- Tanggal: dd/MM/yyyy, dd-MM-yyyy, dd MMM yyyy (Indonesia + Inggris) ---
         Matcher mDate = Pattern.compile("(\\d{1,2})[/-](\\d{1,2})[/-](\\d{2,4})").matcher(t);
         if (mDate.find()) {
             try {
@@ -291,7 +309,7 @@ public class ShareReceiverPlugin extends Plugin {
                 data.date = sdf.format(cal.getTime());
             } catch (Exception ignored) {}
         } else {
-            Matcher mDate2 = Pattern.compile("(\\d{1,2})\\s+(jan\\w*|feb\\w*|mar\\w*|apr\\w*|mei|jun\\w*|jul\\w*|agu\\w*|sep\\w*|okt\\w*|nov\\w*|des\\w*)\\s+(\\d{2,4})",
+            Matcher mDate2 = Pattern.compile("(\\d{1,2})\\s+(jan\\w*|feb\\w*|mar\\w*|apr\\w*|mei|may|jun\\w*|jul\\w*|agu\\w*|aug\\w*|sep\\w*|okt\\w*|oct\\w*|nov\\w*|des\\w*|dec\\w*)\\s+(\\d{4})",
                     Pattern.CASE_INSENSITIVE).matcher(t);
             if (mDate2.find()) {
                 try {
@@ -311,9 +329,9 @@ public class ShareReceiverPlugin extends Plugin {
             data.categoryHint = "Transport";
         } else if (containsAny(lower, "makan", "minum", "resto", "warung", "kopi", "kafe", "cafe", "kuliner", "food")) {
             data.categoryHint = "Makanan";
-        } else if (containsAny(lower, "transfer", "biaya admin", "admin bank")) {
+        } else if (containsAny(lower, "transfer", "topup", "top up", "flazz", "e-money", "emoney", "biaya admin", "admin bank")) {
             data.categoryHint = "Transfer";
-        } else if (containsAny(lower, "belanja", "shopping", "mall", "market", "indomaret", "alfamart", "shopee", "tokopedia")) {
+        } else if (containsAny(lower, "belanja", "shopping", "mall", "market", "indomaret", "alfamart", "shopee", "tokopedia", "qris", "merchant")) {
             data.categoryHint = "Belanja";
         } else if (containsAny(lower, "listrik", "pln", "air", "pdam", "wifi", "indihome", "pulsa", "kuota", "internet", "telkom")) {
             data.categoryHint = "Tagihan";
@@ -323,21 +341,29 @@ public class ShareReceiverPlugin extends Plugin {
             data.categoryHint = "Gaji";
         }
 
-        // --- Deskripsi: 200 karakter pertama yang dirapikan ---
-        String clean = t.replaceAll("\\s+", " ").trim();
-        data.description = clean.length() > 200 ? clean.substring(0, 200) : clean;
+        // Kolom keterangan TIDAK diisi otomatis — pengguna mengisi sendiri.
+        data.description = "";
         return data;
     }
 
-    private static long digitsToLong(String s) {
+    /**
+     * Ubah token angka struk menjadi rupiah bulat: abaikan desimal 1-2 digit
+     * di belakang, digit berjalan >16 dianggap ID (rekening/PAN/NPWP).
+     */
+    private static long parseReceiptAmount(String s) {
         if (s == null) return 0;
-        String d = s.replaceAll("[^\\d]", "");
-        if (d.isEmpty()) return 0;
+        String t = s.trim().replaceAll("[.,]\\d{1,2}$", "");
+        String d = t.replaceAll("[^\\d]", "");
+        if (d.isEmpty() || d.length() > 16) return 0;
         try {
             return Long.parseLong(d);
         } catch (NumberFormatException e) {
             return 0;
         }
+    }
+
+    private static long digitsToLong(String s) {
+        return parseReceiptAmount(s);
     }
 
     private static boolean containsAny(String hay, String... needles) {

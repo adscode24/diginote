@@ -147,13 +147,13 @@ export const DebtsView: React.FC = () => {
             </div>
           </div>
           <div className="text-xl font-bold text-red-600 dark:text-red-400 tabular-nums mt-2 flex items-center gap-1.5">
-            {masked('hutang:total', totalPayableRemaining)}
+            {masked('hutang:all', totalPayableRemaining)}
             <button
-              onClick={() => toggleHidden('hutang:total')}
+              onClick={() => toggleHidden('hutang:all')}
               className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition"
-              title={isHidden('hutang:total') ? 'Tampilkan angka' : 'Sembunyikan angka'}
+              title={isHidden('hutang:all') ? 'Tampilkan semua angka' : 'Sembunyikan semua angka'}
             >
-              {isHidden('hutang:total') ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              {isHidden('hutang:all') ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
             </button>
           </div>
           <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
@@ -171,14 +171,7 @@ export const DebtsView: React.FC = () => {
             </div>
           </div>
           <div className="text-xl font-bold text-orange-600 dark:text-orange-400 tabular-nums mt-2 flex items-center gap-1.5">
-            {masked('hutang:total', totalReceivableRemaining)}
-            <button
-              onClick={() => toggleHidden('hutang:total')}
-              className="p-1 rounded-lg text-slate-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/40 transition"
-              title={isHidden('hutang:total') ? 'Tampilkan angka' : 'Sembunyikan angka'}
-            >
-              {isHidden('hutang:total') ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-            </button>
+            {masked('hutang:all', totalReceivableRemaining)}
           </div>
           <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
             Uang yang dipinjamkan ke orang lain
@@ -321,15 +314,8 @@ export const DebtsView: React.FC = () => {
                     </span>
                   </div>
                   <div className="text-xs text-slate-600 dark:text-slate-300 mt-1 flex items-center gap-1.5">
-                    <strong className="tabular-nums">{masked(`tagihan:${bill.id}`, bill.amount)}</strong>
+                    <strong className="tabular-nums">{masked('hutang:all', bill.amount)}</strong>
                     <span className="text-[11px] text-slate-400"> · Tgl {bill.dueDayOfMonth} tiap bulan</span>
-                    <button
-                      onClick={() => toggleHidden(`tagihan:${bill.id}`)}
-                      className="p-0.5 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition"
-                      title={isHidden(`tagihan:${bill.id}`) ? 'Tampilkan angka' : 'Sembunyikan angka'}
-                    >
-                      {isHidden(`tagihan:${bill.id}`) ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                    </button>
                   </div>
                   <div className="text-[11px] text-slate-400 mt-0.5">
                     Jatuh tempo: {formatDateIndo(bill.dueDateStr)}
@@ -552,32 +538,23 @@ export const DebtsView: React.FC = () => {
 
                   {/* Financial Numbers & Progress Bar */}
                   <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80">
-                    <div className="flex items-center justify-end">
-                      <button
-                        onClick={() => toggleHidden(`hutang:${debt.id}`)}
-                        className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-                        title={isHidden(`hutang:${debt.id}`) ? 'Tampilkan angka' : 'Sembunyikan angka'}
-                      >
-                        {isHidden(`hutang:${debt.id}`) ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
                     <div className="grid grid-cols-3 gap-2 text-xs mb-2">
                       <div>
                         <span className="text-slate-400 text-[11px]">Total Pinjaman</span>
                         <div className="font-semibold text-slate-700 dark:text-slate-300 tabular-nums">
-                          {masked(`hutang:${debt.id}`, debt.totalAmount)}
+                          {masked('hutang:all', debt.totalAmount)}
                         </div>
                       </div>
                       <div>
                         <span className="text-slate-400 text-[11px]">Sudah Dibayar</span>
                         <div className="font-semibold text-orange-600 dark:text-orange-400 tabular-nums">
-                          {masked(`hutang:${debt.id}`, paidAmount)} ({progressPercent}%)
+                          {masked('hutang:all', paidAmount)} ({progressPercent}%)
                         </div>
                       </div>
                       <div>
                         <span className="text-slate-400 text-[11px]">Sisa Hutang</span>
                         <div className="font-bold text-red-600 dark:text-red-400 tabular-nums text-sm">
-                          {masked(`hutang:${debt.id}`, debt.remainingAmount)}
+                          {masked('hutang:all', debt.remainingAmount)}
                         </div>
                       </div>
                     </div>

@@ -115,8 +115,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
       .slice(0, 3);
   }, [debts]);
 
-  // Privasi angka: eye-toggle per kartu (default tertutup, tersimpan di perangkat)
-  const { isHidden, toggleHidden: toggleHide, masked } = useAmountPrivacy();
+  // Privasi angka: 1 eye-toggle untuk seluruh kartu KPI + eye per kartu carousel
+  // (default tertutup; carousel otomatis menutup lagi saat digeser).
+  const { isHidden, toggleHidden: toggleHide, hideIds, masked } = useAmountPrivacy();
 
   const EyeToggle: React.FC<{ id: string; dark?: boolean }> = ({ id, dark }) => (
     <button
@@ -139,6 +140,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
   const [activeCardIdx, setActiveCardIdx] = useState(0);
   const goCard = (idx: number) => {
     if (accounts.length === 0) return;
+    // Geser carousel = angka kartu yang sempat dibuka otomatis tertutup lagi
+    hideIds(accounts.map(a => `acc:${a.id}`));
     setActiveCardIdx(((idx % accounts.length) + accounts.length) % accounts.length);
   };
   const dragRef = React.useRef<{ startX: number; dragging: boolean }>({ startX: 0, dragging: false });
@@ -421,7 +424,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
         )}
       </div>
 
-      {/* Main KPI Summary Cards */}
+      {/* Main KPI Summary Cards: 1 eye-toggle membuka semua kartu */}
+      <div className="flex items-center justify-between px-1">
+        <h3 className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white">
+          Ringkasan Bulan Ini
+        </h3>
+        <button
+          onClick={() => toggleHide('kpi-all')}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-orange-600 dark:hover:text-orange-400 hover:border-orange-500 text-[11px] font-bold transition"
+          title={isHidden('kpi-all') ? 'Tampilkan semua angka' : 'Sembunyikan semua angka'}
+        >
+          {isHidden('kpi-all') ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+          <span>{isHidden('kpi-all') ? 'Tampilkan' : 'Sembunyikan'}</span>
+        </button>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
 
         {/* Monthly Income Card (Clickable to view details) */}
@@ -440,11 +456,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                 <div className="w-8 h-8 rounded-xl bg-orange-50 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 flex items-center justify-center">
                   <ArrowDownLeft className="w-4 h-4" />
                 </div>
-                <EyeToggle id="kpi-income" />
               </div>
             </div>
             <div className="text-2xl font-bold text-orange-600 dark:text-orange-400 tabular-nums mt-3">
-              +{masked('kpi-income', filteredIncome)}
+              +{masked('kpi-all', filteredIncome)}
             </div>
           </div>
           <div className="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
@@ -469,11 +484,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                 <div className="w-8 h-8 rounded-xl bg-red-50 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center">
                   <ArrowUpRight className="w-4 h-4" />
                 </div>
-                <EyeToggle id="kpi-expense" />
               </div>
             </div>
             <div className="text-2xl font-bold text-red-600 dark:text-red-400 tabular-nums mt-3">
-              -{masked('kpi-expense', filteredExpense)}
+              -{masked('kpi-all', filteredExpense)}
             </div>
           </div>
           <div className="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
@@ -496,15 +510,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                 <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
                   <AlertCircle className="w-4 h-4" />
                 </div>
-                <EyeToggle id="kpi-debt" />
               </div>
             </div>
             <div className="text-2xl font-bold text-amber-600 dark:text-amber-400 tabular-nums mt-3">
-              {masked('kpi-debt', summary.totalPayableDebt)}
+              {masked('kpi-all', summary.totalPayableDebt)}
             </div>
           </div>
           <div className="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
-            <span>Piutang: {masked('kpi-debt', summary.totalReceivableDebt)}</span>
+            <span>Piutang: {masked('kpi-all', summary.totalReceivableDebt)}</span>
             <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition" />
           </div>
         </div>

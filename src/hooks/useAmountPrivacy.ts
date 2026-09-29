@@ -1,37 +1,40 @@
 import { useState, useCallback } from 'react';
 import { formatRupiah } from '../utils/formatters';
 
-const HIDE_KEY = 'diginote_hide_amounts_v2';
-
-function loadHidden(): Record<string, boolean> {
-  try {
-    const raw = localStorage.getItem(HIDE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {
-    /* abaikan */
-  }
-  return {};
-}
-
 /**
- * Privasi angka rupiah: default TERSEMBUNYI, diketuk untuk tampil.
- * Pilihan tersimpan di perangkat.
+ * Privasi angka rupiah: SELALU default tersembunyi, diketuk untuk tampil.
+ *
+ * State sengaja ephemeral (tidak disimpan ke localStorage): setiap halaman
+ * di-mount ulang saat navigasi tab sehingga semua angka otomatis tertutup
+ * lagi ketika pengguna pindah halaman.
  */
 export function useAmountPrivacy() {
-  const [hiddenMap, setHiddenMap] = useState<Record<string, boolean>>(loadHidden);
+  const [hiddenMap, setHiddenMap] = useState<Record<string, boolean>>({});
 
   const isHidden = useCallback((id: string) => hiddenMap[id] ?? true, [hiddenMap]);
 
   const toggleHidden = useCallback((id: string) => {
+    setHiddenMap(prev => ({ ...prev, [id]: !(prev[id] ?? true) }));
+  }, []);
+
+  /** Paksa daftar id kembali tersembunyi (mis. saat carousel digeser). */
+  const hideIds = useCallback((ids: string[]) => {
     setHiddenMap(prev => {
-      const next = { ...prev, [id]: !(prev[id] ?? true) };
-      try {
-        localStorage.setItem(HIDE_KEY, JSON.stringify(next));
-      } catch {
-        /* abaikan */
+      let changed = false;
+      const next = { ...prev };
+      for (const id of ids) {
+        if ((next[id] ?? true) !== true) {
+          next[id] = true;
+          changed = true;
+        }
       }
-      return next;
+      return changed ? next : prev;
     });
+  }, []);
+
+  /** Tutup semua angka yang pernah dibuka. */
+  const hideAll = useCallback(() => {
+    setHiddenMap(prev => (Object.keys(prev).length === 0 ? prev : {}));
   }, []);
 
   const masked = useCallback(
@@ -39,5 +42,5 @@ export function useAmountPrivacy() {
     [isHidden]
   );
 
-  return { isHidden, toggleHidden, masked };
+  return { isHidden, toggleHidden, hideIds, hideAll, masked };
 }

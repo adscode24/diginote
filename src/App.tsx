@@ -46,7 +46,7 @@ const ThemeToggleButton: React.FC = () => {
 
 function MainApp() {
   const { currentUser } = useAuth();
-  const { pullFromVaultNow } = useFinance();
+  const { pullFromVaultNow, reminderSettings } = useFinance();
   const { pushToast } = useToast();
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [sharedPrefill, setSharedPrefill] = useState<SharedTransactionPrefill | null>(null);
@@ -90,6 +90,28 @@ function MainApp() {
   useEffect(() => {
     forceUnlockBodyScroll();
   }, [activeTab]);
+
+  // Jadwal ulang pengingat harian native saat aplikasi dibuka
+  // (jadwal sistem hilang bila aplikasi diinstal ulang / data dibersihkan).
+  // Hanya bila izin sudah diberikan — tidak pernah memunculkan dialog izin di sini.
+  useEffect(() => {
+    if (!reminderSettings.enabled) return;
+    (async () => {
+      try {
+        const { Capacitor } = await import('@capacitor/core');
+        if (!Capacitor.isNativePlatform()) return;
+        const { getNotificationPermissionStatus, enableDailyReminder } = await import(
+          './services/notifications'
+        );
+        if ((await getNotificationPermissionStatus()) === 'granted') {
+          await enableDailyReminder(reminderSettings.time);
+        }
+      } catch {
+        /* abaikan: pengingat opsional */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const navItems: { id: ActiveTab; label: string; shortLabel: string; icon: React.FC<{ className?: string }> }[] = [
     { id: 'dashboard', label: 'Dashboard', shortLabel: 'Beranda', icon: LayoutDashboard },

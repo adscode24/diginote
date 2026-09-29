@@ -21,7 +21,7 @@ import {
   persistDigifuelLink,
   fetchDigifuelVault,
 } from '../services/digifuel';
-import { requestNotificationPermission, sendDailyReminderNotification, isNotificationSupported } from '../services/notifications';
+import { isNotificationSupported, enableDailyReminder, disableDailyReminder, sendTestNotification, getNotificationPermissionStatus } from '../services/notifications';
 import { CloudSyncModal } from './CloudSyncModal';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
@@ -124,24 +124,53 @@ export const SettingsView: React.FC = () => {
   };
 
   const handleToggleReminder = async (enabled: boolean) => {
-    if (enabled && isNotificationSupported()) {
-      const granted = await requestNotificationPermission();
-      if (!granted) {
-        alert('Izin notifikasi belum diberikan di browser Anda. Pengingat tetap akan muncul di dalam aplikasi.');
+    if (enabled) {
+      if (!isNotificationSupported()) {
+        setFeedbackMessage('Perangkat ini tidak mendukung notifikasi sistem. Pengingat hanya tampil di dashboard.');
+        setTimeout(() => setFeedbackMessage(null), 4000);
       }
+      // Nyalakan jadwal harian native (meminta izin sistem bila perlu)
+      const ok = await enableDailyReminder(reminderSettings.time);
+      if (!ok) {
+        const status = await getNotificationPermissionStatus();
+        setFeedbackMessage(
+          status === 'denied'
+            ? 'Izin notifikasi ditolak sistem. Buka Pengaturan HP > Aplikasi > DigiNote > Notifikasi untuk mengaktifkannya, lalu nyalakan lagi di sini.'
+            : 'Izin notifikasi belum diberikan. Pengingat tetap tampil di dashboard aplikasi.'
+        );
+        setTimeout(() => setFeedbackMessage(null), 6000);
+        updateReminderSettings({ enabled: false });
+        return;
+      }
+      setFeedbackMessage('Pengingat harian aktif. Notifikasi muncul tiap hari pada jam yang dipilih.');
+      setTimeout(() => setFeedbackMessage(null), 4000);
+    } else {
+      await disableDailyReminder();
     }
     updateReminderSettings({ enabled });
   };
 
-  const handleTestNotification = async () => {
-    const granted = await requestNotificationPermission();
-    if (granted) {
-      sendDailyReminderNotification();
-      setNotificationTestMessage('Notifikasi pengingat terkirim!');
-    } else {
-      setNotificationTestMessage('Izin notifikasi tidak aktif. Aktifkan izin notifikasi di browser Anda.');
+  const handleReminderTimeChange = async (time: string) => {
+    updateReminderSettings({ time });
+    // Jadwal ulang bila pengingat sedang aktif
+    if (reminderSettings.enabled && time) {
+      await enableDailyReminder(time);
     }
-    setTimeout(() => setNotificationTestMessage(null), 4000);
+  };
+
+  const handleTestNotification = async () => {
+    const sent = await sendTestNotification();
+    if (sent) {
+      setNotificationTestMessage('Notifikasi pengingat terkirim! Periksa bilah notifikasi HP Anda.');
+    } else {
+      const status = await getNotificationPermissionStatus();
+      setNotificationTestMessage(
+        status === 'denied'
+          ? 'Izin notifikasi ditolak sistem. Aktifkan di Pengaturan HP > Aplikasi > DigiNote > Notifikasi.'
+          : 'Izin notifikasi tidak aktif. Nyalakan pengingat dulu, lalu coba lagi.'
+      );
+    }
+    setTimeout(() => setNotificationTestMessage(null), 5000);
   };
 
   const handleResetData = () => {
@@ -266,14 +295,14 @@ export const SettingsView: React.FC = () => {
                   Waktu Pengingat Setiap Hari:
                 </span>
                 <p className="text-[11px] text-slate-400">
-                  Pengingat akan muncul di dashboard dan notifikasi browser pada jam ini
+                  Pengingat muncul sebagai notifikasi sistem HP + pengingat di dashboard pada jam ini
                 </p>
               </div>
 
               <input
                 type="time"
                 value={reminderSettings.time}
-                onChange={e => updateReminderSettings({ time: e.target.value })}
+                onChange={e => handleReminderTimeChange(e.target.value)}
                 className="px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
               />
             </div>

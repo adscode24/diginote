@@ -23,7 +23,8 @@ async function main() {
   ];
 
   for (const [name, size] of targets) {
-    // Background putih agar maskable & apple-touch-icon tidak berpixel transparan/hitam
+    // icon.svg full-bleed opaque sehingga flatten tidak mengubah apa pun
+    // (tetap dipasang agar maskable & apple-touch-icon tidak berpixel transparan)
     const png = await sharp(svgPath)
       .flatten({ background: '#FFFFFF' })
       .resize(size, size, { fit: 'cover' })

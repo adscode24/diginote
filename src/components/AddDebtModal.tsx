@@ -566,19 +566,20 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                             <div>
                               <label className="text-[10px] text-slate-400 block mb-0.5">Durasi (Bulan)</label>
                               <input
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
                                 value={period.durationMonths}
-                                onChange={e => updateTierPeriod(idx, 'durationMonths', Number(e.target.value))}
+                                onChange={e => updateTierPeriod(idx, 'durationMonths', Number(e.target.value.replace(/[^0-9]/g, '')) || 0)}
                                 className="w-full px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-medium"
                               />
                             </div>
                             <div>
                               <label className="text-[10px] text-slate-400 block mb-0.5">Bunga (% p.a)</label>
                               <input
-                                type="number"
-                                step="0.05"
+                                type="text"
+                                inputMode="decimal"
                                 value={period.interestRate ?? ''}
-                                onChange={e => updateTierPeriod(idx, 'interestRate', Number(e.target.value))}
+                                onChange={e => updateTierPeriod(idx, 'interestRate', Number(e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0)}
                                 placeholder="3.75"
                                 className="w-full px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-medium"
                               />
@@ -586,9 +587,10 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                             <div>
                               <label className="text-[10px] text-slate-400 block mb-0.5">Cicilan / Bln (Rp)</label>
                               <input
-                                type="number"
-                                value={period.monthlyAmount}
-                                onChange={e => updateTierPeriod(idx, 'monthlyAmount', Number(e.target.value))}
+                                type="text"
+                                inputMode="numeric"
+                                value={period.monthlyAmount ? new Intl.NumberFormat('id-ID').format(Number(String(period.monthlyAmount).replace(/[^0-9]/g, '')) || 0) : ''}
+                                onChange={e => updateTierPeriod(idx, 'monthlyAmount', Number(e.target.value.replace(/[^0-9]/g, '')) || 0)}
                                 placeholder="0"
                                 className="w-full px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold"
                               />

@@ -259,9 +259,10 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 </label>
                 <input
                   type="text"
+                  inputMode="numeric"
                   placeholder="Contoh: 8492019482 atau 0812345678"
                   value={accountNumber}
-                  onChange={e => setAccountNumber(e.target.value)}
+                  onChange={e => setAccountNumber(e.target.value.replace(/[^0-9 ]/g, ''))}
                   className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 />
               </div>

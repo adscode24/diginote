@@ -21,7 +21,7 @@ import {
   persistDigifuelLink,
   fetchDigifuelVault,
 } from '../services/digifuel';
-import { isNotificationSupported, enableDailyReminder, disableDailyReminder, sendTestNotification, getNotificationPermissionStatus } from '../services/notifications';
+import { isNotificationSupported, enableDailyReminder, disableDailyReminder, sendTestNotification, getNotificationPermissionStatus, withTimeout } from '../services/notifications';
 import { CloudSyncModal } from './CloudSyncModal';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
@@ -124,30 +124,31 @@ export const SettingsView: React.FC = () => {
   };
 
   const handleToggleReminder = async (enabled: boolean) => {
-    if (enabled) {
-      if (!isNotificationSupported()) {
-        setFeedbackMessage('Perangkat ini tidak mendukung notifikasi sistem. Pengingat hanya tampil di dashboard.');
-        setTimeout(() => setFeedbackMessage(null), 4000);
-      }
-      // Nyalakan jadwal harian native (meminta izin sistem bila perlu)
-      const ok = await enableDailyReminder(reminderSettings.time);
-      if (!ok) {
-        const status = await getNotificationPermissionStatus();
-        setFeedbackMessage(
-          status === 'denied'
-            ? 'Izin notifikasi ditolak sistem. Buka Pengaturan HP > Aplikasi > DigiNote > Notifikasi untuk mengaktifkannya, lalu nyalakan lagi di sini.'
-            : 'Izin notifikasi belum diberikan. Pengingat tetap tampil di dashboard aplikasi.'
-        );
-        setTimeout(() => setFeedbackMessage(null), 6000);
-        updateReminderSettings({ enabled: false });
-        return;
-      }
-      setFeedbackMessage('Pengingat harian aktif. Notifikasi muncul tiap hari pada jam yang dipilih.');
-      setTimeout(() => setFeedbackMessage(null), 4000);
-    } else {
-      await disableDailyReminder();
-    }
+    // Toggle SELALU bisa on/off: pengingat dalam aplikasi (dashboard) tetap
+    // jalan walau izin notifikasi sistem ditolak / plugin menggantung.
     updateReminderSettings({ enabled });
+    if (!enabled) {
+      withTimeout(disableDailyReminder(), 5000, undefined).catch(() => {});
+      return;
+    }
+    if (!isNotificationSupported()) {
+      setFeedbackMessage('Perangkat ini tidak mendukung notifikasi sistem. Pengingat hanya tampil di dashboard.');
+      setTimeout(() => setFeedbackMessage(null), 4000);
+      return;
+    }
+    // Minta izin + jadwalkan di latar (timeout agar toggle tak macet di HP tertentu)
+    const ok = await withTimeout(enableDailyReminder(reminderSettings.time), 10000, false);
+    if (ok) {
+      setFeedbackMessage('Pengingat harian aktif. Notifikasi muncul tiap hari pada jam yang dipilih.');
+    } else {
+      const status = await withTimeout(getNotificationPermissionStatus(), 5000, 'unknown' as const);
+      setFeedbackMessage(
+        status === 'denied'
+          ? 'Pengingat AKTIF untuk dalam aplikasi. Notifikasi sistem ditolak — buka Pengaturan HP > Aplikasi > DigiNote > Notifikasi untuk mengaktifkannya.'
+          : 'Pengingat AKTIF untuk dalam aplikasi. Izin sistem belum diberikan — notifikasi HP menyusul setelah izin diberikan.'
+      );
+    }
+    setTimeout(() => setFeedbackMessage(null), 6000);
   };
 
   const handleReminderTimeChange = async (time: string) => {
@@ -159,11 +160,11 @@ export const SettingsView: React.FC = () => {
   };
 
   const handleTestNotification = async () => {
-    const sent = await sendTestNotification();
+    const sent = await withTimeout(sendTestNotification(), 10000, false);
     if (sent) {
       setNotificationTestMessage('Notifikasi pengingat terkirim! Periksa bilah notifikasi HP Anda.');
     } else {
-      const status = await getNotificationPermissionStatus();
+      const status = await withTimeout(getNotificationPermissionStatus(), 5000, 'unknown' as const);
       setNotificationTestMessage(
         status === 'denied'
           ? 'Izin notifikasi ditolak sistem. Aktifkan di Pengaturan HP > Aplikasi > DigiNote > Notifikasi.'

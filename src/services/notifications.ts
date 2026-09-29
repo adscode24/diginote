@@ -78,6 +78,17 @@ function parseTime(time: string): { hour: number; minute: number } {
   return { hour, minute };
 }
 
+/** Batasi waktu tunggu operasi plugin (sebagian WebView kadang menggantung). */
+export function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const timeout = new Promise<T>(resolve => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
 /** Aktifkan pengingat harian pada jam tertentu. Mengembalikan false bila izin ditolak. */
 export async function enableDailyReminder(time: string): Promise<boolean> {
   const granted = await requestNotificationPermission();

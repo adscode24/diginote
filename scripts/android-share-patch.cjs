@@ -25,8 +25,16 @@ function main() {
     console.log(`java: ${f} OK`);
   }
 
-  // 2. AndroidManifest: tambah intent-filter SEND/SEND_MULTIPLE (idempoten)
+  // 2. AndroidManifest: tambah intent-filter KHUSUS GAMBAR (idempoten).
+  // DigiNote hanya menerima image/* agar tidak muncul di share-sheet teks/file lain.
   let manifest = fs.readFileSync(manifestPath, 'utf8');
+  // 2b. Buang filter text/plain warisan bila masih ada (opsi gambar saja)
+  const legacyTextFilter = /<intent-filter>\s*<action android:name="android\.intent\.action\.SEND" \/>\s*<category android:name="android\.intent\.category\.DEFAULT" \/>\s*<data android:mimeType="text\/plain" \/>\s*<\/intent-filter>/;
+  if (legacyTextFilter.test(manifest)) {
+    manifest = manifest.replace(legacyTextFilter, '');
+    fs.writeFileSync(manifestPath, manifest);
+    console.log('AndroidManifest.xml: filter text/plain warisan dibuang');
+  }
   if (!manifest.includes('android.intent.action.SEND')) {
     const mainIdx = manifest.indexOf('android.intent.action.MAIN');
     if (mainIdx === -1) throw new Error('Blok MAIN/LAUNCHER tidak ditemukan di AndroidManifest.xml');
@@ -34,16 +42,11 @@ function main() {
     if (closeIdx === -1) throw new Error('Penutup intent-filter LAUNCHER tidak ditemukan');
     const insertAt = closeIdx + '</intent-filter>'.length;
     const filters = `
-            <!-- Share Target DigiNote (disuntik scripts/android-share-patch.cjs) -->
+            <!-- Share Target DigiNote khusus gambar (disuntik scripts/android-share-patch.cjs) -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="image/*" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="text/plain" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.SEND_MULTIPLE" />

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Settings2, Upload, Trash2, Wallet, Plus, ChevronDown } from 'lucide-react';
+import { X, Calendar, Settings2, Upload, Trash2, Wallet, Plus, ChevronDown, Eye, EyeOff } from 'lucide-react';
 import { Transaction, TransactionType, PaymentMethod } from '../types';
 import { SharedTransactionPrefill } from '../services/shareIntent';
 import { useFinance } from '../context/FinanceContext';
@@ -41,6 +41,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [description, setDescription] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('transfer');
   const [receiptImage, setReceiptImage] = useState<string | undefined>(undefined);
+  // Saldo sumber dana disembunyikan default (privasi saat input manual maupun dari share)
+  const [showBalances, setShowBalances] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [error, setError] = useState('');
@@ -48,6 +50,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   // Synchronize when opening for edit or new
   useEffect(() => {
+    // Setiap kali form dibuka (manual maupun dari share), saldo kembali disembunyikan
+    setShowBalances(false);
     if (transactionToEdit) {
       setType(transactionToEdit.type);
       setAmountStr(String(transactionToEdit.amount));
@@ -271,14 +275,24 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                   <Wallet className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
                   <span>Sumber Dana (Rekening / E-Wallet / Tunai) *</span>
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setIsAccountModalOpen(true)}
-                  className="text-[11px] font-semibold text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-0.5"
-                >
-                  <Plus className="w-3 h-3" />
-                  <span>Tambah Sumber Dana</span>
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowBalances(v => !v)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                    title={showBalances ? 'Sembunyikan saldo' : 'Tampilkan saldo'}
+                  >
+                    {showBalances ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsAccountModalOpen(true)}
+                    className="text-[11px] font-semibold text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-0.5"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Tambah Sumber Dana</span>
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto p-1 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-950/40">
@@ -320,7 +334,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                           </span>
                         </div>
                         <div className="text-[10px] tabular-nums truncate text-slate-500 dark:text-slate-400">
-                          {formatRupiah(acc.balance)}
+                          {showBalances ? formatRupiah(acc.balance) : 'Rp••••••'}
                         </div>
                       </div>
                     </button>

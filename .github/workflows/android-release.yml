@@ -93,7 +93,6 @@ jobs:
         working-directory: android
         run: |
           $ANDROID_HOME/build-tools/35.0.0/apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk | head -5
-          java -jar /tmp/bundletool.jar validate --bundle app/build/outputs/bundle/release/app-release.aab
 
       - name: Build universal APK from AAB (Play-identical, ikon lengkap)
         working-directory: android

@@ -71,7 +71,7 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose 
     setBusy(true);
     setStatusMessage(null);
     try {
-      const ok = await pullFromVaultNow();
+      const ok = await pullFromVaultNow(true);
       setStatusMessage(
         ok
           ? { type: 'success', text: 'Data terbaru dari cloud berhasil diterapkan!' }

@@ -16,6 +16,7 @@ import {
 import { ALL_DEFAULT_CATEGORIES } from '../utils/constants';
 import { getTodayString, calculatePayoffDate, getNextDueDate, getActiveTierRate, calculateTieredPayment, TieredPaymentResult, toRupiahInt, sanitizeTransactions, sanitizeDebts } from '../utils/formatters';
 import { generateVaultId, hashPassphrase } from '../services/crypto';
+import { sendSyncNotification } from '../services/notifications';
 import { exportEncryptedBackup, importEncryptedBackup, type SyncPayload } from '../services/sync';
 import { isCloudEnabled, isCloudCapableUid } from '../services/firebase';
 import { getActiveEmail } from './AuthContext';
@@ -83,7 +84,7 @@ interface FinanceContextType {
   clearSyncNotice: () => void;
   cloudVaultId: string | null;
   pushToVaultNow: () => Promise<boolean>;
-  pullFromVaultNow: () => Promise<boolean>;
+  pullFromVaultNow: (announce?: boolean) => Promise<boolean>;
 
   // Tagihan Rutin
   addBill: (bill: Omit<Bill, 'id' | 'createdAt' | 'updatedAt'>) => Bill;
@@ -549,6 +550,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
       setSyncStatus('synced');
       setSyncErrorMsg(null);
       setSyncNotice({ text: 'Data berhasil disinkronkan ke cloud.', action: null });
+      void sendSyncNotification(true, 'Data berhasil disinkronkan ke cloud.');
       persistBase(updatedAt);
       return true;
     } catch (err: unknown) {
@@ -556,6 +558,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
       setSyncStatus('error');
       setSyncErrorMsg(msg);
       setSyncNotice({ text: msg, action: null });
+      void sendSyncNotification(false, msg);
       return false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -563,8 +566,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
 
   /**
    * Pull manual: tarik data terbaru dari cloud SEKARANG (via Pengaturan).
+   * Notifikasi sistem hanya bila announce=true (tombol eksplisit),
+   * agar pull-to-refresh / tombol dashboard tidak membanjiri bilah notifikasi.
    */
-  const pullFromVaultNow = useCallback(async (): Promise<boolean> => {
+  const pullFromVaultNow = useCallback(async (announce = false): Promise<boolean> => {
     if (!cloudEnabled || !isCloudCapableUid(userId)) return false;
     setSyncStatus('syncing');
     try {
@@ -578,12 +583,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
       setSyncStatus(navigator.onLine ? 'synced' : 'offline');
       setSyncErrorMsg(null);
       setSyncNotice(null);
+      if (announce) void sendSyncNotification(true, 'Data terbaru dari cloud berhasil dimuat.');
       return true;
     } catch (err: unknown) {
       const msg = (err as Error)?.message || 'Gagal menarik data dari cloud.';
       setSyncStatus('error');
       setSyncErrorMsg(msg);
       setSyncNotice({ text: msg, action: null });
+      if (announce) void sendSyncNotification(false, msg);
       return false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -170,3 +170,43 @@ export function sendDailyReminderNotification(): void {
     console.warn('Gagal memunculkan notifikasi:', err);
   }
 }
+
+// ---------- Notifikasi sistem untuk hasil sinkronisasi cloud ----------
+
+const SYNC_NOTIFICATION_ID = 1003;
+
+/**
+ * Notifikasi aplikasi (muncul di bilah notifikasi HP, bukan hanya dashboard)
+ * untuk hasil sinkronisasi cloud yang dipicu manual.
+ * Tidak meminta izin di sini: bila izin belum ada, notifikasi dilewati diam-diam
+ * agar tidak mengganggu (izin diminta lewat toggle pengingat / tombol uji).
+ */
+export async function sendSyncNotification(ok: boolean, message: string): Promise<void> {
+  try {
+    if (isNative()) {
+      const perm = await LocalNotifications.checkPermissions().catch(() => null);
+      if (!perm || perm.display !== 'granted') return;
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: SYNC_NOTIFICATION_ID,
+            title: ok ? 'DigiNote tersinkron' : 'Sinkronisasi DigiNote gagal',
+            body: message,
+            schedule: { at: new Date(Date.now() + 500), allowWhileIdle: true },
+          },
+        ],
+      });
+      return;
+    }
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(ok ? 'DigiNote tersinkron' : 'Sinkronisasi DigiNote gagal', {
+        body: message,
+        icon: '/pwa-192x192.png',
+        badge: '/favicon.ico',
+        tag: 'diginote-sync',
+      });
+    }
+  } catch {
+    /* abaikan: notifikasi sync opsional */
+  }
+}

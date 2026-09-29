@@ -55,10 +55,15 @@ function MainApp() {
   const profileInitial = ((currentUser?.name || 'D').trim()[0] || 'D').toUpperCase();
 
   // Terima share gambar/teks dari aplikasi lain (otomatisasi input masuk/keluar):
-  // cek saat aplikasi dibuka + setiap kembali dari luar (resume/fokus tab).
+  // cek saat aplikasi dibuka + setiap kembali dari luar.
+  // Native memicu event window 'diginote-share' + Capacitor App 'resume';
+  // polling dipertahankan sebagai cadangan (WebView kadang tak menembakkan focus).
   useEffect(() => {
     let cancelled = false;
+    let inFlight = false;
     const check = async () => {
+      if (inFlight) return;
+      inFlight = true;
       try {
         const data = await consumeSharedTransaction();
         if (!cancelled && data && (data.amount > 0 || data.receiptImage || data.rawText)) {
@@ -70,18 +75,40 @@ function MainApp() {
         }
       } catch {
         /* abaikan: share opsional, jangan ganggu aplikasi */
+      } finally {
+        inFlight = false;
       }
     };
+    // Cold start: coba beberapa kali (race dengan pemulihan sesi / bridge native)
     check();
+    const t1 = setTimeout(() => !cancelled && check(), 800);
+    const t2 = setTimeout(() => !cancelled && check(), 2000);
+    // Warm start: kembali dari share-sheet aplikasi lain
     const onVisible = () => {
       if (document.visibilityState === 'visible') check();
     };
+    const onNativeShareEvent = () => check();
     window.addEventListener('focus', check);
     document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('diginote-share', onNativeShareEvent);
+    let resumeSub: { remove: () => void } | null = null;
+    (async () => {
+      try {
+        const { App } = await import('@capacitor/app');
+        if (cancelled) return;
+        resumeSub = await App.addListener('resume', () => check());
+      } catch {
+        /* web/tes: App plugin tidak tersedia */
+      }
+    })();
     return () => {
       cancelled = true;
+      clearTimeout(t1);
+      clearTimeout(t2);
       window.removeEventListener('focus', check);
       document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('diginote-share', onNativeShareEvent);
+      resumeSub?.remove();
     };
   }, [pushToast]);
 

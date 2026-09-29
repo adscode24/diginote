@@ -52,6 +52,10 @@ public class ShareReceiverPlugin extends Plugin {
         }
     }
 
+    public static boolean hasPendingIntent() {
+        return isShareIntent(pendingIntent);
+    }
+
     private static boolean isShareIntent(Intent intent) {
         if (intent == null) return false;
         String action = intent.getAction();

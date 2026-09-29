@@ -14,7 +14,7 @@ import {
   ThemeMode,
 } from '../types';
 import { ALL_DEFAULT_CATEGORIES } from '../utils/constants';
-import { getTodayString, calculatePayoffDate, getNextDueDate, getActiveTierRate, calculateTieredPayment, TieredPaymentResult } from '../utils/formatters';
+import { getTodayString, calculatePayoffDate, getNextDueDate, getActiveTierRate, calculateTieredPayment, TieredPaymentResult, toRupiahInt, sanitizeTransactions, sanitizeDebts } from '../utils/formatters';
 import { generateVaultId, hashPassphrase } from '../services/crypto';
 import { exportEncryptedBackup, importEncryptedBackup, type SyncPayload } from '../services/sync';
 import { isCloudEnabled, isCloudCapableUid } from '../services/firebase';
@@ -224,11 +224,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     return [];
   });
 
-  // 2. Transactions State (tanpa data contoh)
+  // 2. Transactions State (tanpa data contoh; selalu disanitasi agar
+  // nominal string/desimal dari data lama tidak merusak penjumlahan total)
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     try {
       const stored = readStoredKey(STORAGE_KEYS.TRANSACTIONS, LEGACY_GLOBAL_KEYS.TRANSACTIONS, LEGACY_STORAGE_KEYS.TRANSACTIONS);
-      if (stored) return JSON.parse(stored);
+      if (stored) return sanitizeTransactions(JSON.parse(stored));
     } catch (e) {
       console.error(e);
     }
@@ -246,11 +247,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     return [...ALL_DEFAULT_CATEGORIES];
   });
 
-  // 4. Debts State (tanpa data contoh)
+  // 4. Debts State (tanpa data contoh; disanitasi seperti transaksi)
   const [debts, setDebts] = useState<Debt[]>(() => {
     try {
       const stored = readStoredKey(STORAGE_KEYS.DEBTS, LEGACY_GLOBAL_KEYS.DEBTS, LEGACY_STORAGE_KEYS.DEBTS);
-      if (stored) return JSON.parse(stored);
+      if (stored) return sanitizeDebts(JSON.parse(stored));
     } catch (e) {
       console.error(e);
     }
@@ -359,11 +360,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     );
     if (Array.isArray(vault.transactions)) {
       setTransactions(
-        vault.transactions.map(t => {
-          const local = localTxById.get(t.id);
-          if (local?.receiptUrl && !t.receiptUrl) return { ...t, receiptUrl: local.receiptUrl };
-          return t;
-        })
+        sanitizeTransactions(
+          vault.transactions.map(t => {
+            const local = localTxById.get(t.id);
+            if (local?.receiptUrl && !t.receiptUrl) return { ...t, receiptUrl: local.receiptUrl };
+            return t;
+          })
+        )
       );
     }
     if (Array.isArray(vault.categories) && vault.categories.length > 0)
@@ -371,15 +374,17 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     if (Array.isArray(vault.accounts)) setAccounts(vault.accounts);
     if (Array.isArray(vault.debts)) {
       setDebts(
-        vault.debts.map(d => ({
-          ...d,
-          payments: (d.payments || []).map(p => {
-            const local = localPayById.get(`${d.id}:${p.id}`);
-            if (local?.receiptImage && !p.receiptImage)
-              return { ...p, receiptImage: local.receiptImage };
-            return p;
-          }),
-        }))
+        sanitizeDebts(
+          vault.debts.map(d => ({
+            ...d,
+            payments: (d.payments || []).map(p => {
+              const local = localPayById.get(`${d.id}:${p.id}`);
+              if (local?.receiptImage && !p.receiptImage)
+                return { ...p, receiptImage: local.receiptImage };
+              return p;
+            }),
+          }))
+        )
       );
     }
     if (Array.isArray(vault.bills)) setBills(vault.bills);
@@ -461,10 +466,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
           reminderSettings,
         };
         if (legacy) {
-          if (legacy.transactions.length > 0) setTransactions(legacy.transactions);
+          if (legacy.transactions.length > 0) setTransactions(sanitizeTransactions(legacy.transactions));
           if (legacy.categories.length > 0) setCategories(legacy.categories);
           if (legacy.accounts.length > 0) setAccounts(legacy.accounts);
-          if (legacy.debts.length > 0) setDebts(legacy.debts);
+          if (legacy.debts.length > 0) setDebts(sanitizeDebts(legacy.debts));
           if (legacy.reminderSettings) setReminderSettings(legacy.reminderSettings);
           setSyncNotice({ text: 'Data lama perangkat ini dimuat dan akan disinkronkan ke cloud.', action: null });
         }
@@ -827,8 +832,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
 
   // Transaction mutations with automatic account balance adjustment
   const addTransaction = (data: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const cleanAmount = toRupiahInt(data.amount);
     const newTx: Transaction = {
       ...data,
+      amount: cleanAmount,
       id: `tx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -839,7 +846,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
       setAccounts(prev =>
         prev.map(acc => {
           if (acc.id !== data.accountId) return acc;
-          const delta = data.type === 'income' ? data.amount : -data.amount;
+          const delta = data.type === 'income' ? cleanAmount : -cleanAmount;
           return {
             ...acc,
             balance: acc.balance + delta,
@@ -862,8 +869,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     const newAccountId = updatedData.accountId !== undefined ? updatedData.accountId : oldTx.accountId;
     const oldType = oldTx.type;
     const newType = updatedData.type || oldType;
-    const oldAmount = oldTx.amount;
-    const newAmount = updatedData.amount !== undefined ? updatedData.amount : oldAmount;
+    const oldAmount = toRupiahInt(oldTx.amount);
+    const newAmount = updatedData.amount !== undefined ? toRupiahInt(updatedData.amount) : oldAmount;
+    if (updatedData.amount !== undefined) {
+      updatedData = { ...updatedData, amount: newAmount };
+    }
 
     setAccounts(prev =>
       prev.map(acc => {
@@ -941,10 +951,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
 
     const newDebt: Debt = {
       ...data,
+      totalAmount: toRupiahInt(data.totalAmount),
       dueDate: effectiveDueDate,
       estimatedPayoffDate: estimatedPayoff,
       id: `debt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      remainingAmount: data.totalAmount,
+      remainingAmount: toRupiahInt(data.totalAmount),
       status: 'unpaid',
       payments: [],
       createdAt: Date.now(),
@@ -958,7 +969,18 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     setDebts(prev =>
       prev.map(d => {
         if (d.id !== id) return d;
-        const updated = { ...d, ...data, updatedAt: Date.now() };
+        const merged = { ...d, ...data, updatedAt: Date.now() };
+        if (data.totalAmount !== undefined) merged.totalAmount = toRupiahInt(data.totalAmount);
+        if (data.remainingAmount !== undefined) merged.remainingAmount = toRupiahInt(data.remainingAmount);
+        if (data.monthlyInstallment !== undefined) merged.monthlyInstallment = toRupiahInt(data.monthlyInstallment);
+        if (data.tieredPeriods !== undefined && Array.isArray(data.tieredPeriods)) {
+          merged.tieredPeriods = data.tieredPeriods.map(tp => ({
+            ...tp,
+            monthlyAmount: toRupiahInt(tp.monthlyAmount),
+            durationMonths: Math.max(0, Math.floor(Number(tp.durationMonths) || 0)),
+          }));
+        }
+        const updated = merged;
 
         if (updated.installmentCategory && updated.installmentCategory !== 'non_installment') {
           if (updated.dueDayOfMonth) {
@@ -969,7 +991,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
           }
         }
 
-        const totalPaid = (updated.payments || []).reduce((sum, p) => sum + p.amount, 0);
+        const totalPaid = (updated.payments || []).reduce((sum, p) => sum + toRupiahInt(p.amount), 0);
         // Cicilan berjangka: replay amortisasi agar konsisten dengan logika bayar
         const remaining =
           updated.type === 'payable' &&
@@ -1014,7 +1036,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
   ) => {
     const targetDebt = debts.find(d => d.id === debtId);
     if (!targetDebt) throw new Error('Catatan hutang tidak ditemukan');
-    if (amount <= 0) throw new Error('Nominal pembayaran harus lebih dari 0');
+    const cleanDebtAmount = toRupiahInt(amount);
+    if (cleanDebtAmount <= 0) throw new Error('Nominal pembayaran harus lebih dari 0');
+    amount = cleanDebtAmount;
 
     const paymentId = `pay_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
@@ -1229,6 +1253,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
   const addBill = (data: Omit<Bill, 'id' | 'createdAt' | 'updatedAt'>) => {
     const newBill: Bill = {
       ...data,
+      amount: toRupiahInt(data.amount),
       id: `bill_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -1238,7 +1263,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
   };
 
   const updateBill = (id: string, data: Partial<Bill>) => {
-    setBills(prev => prev.map(b => (b.id === id ? { ...b, ...data, updatedAt: Date.now() } : b)));
+    const clean = data.amount !== undefined ? { ...data, amount: toRupiahInt(data.amount) } : data;
+    setBills(prev => prev.map(b => (b.id === id ? { ...b, ...clean, updatedAt: Date.now() } : b)));
   };
 
   const deleteBill = (id: string) => {
@@ -1258,7 +1284,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
   ) => {
     const targetBill = bills.find(b => b.id === billId);
     if (!targetBill) throw new Error('Tagihan tidak ditemukan');
-    if (!payment.amount || payment.amount <= 0) throw new Error('Nominal pembayaran harus lebih dari 0');
+    const cleanBillAmount = toRupiahInt(payment.amount);
+    if (cleanBillAmount <= 0) throw new Error('Nominal pembayaran harus lebih dari 0');
+    payment = { ...payment, amount: cleanBillAmount };
 
     const category = categories.find(c => c.id === payment.categoryId);
     if (!category) throw new Error('Kategori pengeluaran tidak valid');
@@ -1375,14 +1403,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     const upserts: Transaction[] = [];
 
     for (const r of vault.fuelRecords || []) {
-      if (!r.totalCost || r.totalCost <= 0) continue;
+      if (!toRupiahInt(r.totalCost)) continue;
       const sourceId = `fuel:${r.id}`;
       seenSourceIds.add(sourceId);
       const existing = transactions.find(t => t.sourceType === 'digifuel' && t.sourceId === sourceId);
       const vName = vehicleName.get(r.vehicleId) || '';
       const base = {
         type: 'expense' as const,
-        amount: Math.round(r.totalCost),
+        amount: toRupiahInt(r.totalCost),
         categoryId: fuelCat.id,
         categoryName: fuelCat.name,
         date: r.date,
@@ -1408,14 +1436,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     }
 
     for (const s of vault.serviceHistory || []) {
-      if (!s.cost || s.cost <= 0) continue;
+      if (!toRupiahInt(s.cost)) continue;
       const sourceId = `svc:${s.id}`;
       seenSourceIds.add(sourceId);
       const existing = transactions.find(t => t.sourceType === 'digifuel' && t.sourceId === sourceId);
       const vName = vehicleName.get(s.vehicleId) || '';
       const base = {
         type: 'expense' as const,
-        amount: Math.round(s.cost),
+        amount: toRupiahInt(s.cost),
         categoryId: fuelCat.id,
         categoryName: fuelCat.name,
         date: s.date,
@@ -1554,11 +1582,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
   const importBackupFile = async (file: File, passphrase: string): Promise<boolean> => {
     const data = await importEncryptedBackup(file, passphrase);
     const ext = data as SyncPayload & { bills?: Bill[]; billPayments?: BillPayment[] };
-    if (Array.isArray(data.transactions)) setTransactions(data.transactions as Transaction[]);
+    if (Array.isArray(data.transactions)) setTransactions(sanitizeTransactions(data.transactions));
     if (Array.isArray(data.categories)) setCategories(data.categories as Category[]);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (Array.isArray((data as any).accounts)) setAccounts((data as any).accounts as Account[]);
-    if (Array.isArray(data.debts)) setDebts(data.debts as Debt[]);
+    if (Array.isArray(data.debts)) setDebts(sanitizeDebts(data.debts));
     if (Array.isArray(ext.bills)) setBills(ext.bills as Bill[]);
     if (Array.isArray(ext.billPayments)) setBillPayments(ext.billPayments as BillPayment[]);
     if (data.reminderSettings) setReminderSettings(data.reminderSettings as ReminderSettings);

@@ -63,6 +63,8 @@ export const TransactionsView: React.FC = () => {
         totalIncome: number;
         totalExpense: number;
         netBalance: number;
+        incomeCount: number;
+        expenseCount: number;
       }
     > = {};
 
@@ -81,14 +83,18 @@ export const TransactionsView: React.FC = () => {
           totalIncome: 0,
           totalExpense: 0,
           netBalance: 0,
+          incomeCount: 0,
+          expenseCount: 0,
         };
       }
 
       groups[monthKey].transactions.push(tx);
       if (tx.type === 'income') {
         groups[monthKey].totalIncome += tx.amount;
+        groups[monthKey].incomeCount += 1;
       } else {
         groups[monthKey].totalExpense += tx.amount;
+        groups[monthKey].expenseCount += 1;
       }
       groups[monthKey].netBalance = groups[monthKey].totalIncome - groups[monthKey].totalExpense;
     });
@@ -283,7 +289,8 @@ export const TransactionsView: React.FC = () => {
                         </span>
                       </div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                        Klik untuk {isExpanded ? 'menutup' : 'melihat'} rincian bulan ini
+                        {group.incomeCount} masuk · {group.expenseCount} keluar — klik untuk{' '}
+                        {isExpanded ? 'menutup' : 'melihat'} rincian bulan ini
                       </p>
                     </div>
                   </div>
@@ -437,6 +444,21 @@ export const TransactionsView: React.FC = () => {
                         </div>
                       );
                     })}
+                    {/* Keterangan total: ringkasan rincian bulan ini agar mudah dicocokkan dengan total header */}
+                    <div className="px-3 sm:px-4 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px]">
+                      <span className="font-semibold text-slate-600 dark:text-slate-300">
+                        Total {group.label}: {group.transactions.length} transaksi
+                      </span>
+                      <span className="tabular-nums text-slate-500 dark:text-slate-400">
+                        <span className="font-bold text-orange-600 dark:text-orange-400">
+                          {group.incomeCount} masuk · +{formatRupiah(group.totalIncome)}
+                        </span>
+                        <span className="mx-1.5 text-slate-300 dark:text-slate-600">|</span>
+                        <span className="font-bold text-red-600 dark:text-red-400">
+                          {group.expenseCount} keluar · -{formatRupiah(group.totalExpense)}
+                        </span>
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>

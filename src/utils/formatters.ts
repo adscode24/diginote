@@ -1,4 +1,4 @@
-import type { TieredPeriod } from '../types';
+import type { TieredPeriod, Transaction, Debt } from '../types';
 
 export function formatRupiah(amount: number, withPrefix = true): string {
   const rounded = Math.round(amount || 0);
@@ -56,6 +56,102 @@ export function getTodayString(): string {
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+/**
+ * Paksa nilai menjadi rupiah bulat (integer >= 0).
+ * Menerima number, string angka ("50000", "Rp 50.000"), desimal, dsb.
+ * Mengembalikan 0 untuk nilai tak valid. Ini garis pertahanan agar
+ * penjumlahan total (`+=`) tidak pernah berubah menjadi gabungan string
+ * dan total header selalu sama dengan jumlah rincian.
+ */
+export function toRupiahInt(v: unknown): number {
+  let n: number;
+  if (typeof v === 'string') {
+    n = Number(normalizeLooseAmount(v));
+  } else {
+    n = Number(v);
+  }
+  if (!isFinite(n) || n <= 0) return 0;
+  return Math.min(Math.round(n), Number.MAX_SAFE_INTEGER);
+}
+
+/** Normalisasi string angka gaya Indonesia ("Rp 1.500.000", "10.000,50") ke bentuk parseable. */
+function normalizeLooseAmount(s: string): string {
+  const t = s.trim();
+  if (!t) return '';
+  const hasDot = t.includes('.');
+  const hasComma = t.includes(',');
+  let norm = t.replace(/[^0-9.,\-]/g, '');
+  if (hasDot && hasComma) {
+    norm = norm.replace(/\./g, '').replace(',', '.');
+  } else if (hasComma) {
+    norm = /,\d{1,2}$/.test(norm) ? norm.replace(',', '.') : norm.replace(/,/g, '');
+  } else if (hasDot) {
+    if (/(\.\d{3})+$/.test(norm)) norm = norm.replace(/\./g, '');
+  }
+  return norm;
+}
+
+/**
+ * Normalisasi satu transaksi dari sumber tak tepercaya
+ * (localStorage lama, cloud vault, file backup, cermin DigiFuel):
+ * nominal bulat, jenis valid, tanggal valid, timestamp angka.
+ */
+export function sanitizeTransaction<T extends Partial<Transaction> & { id?: string }>(t: T): T {
+  const c = { ...t } as T & Record<string, unknown>;
+  c.amount = toRupiahInt((t as Transaction).amount);
+  const type = (t as Transaction).type;
+  c.type = type === 'income' || type === 'expense' ? type : 'expense';
+  const date = (t as Transaction).date;
+  c.date =
+    typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : getTodayString();
+  const ca = Number((t as Transaction).createdAt);
+  const ua = Number((t as Transaction).updatedAt);
+  c.createdAt = isFinite(ca) && ca > 0 ? ca : Date.now();
+  c.updatedAt = isFinite(ua) && ua > 0 ? ua : Date.now();
+  return c as T;
+}
+
+/** Normalisasi daftar hutang/piutang (nominal pembayaran & pokok bulat). */
+export function sanitizeDebts(list: unknown): Debt[] {
+  if (!Array.isArray(list)) return [];
+  const out: Debt[] = [];
+  for (const raw of list) {
+    if (!raw || typeof raw !== 'object') continue;
+    const d = { ...(raw as Debt) };
+    if (typeof d.id !== 'string' || !d.id) continue;
+    d.totalAmount = toRupiahInt(d.totalAmount);
+    d.remainingAmount = toRupiahInt(d.remainingAmount);
+    if (d.monthlyInstallment !== undefined) {
+      d.monthlyInstallment = toRupiahInt(d.monthlyInstallment);
+    }
+    if (Array.isArray(d.payments)) {
+      d.payments = d.payments.map(p => ({ ...p, amount: toRupiahInt(p.amount) }));
+    }
+    if (Array.isArray(d.tieredPeriods)) {
+      d.tieredPeriods = d.tieredPeriods.map(tp => ({
+        ...tp,
+        monthlyAmount: toRupiahInt(tp.monthlyAmount),
+        durationMonths: Math.max(0, Math.floor(Number(tp.durationMonths) || 0)),
+      }));
+    }
+    out.push(d);
+  }
+  return out;
+}
+
+/** Normalisasi daftar transaksi (saring entri rusak, tanpa id dibuang). */
+export function sanitizeTransactions(list: unknown): Transaction[] {
+  if (!Array.isArray(list)) return [];
+  const out: Transaction[] = [];
+  for (const raw of list) {
+    if (!raw || typeof raw !== 'object') continue;
+    const t = raw as Partial<Transaction> & { id?: unknown };
+    if (typeof t.id !== 'string' || !t.id) continue;
+    out.push(sanitizeTransaction(t as Transaction) as Transaction);
+  }
+  return out;
 }
 
 export interface DueDateStatus {

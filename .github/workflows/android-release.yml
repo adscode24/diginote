@@ -93,7 +93,29 @@ jobs:
         working-directory: android
         run: |
           $ANDROID_HOME/build-tools/35.0.0/apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk | head -5
-          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --print-certs --in-bundle app/build/outputs/bundle/release/app-release.aab | head -5
+          java -jar /tmp/bundletool.jar validate --bundle app/build/outputs/bundle/release/app-release.aab
+
+      - name: Build universal APK from AAB (Play-identical, ikon lengkap)
+        working-directory: android
+        run: |
+          curl -sSL -o /tmp/bundletool.jar https://github.com/google/bundletool/releases/download/1.18.0/bundletool-all-1.18.0.jar
+          java -jar /tmp/bundletool.jar validate --bundle app/build/outputs/bundle/release/app-release.aab
+          java -jar /tmp/bundletool.jar build-apks \
+            --bundle app/build/outputs/bundle/release/app-release.aab \
+            --output /tmp/app-release.apks \
+            --mode=universal \
+            --ks app/upload-keystore.jks \
+            --ks-pass:env KEYSTORE_PASSWORD \
+            --ks-key-alias "$KEY_ALIAS" \
+            --key-pass:env KEY_PASSWORD
+          rm -rf /tmp/universal-apk && mkdir -p /tmp/universal-apk
+          unzip -o -j /tmp/app-release.apks universal.apk -d /tmp/universal-apk
+          cp /tmp/universal-apk/universal.apk app/build/outputs/apk/release/app-release.apk
+          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk | head -5
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4

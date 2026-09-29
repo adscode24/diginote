@@ -99,14 +99,18 @@ jobs:
         run: |
           curl -sSL -o /tmp/bundletool.jar https://github.com/google/bundletool/releases/download/1.18.0/bundletool-all-1.18.0.jar
           java -jar /tmp/bundletool.jar validate --bundle app/build/outputs/bundle/release/app-release.aab
+          printf '%s' "$KEYSTORE_PASSWORD" > /tmp/ks-pass.txt
+          printf '%s' "$KEY_PASSWORD" > /tmp/key-pass.txt
+          chmod 600 /tmp/ks-pass.txt /tmp/key-pass.txt
           java -jar /tmp/bundletool.jar build-apks \
             --bundle app/build/outputs/bundle/release/app-release.aab \
             --output /tmp/app-release.apks \
             --mode=universal \
             --ks app/upload-keystore.jks \
-            --ks-pass:env KEYSTORE_PASSWORD \
-            --ks-key-alias "$KEY_ALIAS" \
-            --key-pass:env KEY_PASSWORD
+            --ks-pass=file:/tmp/ks-pass.txt \
+            --ks-key-alias="$KEY_ALIAS" \
+            --key-pass=file:/tmp/key-pass.txt
+          shred -u /tmp/ks-pass.txt /tmp/key-pass.txt || rm -f /tmp/ks-pass.txt /tmp/key-pass.txt
           rm -rf /tmp/universal-apk && mkdir -p /tmp/universal-apk
           unzip -o -j /tmp/app-release.apks universal.apk -d /tmp/universal-apk
           cp /tmp/universal-apk/universal.apk app/build/outputs/apk/release/app-release.apk

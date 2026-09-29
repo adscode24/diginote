@@ -21,7 +21,9 @@ import { SettingsView } from './components/SettingsView';
 import { AuthView } from './components/AuthView';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { PullToRefresh } from './components/PullToRefresh';
-import { ToastProvider } from './components/Toast';
+import { ToastProvider, useToast } from './components/Toast';
+import { TransactionModal } from './components/TransactionModal';
+import { consumeSharedTransaction, SharedTransactionPrefill } from './services/shareIntent';
 import { forceUnlockBodyScroll } from './hooks/useBodyScrollLock';
 
 import { ProfileView } from './components/ProfileView';
@@ -45,8 +47,43 @@ const ThemeToggleButton: React.FC = () => {
 function MainApp() {
   const { currentUser } = useAuth();
   const { pullFromVaultNow } = useFinance();
+  const { pushToast } = useToast();
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const [sharedPrefill, setSharedPrefill] = useState<SharedTransactionPrefill | null>(null);
+  const [sharedKey, setSharedKey] = useState(0);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const profileInitial = ((currentUser?.name || 'D').trim()[0] || 'D').toUpperCase();
+
+  // Terima share gambar/teks dari aplikasi lain (otomatisasi input masuk/keluar):
+  // cek saat aplikasi dibuka + setiap kembali dari luar (resume/fokus tab).
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const data = await consumeSharedTransaction();
+        if (!cancelled && data && (data.amount > 0 || data.receiptImage || data.rawText)) {
+          setSharedPrefill(data);
+          setSharedKey(k => k + 1);
+          setIsShareModalOpen(true);
+          setActiveTab('transactions');
+          pushToast('Bukti transaksi diterima — periksa lalu simpan.');
+        }
+      } catch {
+        /* abaikan: share opsional, jangan ganggu aplikasi */
+      }
+    };
+    check();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') check();
+    };
+    window.addEventListener('focus', check);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', check);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [pushToast]);
 
   // Penyembuhan otomatis: tidak ada modal yang bisa terbuka saat pindah halaman,
   // jadi paksa buka kunci scroll di sini agar halaman tak pernah macet.
@@ -279,6 +316,19 @@ function MainApp() {
           </div>
         </div>
       </nav>
+
+      {/* Modal otomatis dari share gambar/teks luar (hasil OCR + prefill) */}
+      <TransactionModal
+        isOpen={isShareModalOpen}
+        onClose={() => {
+          setIsShareModalOpen(false);
+          setSharedPrefill(null);
+        }}
+        initialType={sharedPrefill?.type || 'expense'}
+        initialDate={sharedPrefill?.date}
+        prefill={sharedPrefill}
+        prefillKey={sharedKey}
+      />
     </div>
   );
 }

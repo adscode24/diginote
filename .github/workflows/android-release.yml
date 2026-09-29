@@ -60,6 +60,9 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      - name: Apply DigiNote share patch (Share Target + OCR)
+        run: node scripts/android-share-patch.cjs
+
       - name: Restore upload keystore
         run: |
           echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks

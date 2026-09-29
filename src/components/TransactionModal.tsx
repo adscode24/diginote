@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, Settings2, Upload, Trash2, Wallet, Plus, ChevronDown } from 'lucide-react';
 import { Transaction, TransactionType, PaymentMethod } from '../types';
+import { SharedTransactionPrefill } from '../services/shareIntent';
 import { useFinance } from '../context/FinanceContext';
 import { PAYMENT_METHODS } from '../utils/constants';
 import { getTodayString, formatRupiah } from '../utils/formatters';
@@ -16,6 +17,8 @@ interface TransactionModalProps {
   initialType?: TransactionType;
   initialDate?: string;
   transactionToEdit?: Transaction | null;
+  prefill?: SharedTransactionPrefill | null;
+  prefillKey?: number;
 }
 
 export const TransactionModal: React.FC<TransactionModalProps> = ({
@@ -24,6 +27,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   initialType = 'expense',
   initialDate,
   transactionToEdit,
+  prefill = null,
+  prefillKey = 0,
 }) => {
   const { categories, accounts, addTransaction, updateTransaction } = useFinance();
   const { pushToast } = useToast();
@@ -52,6 +57,26 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setDescription(transactionToEdit.description);
       setPaymentMethod(transactionToEdit.paymentMethod);
       setReceiptImage(transactionToEdit.receiptUrl);
+    } else if (prefill) {
+      // Prefill dari hasil share gambar/teks (OCR): nominal, jenis, tanggal,
+      // keterangan, dan bukti foto terisi otomatis — pengguna tinggal simpan.
+      setType(prefill.type);
+      setAmountStr(prefill.amount > 0 ? String(prefill.amount) : '');
+      setDate(prefill.date || initialDate || getTodayString());
+      setDescription(prefill.description || '');
+      setAccountId(accounts[0]?.id || '');
+      setPaymentMethod('transfer');
+      setReceiptImage(prefill.receiptImage);
+      if (prefill.categoryHint) {
+        const match = categories.find(
+          c =>
+            c.type === prefill.type &&
+            (c.name.toLowerCase() === prefill.categoryHint.toLowerCase() ||
+              c.name.toLowerCase().includes(prefill.categoryHint.toLowerCase()) ||
+              prefill.categoryHint.toLowerCase().includes(c.name.toLowerCase())),
+        );
+        if (match) setCategoryId(match.id);
+      }
     } else {
       setType(initialType);
       setAmountStr('');
@@ -62,7 +87,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setReceiptImage(undefined);
     }
     setError('');
-  }, [transactionToEdit, initialType, initialDate, isOpen, accounts]);
+  }, [transactionToEdit, prefill, prefillKey, initialType, initialDate, isOpen, accounts]);
 
   // Dynamically filter categories matching the selected transaction type
   const availableCategories = categories.filter(c => c.type === type);

@@ -557,17 +557,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                     <span className="text-sm font-bold text-slate-900 dark:text-white truncate">
                       {bill.name}
                     </span>
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                        bill.showCountdown
-                          ? bill.statusInfo.isOverdue
-                            ? 'bg-red-100 text-red-700 dark:bg-red-950/80 dark:text-red-300'
-                            : 'bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300'
-                          : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
-                      }`}
-                    >
-                      {bill.badgeLabel}
-                    </span>
                   </div>
                   <div className="text-xs text-slate-600 dark:text-slate-300 mt-1">
                     <strong className="tabular-nums">{formatRupiah(bill.amount)}</strong>
@@ -646,17 +635,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                               {debt.installmentCategory === 'tiered_installment' ? 'KPR / Berjangka' : 'Cicilan Tetap'}
                             </span>
                           )}
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                              status.isOverdue
-                                ? 'bg-red-100 text-red-700 dark:bg-red-950/80 dark:text-red-300'
-                                : status.isDueSoon
-                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300'
-                                : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
-                            }`}
-                          >
-                            {status.label}
-                          </span>
                         </div>
 
                         {debt.monthlyInstallment && debt.monthlyInstallment > 0 ? (

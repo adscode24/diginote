@@ -113,6 +113,12 @@ export function sanitizeTransaction<T extends Partial<Transaction> & { id?: stri
   return c as T;
 }
 
+/** Buang transaksi cerminan DigiFuel (fitur dihentikan): tak pernah disimpan/dimuat lagi. */
+export function stripDigifuelMirror(list: Transaction[]): Transaction[] {
+  if (!Array.isArray(list)) return [];
+  return list.filter(t => t && t.sourceType !== 'digifuel');
+}
+
 /** Normalisasi daftar hutang/piutang (nominal pembayaran & pokok bulat). */
 export function sanitizeDebts(list: unknown): Debt[] {
   if (!Array.isArray(list)) return [];

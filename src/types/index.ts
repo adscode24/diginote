@@ -42,7 +42,7 @@ export interface Transaction {
   receiptUrl?: string; // base64 or image url
   createdAt: number;
   updatedAt: number;
-  sourceType?: string; // mis. 'digifuel' untuk transaksi cerminan otomatis
+  sourceType?: string; // asal transaksi (mis. 'digifuel' warisan, sudah tidak dipakai)
   sourceId?: string; // id unik sumber (mis. 'fuel:<id>' / 'svc:<id>')
 }
 

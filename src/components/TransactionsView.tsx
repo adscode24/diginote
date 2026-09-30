@@ -368,11 +368,6 @@ export const TransactionsView: React.FC = () => {
                                     Hutang
                                   </span>
                                 )}
-                                {tx.sourceType === 'digifuel' && (
-                                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-orange-50 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300">
-                                    DigiFuel
-                                  </span>
-                                )}
                               </div>
 
                               <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">

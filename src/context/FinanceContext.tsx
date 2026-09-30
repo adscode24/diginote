@@ -14,7 +14,7 @@ import {
   ThemeMode,
 } from '../types';
 import { ALL_DEFAULT_CATEGORIES } from '../utils/constants';
-import { getTodayString, calculatePayoffDate, getNextDueDate, getActiveTierRate, calculateTieredPayment, TieredPaymentResult, toRupiahInt, sanitizeTransactions, sanitizeDebts } from '../utils/formatters';
+import { getTodayString, calculatePayoffDate, getNextDueDate, getActiveTierRate, calculateTieredPayment, TieredPaymentResult, toRupiahInt, sanitizeTransactions, sanitizeDebts, stripDigifuelMirror } from '../utils/formatters';
 import { generateVaultId, hashPassphrase } from '../services/crypto';
 import { sendSyncNotification } from '../services/notifications';
 import { exportEncryptedBackup, importEncryptedBackup, type SyncPayload } from '../services/sync';
@@ -28,12 +28,6 @@ import {
   type VaultPayload,
   type VaultOwner,
 } from '../services/cloudSync';
-import {
-  getDigifuelLink,
-  fetchDigifuelVault,
-  persistDigifuelLink,
-  subscribeDigifuelVault,
-} from '../services/digifuel';
 
 interface FinanceContextType {
   transactions: Transaction[];
@@ -93,9 +87,6 @@ interface FinanceContextType {
   payBill: (billId: string, payment: { monthKey: string; amount: number; accountId?: string; categoryId: string; paymentDate: string }) => BillPayment;
   deleteBillPayment: (paymentId: string) => void;
 
-  // Integrasi DigiFuel (cermin satu arah -> transaksi keluar)
-  pullDigifuelNow: () => Promise<{ mirrored: number; removed: number; diag: string }>;
-
   // Settings & Theme
   setThemeMode: (mode: ThemeMode) => void;
   updateReminderSettings: (settings: Partial<ReminderSettings>) => void;
@@ -104,7 +95,6 @@ interface FinanceContextType {
   // Cloud Sync & Backup
   exportBackupFile: (passphrase: string) => Promise<void>;
   importBackupFile: (file: File, passphrase: string) => Promise<boolean>;
-  resetToDefaultData: () => void;
   clearAllData: () => void;
 }
 
@@ -230,7 +220,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     try {
       const stored = readStoredKey(STORAGE_KEYS.TRANSACTIONS, LEGACY_GLOBAL_KEYS.TRANSACTIONS, LEGACY_STORAGE_KEYS.TRANSACTIONS);
-      if (stored) return sanitizeTransactions(JSON.parse(stored));
+      if (stored) return stripDigifuelMirror(sanitizeTransactions(JSON.parse(stored)));
     } catch (e) {
       console.error(e);
     }
@@ -361,12 +351,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     );
     if (Array.isArray(vault.transactions)) {
       setTransactions(
-        sanitizeTransactions(
-          vault.transactions.map(t => {
-            const local = localTxById.get(t.id);
-            if (local?.receiptUrl && !t.receiptUrl) return { ...t, receiptUrl: local.receiptUrl };
-            return t;
-          })
+        stripDigifuelMirror(
+          sanitizeTransactions(
+            vault.transactions.map(t => {
+              const local = localTxById.get(t.id);
+              if (local?.receiptUrl && !t.receiptUrl) return { ...t, receiptUrl: local.receiptUrl };
+              return t;
+            })
+          )
         )
       );
     }
@@ -404,7 +396,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
         return undefined;
       };
       const data: VaultPayload = {
-        transactions: pick<Transaction[]>('transactions_v2') ?? [],
+        transactions: stripDigifuelMirror(pick<Transaction[]>('transactions_v2') ?? []),
         categories: pick<Category[]>('categories_v2') ?? [],
         accounts: pick<Account[]>('accounts_v2') ?? [],
         debts: pick<Debt[]>('debts_v2') ?? [],
@@ -467,7 +459,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
           reminderSettings,
         };
         if (legacy) {
-          if (legacy.transactions.length > 0) setTransactions(sanitizeTransactions(legacy.transactions));
+          if (legacy.transactions.length > 0) setTransactions(stripDigifuelMirror(sanitizeTransactions(legacy.transactions)));
           if (legacy.categories.length > 0) setCategories(legacy.categories);
           if (legacy.accounts.length > 0) setAccounts(legacy.accounts);
           if (legacy.debts.length > 0) setDebts(sanitizeDebts(legacy.debts));
@@ -481,8 +473,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
         setCloudVaultId(vault.vaultCode || '');
         setLastSyncedAt(Date.now());
 
-        // Otomatis tersinkron ke data terbaru setiap buka aplikasi:
-        // bila cloud lebih baru dari terakhir yang kita selaraskan, pakai cloud.
+        // Sinkronisasi saat masuk aplikasi: selalu konvergen ke data terbaru.
+        // - Cloud lebih baru (atau lokal kosong) -> pakai cloud, tampilkan terbaru.
+        // - Lokal lebih baru (ada perubahan offline yg belum terkirim) -> dorong lokal ke cloud.
         const storedBase = getStoredBase();
         const localEmpty =
           localSnapshot.transactions.length === 0 &&
@@ -495,15 +488,27 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
           vault.debts.length > 0 ||
           vault.bills.length > 0 ||
           vault.billPayments.length > 0;
-        if (cloudHasData && (localEmpty || (vault.updatedAt && vault.updatedAt > storedBase))) {
+        const vaultTime = vault.updatedAt || '';
+        if (cloudHasData && (localEmpty || (vaultTime && vaultTime > storedBase))) {
           justAppliedRef.current = true;
           applyCloudVault(vault);
-          persistBase(vault.updatedAt || '');
+          persistBase(vaultTime);
           if (!localEmpty) {
             setSyncNotice({ text: 'Data terbaru dari cloud dimuat.', action: null });
           }
+        } else if (!localEmpty && storedBase && (!vaultTime || storedBase > vaultTime)) {
+          // Perangkat ini menyimpan perubahan yang belum ada di cloud -> kirim sekarang
+          try {
+            const updatedAt = await pushVault(owner, vault.vaultCode || '', localSnapshot);
+            persistBase(updatedAt);
+            setLastSyncedAt(Date.now());
+            setSyncNotice({ text: 'Perubahan offline dikirim ke cloud.', action: null });
+          } catch (pushErr) {
+            console.error(pushErr);
+            persistBase(vaultTime || storedBase);
+          }
         } else {
-          persistBase(vault.updatedAt || storedBase);
+          persistBase(vaultTime || storedBase);
         }
 
         setSyncStatus(navigator.onLine ? 'synced' : 'offline');
@@ -598,8 +603,16 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
 
   const clearSyncNotice = () => setSyncNotice(null);
 
+  // Notifikasi dashboard hilang otomatis tanpa perlu diklik (X tetap tersedia).
+  useEffect(() => {
+    if (!syncNotice) return;
+    const timer = setTimeout(() => setSyncNotice(null), 6000);
+    return () => clearTimeout(timer);
+  }, [syncNotice]);
+
   // Otomatis menyimpan ke cloud setiap ada data baru (debounced, pola Fuel-Traxr).
   // Aman dari freeze: payload terstruktur kecil (tanpa foto), tanpa listener realtime.
+  // Jeda 800ms agar "selesai simpan -> langsung tersinkron" terasa seketika.
   useEffect(() => {
     if (!cloudEnabled || !isCloudCapableUid(userId)) return;
     if (!cloudVaultId) return;
@@ -643,7 +656,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
           setSyncErrorMsg(msg);
         }
       }
-    }, 1500);
+    }, 800);
     return () => {
       if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
     };
@@ -1374,201 +1387,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
 
   const updateReminderSettings = (settings: Partial<ReminderSettings>) => {
     setReminderSettings(prev => ({ ...prev, ...settings }));
-  };
-
-  /**
-   * Cermin DigiFuel -> DigiNote (satu arah): catatan bensin & biaya di DigiFuel
-   * menjadi transaksi keluar di DigiNote. Idempoten via sourceId; data yang
-   * dihapus di DigiFuel ikut dibersihkan. Akun pilihan pengguna dipertahankan
-   * (hanya dipakai saat pembuatan).
-   */
-  const lastDigifuelAtRef = React.useRef<string>('');
-
-  /**
-   * Inti pencerminan DigiFuel -> transaksi keluar (dipakai tarik manual & auto-realtime).
-   * Mengembalikan {mirrored, removed, diag}.
-   */
-  const applyDigifuelVault = (
-    vault: import('../services/digifuel').DigifuelVault,
-    linkAccountId?: string
-  ): { mirrored: number; removed: number; diag: string } => {
-    const fuelTotal = (vault.fuelRecords || []).length;
-    const svcTotal = (vault.serviceHistory || []).length;
-
-    const vehicleName = new Map((vault.vehicles || []).map(v => [v.id, v.name]));
-    const expenseCats = categories.filter(c => c.type === 'expense');
-    const fuelCat =
-      expenseCats.find(c => c.id === 'cat_transport') ||
-      expenseCats.find(c => c.id === 'cat_other_exp') ||
-      expenseCats[0];
-    if (!fuelCat) throw new Error('Tidak ada kategori pengeluaran di DigiNote.');
-    const mappedAccount = accounts.find(a => a.id === linkAccountId);
-    const targetAccount = mappedAccount || accounts.find(a => a.type === 'bank' || a.type === 'cash' || a.type === 'ewallet') || accounts[0];
-
-    let mirrored = 0;
-    const seenSourceIds = new Set<string>();
-    const upserts: Transaction[] = [];
-
-    for (const r of vault.fuelRecords || []) {
-      if (!toRupiahInt(r.totalCost)) continue;
-      const sourceId = `fuel:${r.id}`;
-      seenSourceIds.add(sourceId);
-      const existing = transactions.find(t => t.sourceType === 'digifuel' && t.sourceId === sourceId);
-      const vName = vehicleName.get(r.vehicleId) || '';
-      const base = {
-        type: 'expense' as const,
-        amount: toRupiahInt(r.totalCost),
-        categoryId: fuelCat.id,
-        categoryName: fuelCat.name,
-        date: r.date,
-        description: `BBM ${vName ? vName + ' · ' : ''}${r.liters}L ${r.fuelType}${r.stationName ? ` · ${r.stationName}` : ''}`.trim(),
-        paymentMethod: 'transfer' as const,
-        sourceType: 'digifuel',
-        sourceId,
-        createdAt: existing?.createdAt || Date.now(),
-        updatedAt: Date.now(),
-      };
-      if (existing) {
-        // Mirror menang untuk isi, tapi akun pilihan pengguna dipertahankan
-        upserts.push({ ...existing, ...base, id: existing.id, accountId: existing.accountId, accountName: existing.accountName });
-      } else {
-        upserts.push({
-          ...base,
-          id: `tx_dfuel_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`,
-          accountId: targetAccount?.id,
-          accountName: targetAccount?.name,
-        });
-        mirrored++;
-      }
-    }
-
-    for (const s of vault.serviceHistory || []) {
-      if (!toRupiahInt(s.cost)) continue;
-      const sourceId = `svc:${s.id}`;
-      seenSourceIds.add(sourceId);
-      const existing = transactions.find(t => t.sourceType === 'digifuel' && t.sourceId === sourceId);
-      const vName = vehicleName.get(s.vehicleId) || '';
-      const base = {
-        type: 'expense' as const,
-        amount: toRupiahInt(s.cost),
-        categoryId: fuelCat.id,
-        categoryName: fuelCat.name,
-        date: s.date,
-        description: `Servis ${vName ? vName + ' · ' : ''}${s.title}${s.workshop ? ` · ${s.workshop}` : ''}`.trim(),
-        paymentMethod: 'transfer' as const,
-        sourceType: 'digifuel',
-        sourceId,
-        createdAt: existing?.createdAt || Date.now(),
-        updatedAt: Date.now(),
-      };
-      if (existing) {
-        upserts.push({ ...existing, ...base, id: existing.id, accountId: existing.accountId, accountName: existing.accountName });
-      } else {
-        upserts.push({
-          ...base,
-          id: `tx_dfuel_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`,
-          accountId: targetAccount?.id,
-          accountName: targetAccount?.name,
-        });
-        mirrored++;
-      }
-    }
-
-    // Terapkan upsert + prune cerminan yang sumbernya sudah tidak ada
-    const removed = transactions.filter(
-      t => t.sourceType === 'digifuel' && t.sourceId && !seenSourceIds.has(t.sourceId)
-    ).length;
-    setTransactions(prev => {
-      const kept = prev.filter(
-        t => t.sourceType !== 'digifuel' || !t.sourceId || seenSourceIds.has(t.sourceId)
-      );
-      const byId = new Map(kept.map(t => [t.id, t]));
-      for (const u of upserts) byId.set(u.id, u);
-      return [...byId.values()].sort((a, b) => {
-        const d = b.date.localeCompare(a.date);
-        return d !== 0 ? d : (b.createdAt || 0) - (a.createdAt || 0);
-      });
-    });
-
-    const fuelQualified = (vault.fuelRecords || []).filter(r => r.totalCost && r.totalCost > 0).length;
-    const svcQualified = (vault.serviceHistory || []).filter(s => s.cost && s.cost > 0).length;
-    const diag =
-      `Vault: ${fuelTotal} bensin (${fuelQualified} bernominal), ` +
-      `${svcTotal} servis (${svcQualified} berbiaya).`;
-    return { mirrored, removed, diag };
-  };
-
-  const pullDigifuelNow = async (): Promise<{
-    mirrored: number;
-    removed: number;
-    diag: string;
-  }> => {
-    const link = getDigifuelLink(userId);
-    if (!link) throw new Error('Hubungkan akun DigiFuel dulu di Pengaturan.');
-    const vault = await fetchDigifuelVault(link.email);
-    if (!vault) {
-      throw new Error(
-        'Vault DigiFuel tidak ditemukan untuk email ini. Pastikan Anda pernah login di aplikasi DigiFuel (bukan mode tamu) dan Rules sudah di-publish.'
-      );
-    }
-    const res = applyDigifuelVault(vault, link.accountId);
-    persistDigifuelLink(userId, { lastPulledAt: Date.now(), mirroredCount: res.mirrored });
-    lastDigifuelAtRef.current = vault.updatedAt || '';
-    return res;
-  };
-
-  // Realtime DigiFuel: setiap ada catatan bensin/biaya baru di cloud,
-  // otomatis tercermin di DigiNote (debounced, tanpa perlu aplikasi DigiFuel).
-  // Tombol "Tarik dari DigiFuel" tetap ada untuk penarikan manual paksa.
-  useEffect(() => {
-    const link = getDigifuelLink(userId);
-    if (!link) return;
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    let unsub: (() => void) | null = null;
-    try {
-      unsub = subscribeDigifuelVault(
-        link.email,
-        vault => {
-          if (cancelled || !vault) return;
-          if (vault.updatedAt && vault.updatedAt === lastDigifuelAtRef.current) return;
-          if (timer) clearTimeout(timer);
-          timer = setTimeout(() => {
-            timer = null;
-            if (cancelled) return;
-            try {
-              const freshLink = getDigifuelLink(userId);
-              const res = applyDigifuelVault(vault, freshLink?.accountId);
-              lastDigifuelAtRef.current = vault.updatedAt || '';
-              persistDigifuelLink(userId, {
-                lastPulledAt: Date.now(),
-                mirroredCount: res.mirrored,
-              });
-              if (res.mirrored > 0) {
-                setSyncNotice({
-                  text: `DigiFuel: ${res.mirrored} catatan baru masuk sebagai pengeluaran.`,
-                  action: null,
-                });
-              }
-            } catch (e) {
-              console.error(e);
-            }
-          }, 2000);
-        },
-        err => console.error('DigiFuel subscribe error:', err)
-      );
-    } catch (e) {
-      console.error(e);
-    }
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-      if (unsub) unsub();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
-
-  const updateSyncSettings = (settings: Partial<SyncSettings>) => {
+  };const updateSyncSettings = (settings: Partial<SyncSettings>) => {
     setSyncSettings(prev => ({ ...prev, ...settings }));
   };
 
@@ -1589,7 +1408,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
   const importBackupFile = async (file: File, passphrase: string): Promise<boolean> => {
     const data = await importEncryptedBackup(file, passphrase);
     const ext = data as SyncPayload & { bills?: Bill[]; billPayments?: BillPayment[] };
-    if (Array.isArray(data.transactions)) setTransactions(sanitizeTransactions(data.transactions));
+    if (Array.isArray(data.transactions)) setTransactions(stripDigifuelMirror(sanitizeTransactions(data.transactions)));
     if (Array.isArray(data.categories)) setCategories(data.categories as Category[]);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (Array.isArray((data as any).accounts)) setAccounts((data as any).accounts as Account[]);
@@ -1598,17 +1417,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     if (Array.isArray(ext.billPayments)) setBillPayments(ext.billPayments as BillPayment[]);
     if (data.reminderSettings) setReminderSettings(data.reminderSettings as ReminderSettings);
     return true;
-  };
-
-  const resetToDefaultData = () => {
-    // Mulai dari awal: tanpa data contoh, tanpa sumber dana bawaan.
-    // Kategori bawaan tetap dipertahankan sebagai master.
-    setCategories([...ALL_DEFAULT_CATEGORIES]);
-    setAccounts([]);
-    setTransactions([]);
-    setDebts([]);
-    setBills([]);
-    setBillPayments([]);
   };
 
   const clearAllData = () => {
@@ -1663,13 +1471,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
         deleteBill,
         payBill,
         deleteBillPayment,
-        pullDigifuelNow,
         setThemeMode,
         updateReminderSettings,
         updateSyncSettings,
         exportBackupFile,
         importBackupFile,
-        resetToDefaultData,
         clearAllData,
         syncStatus,
         lastSyncedAt,

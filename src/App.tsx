@@ -256,9 +256,9 @@ function MainApp() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col antialiased selection:bg-orange-500/20 selection:text-orange-600">
+    <div className="min-h-screen bg-cream dark:bg-slate-950 text-ink dark:text-slate-100 flex flex-col antialiased selection:bg-orange-500/20 selection:text-orange-600">
       {/* Clean Header */}
-      <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80">
+      <header className="sticky top-0 z-30 bg-cream/85 dark:bg-slate-900/80 backdrop-blur-md border-b border-sand dark:border-slate-800/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
           {/* Brand: Logo Vektor DigiNote */}
           <div className="flex items-center gap-2.5">
@@ -338,7 +338,7 @@ function MainApp() {
           navTouchId.current = null;
           setTouchTab(null);
         }}
-        className="fixed bottom-4 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[480px] z-40 rounded-[28px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl backdrop-saturate-150 border border-white/50 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.45)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.08)] overflow-hidden"
+        className="fixed bottom-4 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[480px] z-40 rounded-[28px] bg-white/75 dark:bg-slate-900/60 backdrop-blur-2xl backdrop-saturate-150 border border-sand dark:border-white/10 shadow-[0_8px_32px_rgba(120,90,40,0.18),inset_0_1px_0_rgba(255,255,255,0.6)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.08)] overflow-hidden"
       >
         {/* Sorotan kaca mengikuti kursor/sentuhan */}
         <span
@@ -354,7 +354,7 @@ function MainApp() {
             {/* Bubble highlight meluncur ke tab aktif */}
             <span
               aria-hidden
-              className="absolute top-1.5 bottom-1.5 rounded-2xl bg-orange-500/15 dark:bg-white/10 border border-orange-500/20 dark:border-white/10 transition-all duration-300 ease-out pointer-events-none"
+              className="absolute top-1.5 bottom-1.5 rounded-2xl bg-orange-500/15 dark:bg-white/10 border border-orange-500/25 dark:border-white/10 transition-all duration-300 ease-out pointer-events-none"
               style={{
                 left: bubble.left,
                 width: bubble.width,

@@ -2,6 +2,17 @@
 
 @custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
 
+@theme {
+  /* Palet krem ala aplikasi keluarga (mode terang) */
+  --color-cream: #faf6ef;
+  --color-cream-deep: #f3ecdf;
+  --color-sand: #e9e0d2;
+  --color-sand-dark: #d9cdb6;
+  --color-ink: #1f1b16;
+  --color-gold: #b9862f;
+  --color-gold-soft: #f0e3c8;
+}
+
 @layer base {
   :root {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;

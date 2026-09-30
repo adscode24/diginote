@@ -3,6 +3,7 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   Calendar,
+  CalendarDays,
   AlertCircle,
   Clock,
   CheckCircle2,
@@ -17,6 +18,11 @@ import {
   Eye,
   EyeOff,
   Plus,
+  Wallet,
+  CreditCard,
+  BarChart3,
+  Settings as SettingsIcon,
+  User,
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { useAuth } from '../context/AuthContext';
@@ -173,8 +179,49 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
         if (dateDiff !== 0) return dateDiff;
         return (b.createdAt || 0) - (a.createdAt || 0);
       })
-      .slice(0, 5);
+      .slice(0, 12);
   }, [transactions]);
+
+  // Kelompokkan transaksi terbaru per hari (gaya daftar keluarga) + total harian
+  const recentByDay = useMemo(() => {
+    const groups: { date: string; items: Transaction[]; net: number }[] = [];
+    for (const tx of recentTransactions) {
+      const g = groups.find(x => x.date === tx.date);
+      if (g) {
+        g.items.push(tx);
+        g.net += tx.type === 'income' ? tx.amount : -tx.amount;
+      } else {
+        groups.push({
+          date: tx.date,
+          items: [tx],
+          net: tx.type === 'income' ? tx.amount : -tx.amount,
+        });
+      }
+    }
+    return groups.slice(0, 4);
+  }, [recentTransactions]);
+
+  const hourNow = new Date().getHours();
+  const greeting =
+    hourNow < 11 ? 'Selamat pagi' : hourNow < 15 ? 'Selamat siang' : hourNow < 19 ? 'Selamat sore' : 'Selamat malam';
+
+  // Menu jalan pintas ala aplikasi keluarga (navigasi ke tab yang sudah ada)
+  const shortcutMenus: {
+    label: string;
+    icon: React.FC<{ className?: string }>;
+    tile: string;
+    ink: string;
+    go: () => void;
+  }[] = [
+    { label: 'Transaksi', icon: Receipt, tile: 'bg-[#fbe3cf] dark:bg-orange-950/60', ink: 'text-orange-700 dark:text-orange-300', go: () => onNavigateTab('transactions') },
+    { label: 'Dana', icon: Wallet, tile: 'bg-[#dce7f5] dark:bg-slate-800', ink: 'text-blue-700 dark:text-blue-300', go: () => onNavigateTab('accounts') },
+    { label: 'Hutang', icon: CreditCard, tile: 'bg-[#f6dcdc] dark:bg-red-950/60', ink: 'text-red-700 dark:text-red-300', go: () => onNavigateTab('debts') },
+    { label: 'Kalender', icon: CalendarDays, tile: 'bg-[#ddebd9] dark:bg-emerald-950/60', ink: 'text-emerald-700 dark:text-emerald-300', go: () => onNavigateTab('summary') },
+    { label: 'Tagihan', icon: BellRing, tile: 'bg-[#f5e8c8] dark:bg-amber-950/60', ink: 'text-amber-700 dark:text-amber-300', go: () => onNavigateTab('debts') },
+    { label: 'Laporan', icon: BarChart3, tile: 'bg-[#e4dff2] dark:bg-violet-950/60', ink: 'text-violet-700 dark:text-violet-300', go: () => onNavigateTab('summary') },
+    { label: 'Pengaturan', icon: SettingsIcon, tile: 'bg-slate-200 dark:bg-slate-800', ink: 'text-slate-600 dark:text-slate-300', go: () => onNavigateTab('settings') },
+    { label: 'Profil', icon: User, tile: 'bg-[#d8ecec] dark:bg-teal-950/60', ink: 'text-teal-700 dark:text-teal-300', go: () => onNavigateTab('profile') },
+  ];
 
   // Tagihan rutin bulan berjalan (read-only di Beranda; kelola di tab Hutang)
   const billCards = useBillCards();
@@ -209,32 +256,69 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
         </div>
       )}
 
-      {/* Kartu Ucapan Selamat Datang */}
-      <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-600 to-amber-700 text-white shadow-sm flex items-center gap-3">
-        <div className="flex items-center gap-3">
+      {/* Hero sapaan ala aplikasi keluarga */}
+      <div className="p-5 rounded-3xl bg-gradient-to-br from-stone-900 via-stone-800 to-orange-950 text-cream shadow-md flex items-center justify-between gap-3 overflow-hidden relative">
+        <div
+          aria-hidden
+          className="absolute -right-12 -top-20 w-52 h-52 rounded-full bg-orange-500/20 pointer-events-none"
+        />
+        <div
+          aria-hidden
+          className="absolute -right-2 top-10 w-28 h-28 rounded-full bg-amber-400/10 pointer-events-none"
+        />
+        <div className="flex items-center gap-3 relative">
           {currentUser?.photoURL && !currentUser.photoURL.startsWith('data:') && !currentUser.photoURL.startsWith('http') ? (
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0 text-2xl shadow-xs">
+            <div className="w-11 h-11 rounded-2xl bg-white/15 flex items-center justify-center shrink-0 text-2xl shadow-xs">
               {currentUser.photoURL}
             </div>
           ) : currentUser?.photoURL ? (
             <img
               src={currentUser.photoURL}
               alt="Foto profil"
-              className="w-10 h-10 rounded-xl object-cover shrink-0 shadow-xs"
+              className="w-11 h-11 rounded-2xl object-cover shrink-0 shadow-xs"
             />
           ) : (
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0 text-lg font-extrabold">
+            <div className="w-11 h-11 rounded-2xl bg-white/15 flex items-center justify-center shrink-0 text-lg font-extrabold">
               {((currentUser?.name || 'D').trim()[0] || 'D').toUpperCase()}
             </div>
           )}
           <div>
-            <h4 className="text-sm font-bold">Selamat Datang, {currentUser?.name || 'Pengguna'}!</h4>
-            <p className="text-xs text-orange-100 mt-0.5">
+            <div className="text-[11px] font-semibold uppercase tracking-widest text-orange-200/90">
               {formatDateIndo(today)}
-              {!hasLoggedToday && reminderSettings.enabled && ' · Belum ada catatan hari ini, yuk catat!'}
+            </div>
+            <h4 className="text-base font-extrabold tracking-tight">
+              {greeting}, {currentUser?.name?.split(' ')[0] || 'Pengguna'}!
+            </h4>
+            <p className="text-xs text-white/70 mt-0.5">
+              {!hasLoggedToday && reminderSettings.enabled
+                ? 'Belum ada catatan hari ini, yuk catat!'
+                : 'Arus kas tercatat rapi hari ini.'}
             </p>
           </div>
         </div>
+        <img src="/icon.svg" alt="" aria-hidden className="w-14 h-14 rounded-2xl shadow-lg relative shrink-0" />
+      </div>
+
+      {/* Menu jalan pintas */}
+      <div className="grid grid-cols-4 gap-2.5">
+        {shortcutMenus.map(item => {
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.label}
+              type="button"
+              onClick={item.go}
+              className="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-white dark:bg-slate-900 border border-sand dark:border-slate-800 shadow-xs hover:border-orange-400 active:scale-95 transition"
+            >
+              <span className={`w-11 h-11 rounded-2xl flex items-center justify-center ${item.tile}`}>
+                <Icon className={`w-5 h-5 ${item.ink}`} />
+              </span>
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 leading-tight text-center">
+                {item.label}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Keuangan Berdua: siapa mencatat bulan ini */}
@@ -751,52 +835,74 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
               </button>
             </div>
 
-            <div className="mt-4 space-y-2.5">
-              {recentTransactions.length === 0 ? (
+            <div className="mt-4 space-y-4">
+              {recentByDay.length === 0 ? (
                 <div className="p-6 text-center text-xs text-slate-400">
                   Belum ada transaksi yang dicatat.
                 </div>
               ) : (
-                recentTransactions.map(tx => {
-                  const cat = categories.find(c => c.id === tx.categoryId);
-                  const isIncome = tx.type === 'income';
-
-                  return (
-                    <div
-                      key={tx.id}
-                      className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition text-xs"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div
-                          className="w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0"
-                          style={{ backgroundColor: cat?.color || (isIncome ? '#10B981' : '#EF4444') }}
-                        >
-                          <CategoryIcon
-                            name={cat?.icon || (isIncome ? 'ArrowDownLeft' : 'ArrowUpRight')}
-                            className="w-4 h-4"
-                          />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="font-semibold text-slate-900 dark:text-white truncate">
-                            {tx.categoryName}
-                          </div>
-                          <div className="text-[10px] text-slate-400 truncate">
-                            {formatDateIndo(tx.date)} · {tx.accountName || tx.paymentMethod}
-                            {tx.authorName && ` · ${tx.authorName.split(' ')[0]}`}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div
-                        className={`font-bold tabular-nums shrink-0 ml-2 ${
-                          isIncome ? 'text-orange-600 dark:text-orange-400' : 'text-slate-900 dark:text-white'
+                recentByDay.map(day => (
+                  <div key={day.date}>
+                    <div className="flex items-center justify-between px-1 mb-1.5">
+                      <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                        {formatDateIndo(day.date)}
+                      </span>
+                      <span
+                        className={`text-[11px] font-bold tabular-nums ${
+                          day.net >= 0
+                            ? 'text-orange-600 dark:text-orange-400'
+                            : 'text-slate-700 dark:text-slate-300'
                         }`}
                       >
-                        {isIncome ? '+' : '-'}{formatRupiah(tx.amount)}
-                      </div>
+                        {day.net >= 0 ? '+' : '-'}
+                        {formatRupiah(day.net)}
+                      </span>
                     </div>
-                  );
-                })
+                    <div className="space-y-2">
+                      {day.items.map(tx => {
+                        const cat = categories.find(c => c.id === tx.categoryId);
+                        const isIncome = tx.type === 'income';
+
+                        return (
+                          <div
+                            key={tx.id}
+                            className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition text-xs"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0"
+                                style={{ backgroundColor: cat?.color || (isIncome ? '#10B981' : '#EF4444') }}
+                              >
+                                <CategoryIcon
+                                  name={cat?.icon || (isIncome ? 'ArrowDownLeft' : 'ArrowUpRight')}
+                                  className="w-4 h-4"
+                                />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-semibold text-slate-900 dark:text-white truncate">
+                                  {tx.categoryName}
+                                </div>
+                                <div className="text-[10px] text-slate-400 truncate">
+                                  {tx.accountName || tx.paymentMethod}
+                                  {tx.authorName && ` · ${tx.authorName.split(' ')[0]}`}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div
+                              className={`font-bold tabular-nums shrink-0 ml-2 ${
+                                isIncome ? 'text-orange-600 dark:text-orange-400' : 'text-slate-900 dark:text-white'
+                              }`}
+                            >
+                              {isIncome ? '+' : '-'}{formatRupiah(tx.amount)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           </div>

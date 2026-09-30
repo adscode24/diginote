@@ -3,7 +3,6 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   Calendar,
-  CalendarDays,
   AlertCircle,
   Clock,
   CheckCircle2,
@@ -18,11 +17,6 @@ import {
   Eye,
   EyeOff,
   Plus,
-  Wallet,
-  CreditCard,
-  BarChart3,
-  Settings as SettingsIcon,
-  User,
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { useAuth } from '../context/AuthContext';
@@ -205,24 +199,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
   const greeting =
     hourNow < 11 ? 'Selamat pagi' : hourNow < 15 ? 'Selamat siang' : hourNow < 19 ? 'Selamat sore' : 'Selamat malam';
 
-  // Menu jalan pintas ala aplikasi keluarga (navigasi ke tab yang sudah ada)
-  const shortcutMenus: {
-    label: string;
-    icon: React.FC<{ className?: string }>;
-    tile: string;
-    ink: string;
-    go: () => void;
-  }[] = [
-    { label: 'Transaksi', icon: Receipt, tile: 'bg-[#fbe3cf] dark:bg-orange-950/60', ink: 'text-orange-700 dark:text-orange-300', go: () => onNavigateTab('transactions') },
-    { label: 'Dana', icon: Wallet, tile: 'bg-[#dce7f5] dark:bg-slate-800', ink: 'text-blue-700 dark:text-blue-300', go: () => onNavigateTab('accounts') },
-    { label: 'Hutang', icon: CreditCard, tile: 'bg-[#f6dcdc] dark:bg-red-950/60', ink: 'text-red-700 dark:text-red-300', go: () => onNavigateTab('debts') },
-    { label: 'Kalender', icon: CalendarDays, tile: 'bg-[#ddebd9] dark:bg-emerald-950/60', ink: 'text-emerald-700 dark:text-emerald-300', go: () => onNavigateTab('summary') },
-    { label: 'Tagihan', icon: BellRing, tile: 'bg-[#f5e8c8] dark:bg-amber-950/60', ink: 'text-amber-700 dark:text-amber-300', go: () => onNavigateTab('debts') },
-    { label: 'Laporan', icon: BarChart3, tile: 'bg-[#e4dff2] dark:bg-violet-950/60', ink: 'text-violet-700 dark:text-violet-300', go: () => onNavigateTab('summary') },
-    { label: 'Pengaturan', icon: SettingsIcon, tile: 'bg-slate-200 dark:bg-slate-800', ink: 'text-slate-600 dark:text-slate-300', go: () => onNavigateTab('settings') },
-    { label: 'Profil', icon: User, tile: 'bg-[#d8ecec] dark:bg-teal-950/60', ink: 'text-teal-700 dark:text-teal-300', go: () => onNavigateTab('profile') },
-  ];
-
   // Tagihan rutin bulan berjalan (read-only di Beranda; kelola di tab Hutang)
   const billCards = useBillCards();
 
@@ -297,28 +273,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
           </div>
         </div>
         <img src="/icon.svg" alt="" aria-hidden className="w-14 h-14 rounded-2xl shadow-lg relative shrink-0" />
-      </div>
-
-      {/* Menu jalan pintas */}
-      <div className="grid grid-cols-4 gap-2.5">
-        {shortcutMenus.map(item => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.label}
-              type="button"
-              onClick={item.go}
-              className="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-white dark:bg-slate-900 border border-sand dark:border-slate-800 shadow-xs hover:border-orange-400 active:scale-95 transition"
-            >
-              <span className={`w-11 h-11 rounded-2xl flex items-center justify-center ${item.tile}`}>
-                <Icon className={`w-5 h-5 ${item.ink}`} />
-              </span>
-              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 leading-tight text-center">
-                {item.label}
-              </span>
-            </button>
-          );
-        })}
       </div>
 
       {/* Keuangan Berdua: siapa mencatat bulan ini */}

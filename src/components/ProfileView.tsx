@@ -12,6 +12,7 @@ import {
   Smartphone,
   Mail,
   User as UserIcon,
+  ChevronDown,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useFinance } from '../context/FinanceContext';
@@ -232,28 +233,31 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack }) => {
           <div className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
             Avatar Karakter
           </div>
-          <div className="grid grid-cols-6 gap-2">
-            {AVATAR_CHOICES.map(emoji => {
-              const selected = photoURL === emoji;
-              return (
-                <button
-                  key={emoji}
-                  onClick={() => handleSelectAvatar(emoji)}
-                  disabled={photoBusy}
-                  className={`aspect-square rounded-2xl text-2xl flex items-center justify-center border-2 transition disabled:opacity-60 ${
-                    selected
-                      ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/40 ring-2 ring-orange-500/30'
-                      : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 hover:border-orange-400'
-                  }`}
-                  title={`Pilih ${emoji}`}
-                >
-                  {emoji}
-                </button>
-              );
-            })}
+          <div className="relative">
+            <select
+              value={photoURL && AVATAR_CHOICES.includes(photoURL) ? photoURL : ''}
+              onChange={e => {
+                if (e.target.value) void handleSelectAvatar(e.target.value);
+              }}
+              disabled={photoBusy}
+              className="w-full appearance-none pl-11 pr-10 py-2.5 text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500 disabled:opacity-60"
+            >
+              <option value="" disabled>
+                {photoURL && AVATAR_CHOICES.includes(photoURL) ? 'Ganti avatar…' : 'Pilih avatar…'}
+              </option>
+              {AVATAR_CHOICES.map(emoji => (
+                <option key={emoji} value={emoji}>
+                  {emoji} {photoURL === emoji ? '(dipakai)' : ''}
+                </option>
+              ))}
+            </select>
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xl pointer-events-none">
+              {photoURL && AVATAR_CHOICES.includes(photoURL) ? photoURL : '🙂'}
+            </span>
+            <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           </div>
           <div className="mt-2 flex items-center justify-between">
-            <span className="text-[11px] text-slate-400">Laki-laki & perempuan tersedia di atas</span>
+            <span className="text-[11px] text-slate-400">Laki-laki & perempuan tersedia di daftar</span>
             {photoURL && !AVATAR_CHOICES.includes(photoURL) && (
               <button onClick={handleRemovePhoto} className="text-[11px] font-semibold text-red-500 hover:underline">
                 Hapus foto lama

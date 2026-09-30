@@ -407,7 +407,7 @@ function GatedApp() {
 
   // Data terisolasi per pengguna login
   return (
-    <FinanceProvider userId={currentUser.id}>
+    <FinanceProvider userId={currentUser.id} authorName={currentUser.name} key={currentUser.id}>
       <MainApp />
     </FinanceProvider>
   );

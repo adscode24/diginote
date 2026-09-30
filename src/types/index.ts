@@ -44,6 +44,8 @@ export interface Transaction {
   updatedAt: number;
   sourceType?: string; // asal transaksi (mis. 'digifuel' warisan, sudah tidak dipakai)
   sourceId?: string; // id unik sumber (mis. 'fuel:<id>' / 'svc:<id>')
+  authorUid?: string; // pencatat (keuangan berdua): uid penulis
+  authorName?: string; // pencatat (keuangan berdua): nama tampilan penulis
 }
 
 export type DebtType = 'payable' | 'receivable'; // payable = Hutang Saya, receivable = Piutang Orang Lain

@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, onSnapshot, deleteDoc } from "firebase/firestore";
 import type {
   Account,
   Bill,
@@ -23,12 +23,20 @@ export interface VaultPayload {
   reminderSettings: ReminderSettings;
 }
 
+export interface VaultMember {
+  uid: string;
+  email?: string | null;
+  name?: string | null;
+}
+
 export interface CloudVault extends VaultPayload {
   ownerEmail: string | null;
   displayName: string | null;
   vaultCode: string;
   updatedAt: string; // ISO string
   schemaVersion: number;
+  members: string[];
+  memberProfiles: VaultMember[];
 }
 
 /** Identitas minimal pemilik vault (dekopling dari tipe firebase User). */
@@ -94,14 +102,23 @@ export function generateVaultCode(): string {
   return `DN-${suffix}`;
 }
 
-function vaultDocRef(uid: string) {
-  return doc(db, VAULT_COLLECTION, uid);
+function vaultDocRef(docId: string) {
+  return doc(db, VAULT_COLLECTION, docId);
+}
+
+function inviteDocRef(code: string) {
+  return doc(db, "vaultInvites", code.trim().toUpperCase());
 }
 
 /** Ambil vault sekali (untuk tarik manual paksa). */
 export async function fetchVault(uid: string): Promise<CloudVault | null> {
+  return fetchVaultById(uid);
+}
+
+/** Ambil vault berdasarkan ID dokumen (pribadi = uid sendiri, berdua = uid pemilik). */
+export async function fetchVaultById(docId: string): Promise<CloudVault | null> {
   try {
-    const snap = await getDoc(vaultDocRef(uid));
+    const snap = await getDoc(vaultDocRef(docId));
     if (!snap.exists()) return null;
     const data = snap.data() as Partial<CloudVault>;
     return {
@@ -117,6 +134,8 @@ export async function fetchVault(uid: string): Promise<CloudVault | null> {
       vaultCode: (data.vaultCode as string) ?? "",
       updatedAt: (data.updatedAt as string) ?? new Date(0).toISOString(),
       schemaVersion: (data.schemaVersion as number) ?? VAULT_SCHEMA_VERSION,
+      members: Array.isArray(data.members) ? (data.members as string[]) : [],
+      memberProfiles: Array.isArray(data.memberProfiles) ? (data.memberProfiles as VaultMember[]) : [],
     };
   } catch (err) {
     throw toFriendlyError(err);
@@ -153,10 +172,11 @@ function toFriendlyError(err: unknown): CloudSyncError {
  */
 export async function ensureUserVault(
   user: VaultOwner,
-  initialLocal?: VaultPayload
+  initialLocal?: VaultPayload,
+  docId?: string
 ): Promise<CloudVault> {
   try {
-    const ref = vaultDocRef(user.uid);
+    const ref = vaultDocRef(docId || user.uid);
     const snap = await getDoc(ref);
     if (snap.exists()) {
       const data = snap.data() as Partial<CloudVault>;
@@ -186,6 +206,8 @@ export async function ensureUserVault(
           vaultCode,
           updatedAt: (data.updatedAt as string) ?? new Date().toISOString(),
           schemaVersion: VAULT_SCHEMA_VERSION,
+          members: Array.isArray(data.members) ? (data.members as string[]) : [],
+          memberProfiles: Array.isArray(data.memberProfiles) ? (data.memberProfiles as VaultMember[]) : [],
         };
       }
       return {
@@ -201,6 +223,8 @@ export async function ensureUserVault(
         vaultCode: data.vaultCode as string,
         updatedAt: (data.updatedAt as string) ?? new Date().toISOString(),
         schemaVersion: VAULT_SCHEMA_VERSION,
+        members: Array.isArray(data.members) ? (data.members as string[]) : [],
+        memberProfiles: Array.isArray(data.memberProfiles) ? (data.memberProfiles as VaultMember[]) : [],
       };
     }
     // Belum ada -> buat baru, bawa data lokal HP pertama jika ada
@@ -220,6 +244,8 @@ export async function ensureUserVault(
       vaultCode,
       updatedAt: new Date().toISOString(),
       schemaVersion: VAULT_SCHEMA_VERSION,
+      members: [user.uid],
+      memberProfiles: [{ uid: user.uid, email: user.email ?? null, name: user.displayName ?? null }],
     };
     await setDoc(ref, fresh);
     return fresh;
@@ -232,12 +258,13 @@ export async function ensureUserVault(
 export async function pushVault(
   user: VaultOwner,
   vaultCode: string,
-  payload: VaultPayload
+  payload: VaultPayload,
+  docId?: string
 ): Promise<string> {
   try {
     const updatedAt = new Date().toISOString();
     await setDoc(
-      vaultDocRef(user.uid),
+      vaultDocRef(docId || user.uid),
       {
         transactions: sanitizeForFirestore(payload.transactions),
         categories: sanitizeForFirestore(payload.categories),
@@ -267,11 +294,12 @@ export async function pushVault(
 export function subscribeVault(
   user: VaultOwner,
   onData: (vault: CloudVault | null) => void,
-  onError: (err: CloudSyncError) => void
+  onError: (err: CloudSyncError) => void,
+  docId?: string
 ): () => void {
   try {
     return onSnapshot(
-      vaultDocRef(user.uid),
+      vaultDocRef(docId || user.uid),
       (snap) => {
         try {
           if (!snap.exists()) {
@@ -292,6 +320,8 @@ export function subscribeVault(
             vaultCode: (data.vaultCode as string) ?? "",
             updatedAt: (data.updatedAt as string) ?? new Date(0).toISOString(),
             schemaVersion: (data.schemaVersion as number) ?? VAULT_SCHEMA_VERSION,
+            members: Array.isArray(data.members) ? (data.members as string[]) : [],
+            memberProfiles: Array.isArray(data.memberProfiles) ? (data.memberProfiles as VaultMember[]) : [],
           });
         } catch (err) {
           onError(toFriendlyError(err));
@@ -302,5 +332,223 @@ export function subscribeVault(
   } catch (err) {
     onError(toFriendlyError(err));
     return () => {};
+  }
+}
+
+// =====================================================================
+// Keuangan Berdua: berbagi satu vault antar email via kode undangan.
+// Alur: pemilik menyalakan undangan (kode = vaultCode) -> pasangan
+// memasukkan kode -> UID pasangan masuk `members` -> kedua HP
+// baca/tulis dokumen vault yang sama. Foto struk tetap lokal per HP.
+// =====================================================================
+
+export interface VaultInvite {
+  code: string;
+  vaultUid: string;
+  ownerName: string | null;
+  createdAt: string;
+}
+
+function activeVaultKey(appUid: string): string {
+  return `diginote_active_vault_${appUid}`;
+}
+
+/** ID dokumen vault yang dipakai akun ini (pribadi = uid sendiri). */
+export function getActiveVaultUid(appUid: string): string | null {
+  try {
+    return localStorage.getItem(activeVaultKey(appUid));
+  } catch {
+    return null;
+  }
+}
+
+export function setActiveVaultUid(appUid: string, vaultUid: string | null): void {
+  try {
+    if (vaultUid) localStorage.setItem(activeVaultKey(appUid), vaultUid);
+    else localStorage.removeItem(activeVaultKey(appUid));
+  } catch {
+    /* abaikan */
+  }
+}
+
+function profileOf(user: VaultOwner): VaultMember {
+  return { uid: user.uid, email: user.email ?? null, name: user.displayName ?? null };
+}
+
+/** Pemilik menyalakan undangan berdua (kode = vaultCode miliknya). */
+export async function publishInvite(owner: VaultOwner, vaultUid: string): Promise<VaultInvite> {
+  try {
+    const vault = await fetchVaultById(vaultUid);
+    if (!vault) throw new CloudSyncError("Vault tidak ditemukan.", "unknown");
+    if (!vault.members.includes(owner.uid)) {
+      throw new CloudSyncError("Hanya anggota vault yang bisa mengundang.", "permission-denied");
+    }
+    const code = (vault.vaultCode || "").trim().toUpperCase();
+    if (!code) throw new CloudSyncError("Vault belum punya kode undangan.", "unknown");
+    const invite: VaultInvite = {
+      code,
+      vaultUid,
+      ownerName: owner.displayName ?? owner.email ?? null,
+      createdAt: new Date().toISOString(),
+    };
+    await setDoc(inviteDocRef(code), sanitizeForFirestore(invite));
+    return invite;
+  } catch (err) {
+    if (err instanceof CloudSyncError) throw err;
+    throw toFriendlyError(err);
+  }
+}
+
+/** Pemilik mencabut undangan (kode lama tak bisa dipakai gabung lagi). */
+export async function revokeInvite(code: string): Promise<void> {
+  try {
+    await deleteDoc(inviteDocRef(code));
+  } catch (err) {
+    throw toFriendlyError(err);
+  }
+}
+
+/** Cari undangan berdasarkan kode (untuk gabung). */
+export async function lookupInvite(code: string): Promise<VaultInvite | null> {
+  try {
+    const snap = await getDoc(inviteDocRef(code));
+    if (!snap.exists()) return null;
+    const d = snap.data() as Partial<VaultInvite>;
+    if (!d.vaultUid) return null;
+    return {
+      code: (d.code as string) || code.trim().toUpperCase(),
+      vaultUid: d.vaultUid as string,
+      ownerName: (d.ownerName as string | null) ?? null,
+      createdAt: (d.createdAt as string) ?? new Date(0).toISOString(),
+    };
+  } catch (err) {
+    throw toFriendlyError(err);
+  }
+}
+
+/**
+ * Gabung ke vault pasangan via kode. Menambah UID sendiri ke members
+ * (satu-satunya perubahan yang diizinkan rules untuk non-anggota).
+ * Mengembalikan vault gabungan + ID dokumennya.
+ */
+export async function joinVaultByCode(
+  user: VaultOwner,
+  code: string
+): Promise<{ vault: CloudVault; vaultUid: string }> {
+  try {
+    const invite = await lookupInvite(code);
+    if (!invite) {
+      throw new CloudSyncError("Kode undangan tidak ditemukan. Minta kode terbaru dari pasangan.", "unknown");
+    }
+    const ref = vaultDocRef(invite.vaultUid);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) throw new CloudSyncError("Vault pasangan tidak ditemukan.", "unknown");
+    const data = snap.data() as Partial<CloudVault> & { members?: string[] };
+    const members = Array.isArray(data.members) ? [...(data.members as string[])] : [];
+    const profiles = Array.isArray(data.memberProfiles)
+      ? [...(data.memberProfiles as VaultMember[])]
+      : [];
+    if (!members.includes(user.uid)) {
+      members.push(user.uid);
+      const mine = profileOf(user);
+      const idx = profiles.findIndex(p => p.uid === user.uid);
+      if (idx >= 0) profiles[idx] = mine;
+      else profiles.push(mine);
+      await updateDoc(ref, sanitizeForFirestore({ members, memberProfiles: profiles }));
+    }
+    const vault = await fetchVaultById(invite.vaultUid);
+    if (!vault) throw new CloudSyncError("Gagal memuat vault pasangan.", "unknown");
+    return { vault, vaultUid: invite.vaultUid };
+  } catch (err) {
+    if (err instanceof CloudSyncError) throw err;
+    throw toFriendlyError(err);
+  }
+}
+
+/** Keluar dari vault berdua (kembali ke vault pribadi, keanggotaan dihapus). */
+export async function leaveSharedVault(user: VaultOwner, sharedUid: string): Promise<void> {
+  try {
+    const ref = vaultDocRef(sharedUid);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+    const data = snap.data() as Partial<CloudVault> & { members?: string[] };
+    const members = (Array.isArray(data.members) ? [...(data.members as string[])] : []).filter(
+      u => u !== user.uid
+    );
+    const profiles = (Array.isArray(data.memberProfiles) ? [...(data.memberProfiles as VaultMember[])] : []).filter(
+      p => p.uid !== user.uid
+    );
+    await updateDoc(ref, sanitizeForFirestore({ members, memberProfiles: profiles }));
+  } catch (err) {
+    throw toFriendlyError(err);
+  }
+}
+
+/** Keluarkan anggota (kick) dari vault. Bisa dipakai anggota mana pun. */
+export async function kickMember(requester: VaultOwner, vaultUid: string, targetUid: string): Promise<void> {
+  try {
+    if (targetUid === requester.uid) {
+      await leaveSharedVault(requester, vaultUid);
+      return;
+    }
+    const ref = vaultDocRef(vaultUid);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) throw new CloudSyncError("Vault tidak ditemukan.", "unknown");
+    const data = snap.data() as Partial<CloudVault> & { members?: string[] };
+    if (!((data.members as string[]) || []).includes(requester.uid)) {
+      throw new CloudSyncError("Anda bukan anggota vault ini.", "permission-denied");
+    }
+    const members = ((data.members as string[]) || []).filter(u => u !== targetUid);
+    const profiles = ((data.memberProfiles as VaultMember[]) || []).filter(p => p.uid !== targetUid);
+    await updateDoc(ref, sanitizeForFirestore({ members, memberProfiles: profiles }));
+  } catch (err) {
+    if (err instanceof CloudSyncError) throw err;
+    throw toFriendlyError(err);
+  }
+}
+
+/** Ganti kode undangan (rotasi): update vaultCode + tulis ulang dokumen invite. */
+export async function rotateInviteCode(owner: VaultOwner, vaultUid: string): Promise<VaultInvite> {
+  try {
+    const oldVault = await fetchVaultById(vaultUid);
+    if (!oldVault) throw new CloudSyncError("Vault tidak ditemukan.", "unknown");
+    if (!oldVault.members.includes(owner.uid)) {
+      throw new CloudSyncError("Hanya anggota vault yang bisa memutar kode.", "permission-denied");
+    }
+    const newCode = generateVaultCode();
+    await updateDoc(vaultDocRef(vaultUid), { vaultCode: newCode });
+    const oldCode = (oldVault.vaultCode || "").trim().toUpperCase();
+    if (oldCode && oldCode !== newCode) {
+      try {
+        await deleteDoc(inviteDocRef(oldCode));
+      } catch {
+        /* abaikan */
+      }
+    }
+    return publishInvite(owner, vaultUid);
+  } catch (err) {
+    if (err instanceof CloudSyncError) throw err;
+    throw toFriendlyError(err);
+  }
+}
+
+/** Daftarkan profil tampilan sendiri ke vault aktif (nama/avatar pasangan). */
+export async function touchOwnProfile(user: VaultOwner, vaultUid: string): Promise<void> {
+  try {
+    const ref = vaultDocRef(vaultUid);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+    const data = snap.data() as Partial<CloudVault>;
+    const members = Array.isArray(data.members) ? (data.members as string[]) : [];
+    if (!members.includes(user.uid)) return;
+    const profiles = Array.isArray(data.memberProfiles) ? [...(data.memberProfiles as VaultMember[])] : [];
+    const mine = profileOf(user);
+    const idx = profiles.findIndex(p => p.uid === user.uid);
+    if (idx >= 0 && profiles[idx].name === mine.name) return;
+    if (idx >= 0) profiles[idx] = mine;
+    else profiles.push(mine);
+    await updateDoc(ref, sanitizeForFirestore({ memberProfiles: profiles }));
+  } catch {
+    /* abaikan: profil opsional */
   }
 }

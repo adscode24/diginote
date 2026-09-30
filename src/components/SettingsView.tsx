@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Sun,
   Moon,
@@ -9,6 +9,7 @@ import {
   Trash2,
   CheckCircle2,
   AlertTriangle,
+  Heart,
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { useAuth } from '../context/AuthContext';
@@ -16,6 +17,316 @@ import { ThemeMode } from '../types';
 import { isNotificationSupported, enableDailyReminder, disableDailyReminder, sendTestNotification, getNotificationPermissionStatus, withTimeout } from '../services/notifications';
 import { CloudSyncModal } from './CloudSyncModal';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { publishInvite, revokeInvite, lookupInvite } from '../services/cloudSync';
+
+/** Kartu Keuangan Berdua: bagikan 1 vault ke pasangan via kode undangan. */
+const CoupleCard: React.FC = () => {
+  const {
+    shareMode,
+    shareMembers,
+    myInviteCode,
+    joinSharedVault,
+    leaveSharedVault,
+    kickSharedMember,
+    rotateSharedCode,
+    refreshShareMembers,
+  } = useFinance();
+  const { currentUser } = useAuth();
+  const [joinCode, setJoinCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [inviteOn, setInviteOn] = useState(false);
+
+  const flash = (text: string, ms = 5000) => {
+    setMsg(text);
+    setTimeout(() => setMsg(null), ms);
+  };
+
+  // Cek apakah undangan kode saya sedang aktif (saat kartu dibuka)
+  useEffect(() => {
+    if (!myInviteCode) return;
+    let cancelled = false;
+    lookupInvite(myInviteCode)
+      .then(inv => {
+        if (!cancelled) setInviteOn(!!inv);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [myInviteCode]);
+
+  const ownerOf = () =>
+    currentUser
+      ? { uid: currentUser.id, email: currentUser.email ?? null, displayName: currentUser.name ?? null }
+      : null;
+
+  const handlePublish = async () => {
+    const owner = ownerOf();
+    if (!owner) return;
+    setBusy(true);
+    try {
+      // Undangan selalu dibuka di vault pribadi sendiri (doc = uid sendiri)
+      await publishInvite(owner, owner.uid);
+      setInviteOn(true);
+      flash(`Undangan aktif! Kode: ${myInviteCode}. Pasangan memasukkannya di HP-nya.`);
+    } catch (err: unknown) {
+      flash(err instanceof Error ? err.message : 'Gagal menyalakan undangan.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRevoke = async () => {
+    if (!myInviteCode) return;
+    setBusy(true);
+    try {
+      await revokeInvite(myInviteCode);
+      setInviteOn(false);
+      flash('Undangan dicabut. Kode lama tak bisa dipakai gabung lagi.');
+    } catch (err: unknown) {
+      flash(err instanceof Error ? err.message : 'Gagal mencabut undangan.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleJoin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!joinCode.trim()) return;
+    setBusy(true);
+    try {
+      const res = await joinSharedVault(joinCode);
+      setJoinCode('');
+      flash(
+        res.ownerName
+          ? `Terhubung ke vault ${res.ownerName}! Data terbaru dimuat.`
+          : 'Terhubung ke vault pasangan! Data terbaru dimuat.'
+      );
+    } catch (err: unknown) {
+      flash(err instanceof Error ? err.message : 'Gagal gabung.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleKick = async (uid: string, name: string) => {
+    if (!confirm(`Keluarkan ${name || 'anggota ini'} dari vault berdua?`)) return;
+    setBusy(true);
+    try {
+      await kickSharedMember(uid);
+      flash('Anggota dikeluarkan.');
+    } catch (err: unknown) {
+      flash(err instanceof Error ? err.message : 'Gagal mengeluarkan.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleLeave = async () => {
+    if (!confirm('Keluar dari vault berdua dan kembali ke data pribadi?')) return;
+    setBusy(true);
+    try {
+      await leaveSharedVault();
+    } catch (err: unknown) {
+      flash(err instanceof Error ? err.message : 'Gagal keluar.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRotate = async () => {
+    if (!confirm('Ganti kode undangan? Kode lama langsung mati.')) return;
+    setBusy(true);
+    try {
+      const code = await rotateSharedCode();
+      setInviteOn(true);
+      flash(`Kode baru: ${code}. Bagikan ke pasangan.`);
+    } catch (err: unknown) {
+      flash(err instanceof Error ? err.message : 'Gagal mengganti kode.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <Heart className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+            <span>Keuangan Berdua</span>
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            1 catatan untuk 2 email — cocok untuk pasangan. Foto struk tetap tersimpan di masing-masing HP.
+          </p>
+        </div>
+        <span
+          className={`text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0 ${
+            shareMode === 'shared'
+              ? 'bg-orange-100 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+          }`}
+        >
+          {shareMode === 'shared' ? `Berdua · ${shareMembers.length} anggota` : 'Pribadi'}
+        </span>
+      </div>
+
+      {msg && (
+        <div className="p-2.5 rounded-xl bg-orange-50 dark:bg-orange-950/60 border border-orange-200 dark:border-orange-800 text-xs font-medium text-orange-700 dark:text-orange-300">
+          {msg}
+        </div>
+      )}
+
+      {shareMode === 'personal' && (
+        <>
+          {/* Kode undangan saya */}
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800 flex items-center justify-between gap-2">
+            <div>
+              <div className="text-[11px] text-slate-400">Kode undangan saya</div>
+              <div className="text-lg font-extrabold font-mono tracking-widest text-slate-900 dark:text-white tabular-nums">
+                {myInviteCode || '-'}
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                disabled={busy || !myInviteCode}
+                onClick={() => {
+                  try {
+                    navigator.clipboard.writeText(myInviteCode);
+                    flash('Kode disalin.');
+                  } catch {
+                    /* abaikan */
+                  }
+                }}
+                className="px-2.5 py-1.5 text-[11px] font-bold rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 transition"
+              >
+                Salin
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={handleRotate}
+                className="px-2.5 py-1.5 text-[11px] font-bold rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 transition"
+                title="Ganti kode baru"
+              >
+                Acak
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={handlePublish}
+              className="py-2 px-3 text-xs font-bold rounded-xl bg-orange-600 hover:bg-orange-700 disabled:opacity-60 text-white transition"
+            >
+              {busy ? 'Memproses…' : inviteOn ? 'Undangan Aktif ✓' : 'Nyalakan Undangan'}
+            </button>
+            {inviteOn && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={handleRevoke}
+                className="py-2 px-3 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition disabled:opacity-50"
+              >
+                Cabut Undangan
+              </button>
+            )}
+          </div>
+
+          {/* Gabung ke vault pasangan */}
+          <form onSubmit={handleJoin} className="flex items-center gap-2">
+            <input
+              type="text"
+              value={joinCode}
+              onChange={e => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))}
+              placeholder="Kode pasangan, mis. DN-XXXXXX"
+              className="flex-1 px-3 py-2 text-xs font-mono font-bold tracking-widest rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+            />
+            <button
+              type="submit"
+              disabled={busy || !joinCode.trim()}
+              className="py-2 px-4 text-xs font-bold rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90 disabled:opacity-50 transition shrink-0"
+            >
+              Gabung
+            </button>
+          </form>
+        </>
+      )}
+
+      {/* Anggota */}
+      {shareMembers.length > 0 && (
+        <div className="space-y-1.5 pt-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Anggota ({shareMembers.length})
+            </span>
+            <button
+              type="button"
+              onClick={() => void refreshShareMembers()}
+              className="text-[11px] font-semibold text-orange-600 dark:text-orange-400 hover:underline"
+            >
+              Muat ulang
+            </button>
+          </div>
+          {shareMembers.map(m => {
+            const isMe = currentUser?.id === m.uid;
+            const initial = ((m.name || m.email || '?').trim()[0] || '?').toUpperCase();
+            return (
+              <div
+                key={m.uid}
+                className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-7 h-7 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 text-white text-xs font-extrabold flex items-center justify-center shrink-0">
+                    {initial}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                      {m.name || m.email || 'Anggota'}
+                      {isMe && <span className="ml-1 text-[10px] font-semibold text-orange-600">(Anda)</span>}
+                    </div>
+                    {m.email && m.name && (
+                      <div className="text-[10px] text-slate-400 truncate">{m.email}</div>
+                    )}
+                  </div>
+                </div>
+                {!isMe && shareMode === 'shared' && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void handleKick(m.uid, m.name || m.email || '')}
+                    className="text-[11px] font-semibold text-red-600 dark:text-red-400 hover:underline shrink-0 disabled:opacity-50"
+                  >
+                    Keluarkan
+                  </button>
+                )}
+              </div>
+            );
+          })}
+          {shareMode === 'shared' && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void handleLeave()}
+              className="w-full py-2 text-xs font-semibold rounded-xl border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition disabled:opacity-50"
+            >
+              Keluar dari Vault Berdua
+            </button>
+          )}
+        </div>
+      )}
+
+      <p className="text-[11px] text-slate-400 leading-relaxed">
+        Butuh Rules Firestore terbaru (lihat FIRESTORE_SETUP.md) lalu Publish. Bila keduanya mencatat bersamaan,
+        simpanan terakhir yang menang — tunggu notifikasi sinkron sebelum pindah HP.
+      </p>
+    </div>
+  );
+};
 
 export const SettingsView: React.FC = () => {
   const {
@@ -264,6 +575,8 @@ export const SettingsView: React.FC = () => {
         </div>
       </div>
 
+      {/* Keuangan Berdua: 1 vault untuk 2 email (pasangan) */}
+      <CoupleCard />
       {/* 4. Data Management: Delete All Data */}
       <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
         <div>

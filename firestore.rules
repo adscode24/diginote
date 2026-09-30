@@ -1,11 +1,52 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Cloud Vault pribadi DigiNote: dokumen ID == uid pemilik.
-    // Setiap email terisolasi: hanya pemilik yang bisa baca/tulis vault-nya sendiri.
-    // Login dengan email+sandi yang sama di HP lain (uid sama) -> data sama & tersinkron.
+
+    // ---------- Helper ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+    // Anggota vault (dokumen baru). Dokumen lama tanpa `members` tetap bisa
+    // diakses pemiliknya (migrasi otomatis saat tulis pertama).
+    function isMember(vault) {
+      return signedIn() && request.auth.uid in vault.members;
+    }
+    function isLegacyOwner(vault, uid) {
+      return signedIn() && !('members' in vault) && request.auth.uid == uid;
+    }
+    function isOwner(vaultUid) {
+      return signedIn()
+        && get(/databases/$(database)/documents/digiVaults/$(vaultUid)).data.members[0]
+          == request.auth.uid;
+    }
+
+    // ---------- Vault keuangan (pribadi / berdua) ----------
+    // Dokumen ID == uid pemilik pertama. Pasangan bergabung via kode undangan
+    // (lihat vaultInvites) lalu UID-nya masuk `members`.
     match /digiVaults/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow get: if isMember(resource.data) || isLegacyOwner(resource.data, uid);
+      allow list: if false;
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.members == [request.auth.uid];
+      allow update: if isMember(resource.data)
+        || isLegacyOwner(resource.data, uid)
+        || (
+          // Gabung mandiri: hanya boleh menambah diri sendiri ke members/profiles
+          signedIn()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'memberProfiles'])
+          && request.resource.data.members.removeAll(resource.data.members) == [request.auth.uid]
+        );
+      allow delete: if false;
+    }
+
+    // ---------- Undangan berdua: vaultInvites/{KODE} ----------
+    // Dibaca siapa pun yang login (untuk gabung via kode), ditulis hanya pemilik vault.
+    match /vaultInvites/{code} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if isOwner(request.resource.data.vaultUid);
+      allow update, delete: if isOwner(resource.data.vaultUid);
     }
   }
 }

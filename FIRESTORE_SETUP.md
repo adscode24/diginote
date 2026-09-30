@@ -5,6 +5,9 @@ DigiNote memakai pola yang sama dengan Fuel-Traxr: **satu email = satu vault**
 lain (web, web-mobile, APK Android) membuka data yang sama — tanpa daftar ulang,
 tanpa frasa sandi vault.
 
+**Keuangan Berdua**: satu vault bisa dipakai 2 email (pasangan) via kode
+undangan — lihat bagian "Keuangan Berdua" di bawah.
+
 ## 1. Aktifkan Authentication
 
 Firebase Console → **Build → Authentication → Get started** →
@@ -18,18 +21,22 @@ lokasi `asia-southeast2` (Jakarta) → Enable.
 ## 3. Tempel Rules
 
 **Firestore Database → Rules** → ganti seluruh isi dengan `firestore.rules`
-di repo ini → **Publish**:
+di repo ini → **Publish**. WAJIB Publish ulang setiap ada perubahan rules
+(mis. setelah update mendukung Keuangan Berdua).
 
 ```
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /digiVaults/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
-    }
+    // Vault: hanya anggota (members) yang bisa baca/tulis.
+    // Gabung mandiri hanya boleh menambah UID sendiri.
+    // Undangan: dibaca semua yang login, ditulis hanya pemilik vault.
+    match /digiVaults/{uid} { ... }   // lihat firestore.rules lengkap
+    match /vaultInvites/{code} { ... } // lihat firestore.rules lengkap
   }
 }
 ```
+(Lihat `firestore.rules` di repo untuk isi lengkap — tempel seluruh file.)
 
 ## 4. Config sudah di dalam repo
 
@@ -57,27 +64,15 @@ dan APK langsung mode Cloud setelah deploy.
 | `auth/operation-not-allowed` | Provider Email/Password belum diaktifkan |
 | Data tidak tersinkron | Periksa status di Pengaturan → Sinkronisasi Cloud |
 
-## Integrasi DigiFuel (catatan BBM & biaya -> transaksi keluar)
+## Keuangan Berdua (1 vault untuk 2 email)
 
-Satu arah, project tetap terpisah. Di DigiNote: **Pengaturan → Integrasi DigiFuel** →
-masukkan email + kata sandi DigiFuel (akun terdaftar terpisah di sana, idealnya
-email yang sama) → pilih sumber dana → **Tarik dari DigiFuel**.
+1. Pemilik: **Pengaturan → Keuangan Berdua → Nyalakan Undangan** (aktifkan kode `DN-XXXXXX`, Salin).
+2. Pastikan Rules terbaru (bagian 3) sudah di-Publish — tanpa ini pasangan mendapat `permission-denied`.
+3. Pasangan: **Pengaturan → Keuangan Berdua** → masukkan kode → **Gabung**. Data terbaru langsung dimuat.
+4. Setiap transaksi baru tercatat atas nama penulisnya (label nama di rincian).
+5. Mengeluarkan anggota / keluar / ganti kode tersedia di kartu yang sama.
 
-- Catatan bensin (`totalCost > 0`) dan riwayat servis (`cost > 0`) menjadi transaksi
-  keluar berlabel **DigiFuel**, idempoten via `sourceId` (edit/hapus di DigiFuel
-  menular saat penarikan berikutnya).
-- Akun sumber dana pilihan Anda dipertahankan (hanya dipakai saat pembuatan).
+Batasan yang disengaja:
 
-Satu langkah wajib di **project Firebase DigiFuel** (Console → Firestore → Rules →
-tambahkan blok ini sejajar `match /fuelVaults/{uid}` yang sudah ada, lalu Publish):
-
-```
-match /fuelVaults/{uid} {
-  allow read: if request.auth != null &&
-    (request.auth.uid == uid || resource.data.ownerEmail == request.auth.token.email);
-  allow write: if request.auth != null && request.auth.uid == uid;
-}
-```
-
-Ganti blok `fuelVaults` lama bila isinya hanya `allow read, write: ... uid == uid`.
-Tanpa ini DigiNote tidak bisa membaca vault DigiFuel (permission-denied).
+- Bila keduanya mencatat persis bersamaan, simpanan terakhir yang menang — tunggu notifikasi sinkron sebelum pindah HP.
+- Foto struk tidak ikut ke cloud (batas 1 MB/dokumen): pasangan melihat transaksi tanpa foto; foto tetap aman di HP masing-masing.

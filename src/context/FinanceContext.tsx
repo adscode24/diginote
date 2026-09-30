@@ -23,10 +23,20 @@ import { getActiveEmail } from './AuthContext';
 import {
   ensureUserVault,
   pushVault,
-  fetchVault,
+  fetchVaultById,
   type CloudVault,
   type VaultPayload,
   type VaultOwner,
+  type VaultMember,
+  getActiveVaultUid,
+  setActiveVaultUid,
+  publishInvite,
+  revokeInvite,
+  joinVaultByCode,
+  leaveSharedVault as svcLeaveSharedVault,
+  kickMember,
+  rotateInviteCode,
+  touchOwnProfile,
 } from '../services/cloudSync';
 
 interface FinanceContextType {
@@ -86,6 +96,16 @@ interface FinanceContextType {
   deleteBill: (id: string) => void;
   payBill: (billId: string, payment: { monthKey: string; amount: number; accountId?: string; categoryId: string; paymentDate: string }) => BillPayment;
   deleteBillPayment: (paymentId: string) => void;
+
+  // Keuangan Berdua (1 vault untuk 2 email via kode undangan)
+  shareMode: 'personal' | 'shared';
+  shareMembers: VaultMember[];
+  myInviteCode: string;
+  joinSharedVault: (code: string) => Promise<{ ownerName: string | null }>;
+  leaveSharedVault: () => Promise<void>;
+  kickSharedMember: (targetUid: string) => Promise<void>;
+  rotateSharedCode: () => Promise<string>;
+  refreshShareMembers: () => Promise<void>;
 
   // Settings & Theme
   setThemeMode: (mode: ThemeMode) => void;
@@ -202,8 +222,13 @@ const LEGACY_GLOBAL_KEYS: Record<string, string> = {
   SYNC: 'diginote_sync_v2',
 };
 
-export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: string }> = ({ children, userId }) => {
+export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: string; authorName?: string }> = ({ children, userId, authorName }) => {
   const STORAGE_KEYS = buildStorageKeys(userId);
+
+  // Keuangan Berdua: dokumen vault aktif (pribadi = uid sendiri).
+  const [activeVaultUid, setActiveVaultUidState] = useState<string | null>(() => getActiveVaultUid(userId));
+  const vaultDocUid = activeVaultUid || userId;
+  const [vaultMembers, setVaultMembers] = useState<VaultMember[]>([]);
   // 1. Accounts / Sumber Dana State (kosong secara default, pengguna buat sendiri)
   const [accounts, setAccounts] = useState<Account[]>(() => {
     try {
@@ -340,6 +365,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
   const vaultOwner = (email?: string | null): VaultOwner => ({
     uid: userId,
     email: email ?? null,
+    displayName: authorName || null,
   });
 
   const applyCloudVault = (vault: CloudVault) => {
@@ -383,6 +409,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     if (Array.isArray(vault.bills)) setBills(vault.bills);
     if (Array.isArray(vault.billPayments)) setBillPayments(vault.billPayments);
     if (vault.reminderSettings) setReminderSettings(vault.reminderSettings);
+    if (Array.isArray(vault.memberProfiles)) setVaultMembers(vault.memberProfiles);
     setLastSyncedAt(Date.now());
   };
 
@@ -468,10 +495,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
         }
 
         const owner = vaultOwner(currentEmail());
-        const vault = await ensureUserVault(owner, localSnapshot);
+        const vault = await ensureUserVault(owner, localSnapshot, vaultDocUid);
         if (cancelled) return;
         setCloudVaultId(vault.vaultCode || '');
+        setVaultMembers(Array.isArray(vault.memberProfiles) ? vault.memberProfiles : []);
         setLastSyncedAt(Date.now());
+        // Daftarkan profil tampilan sendiri agar pasangan melihat nama (sekali jalan, diam-diam)
+        void touchOwnProfile(owner, vaultDocUid);
 
         // Sinkronisasi saat masuk aplikasi: selalu konvergen ke data terbaru.
         // - Cloud lebih baru (atau lokal kosong) -> pakai cloud, tampilkan terbaru.
@@ -499,7 +529,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
         } else if (!localEmpty && storedBase && (!vaultTime || storedBase > vaultTime)) {
           // Perangkat ini menyimpan perubahan yang belum ada di cloud -> kirim sekarang
           try {
-            const updatedAt = await pushVault(owner, vault.vaultCode || '', localSnapshot);
+            const updatedAt = await pushVault(owner, vault.vaultCode || '', localSnapshot, vaultDocUid);
             persistBase(updatedAt);
             setLastSyncedAt(Date.now());
             setSyncNotice({ text: 'Perubahan offline dikirim ke cloud.', action: null });
@@ -550,7 +580,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
         bills,
         billPayments,
         reminderSettings,
-      });
+      }, vaultDocUid);
       setLastSyncedAt(Date.now());
       setSyncStatus('synced');
       setSyncErrorMsg(null);
@@ -578,12 +608,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     if (!cloudEnabled || !isCloudCapableUid(userId)) return false;
     setSyncStatus('syncing');
     try {
-      const remote = await fetchVault(userId);
+      const remote = await fetchVaultById(vaultDocUid);
       if (!remote) {
         setSyncStatus(navigator.onLine ? 'synced' : 'offline');
         return false;
       }
       if (remote.vaultCode) setCloudVaultId(remote.vaultCode);
+      if (Array.isArray(remote.memberProfiles)) setVaultMembers(remote.memberProfiles);
       applyCloudVault(remote);
       setSyncStatus(navigator.onLine ? 'synced' : 'offline');
       setSyncErrorMsg(null);
@@ -609,6 +640,82 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     const timer = setTimeout(() => setSyncNotice(null), 6000);
     return () => clearTimeout(timer);
   }, [syncNotice]);
+
+  // ---------- Keuangan Berdua ----------
+  const shareMode: 'personal' | 'shared' = activeVaultUid && activeVaultUid !== userId ? 'shared' : 'personal';
+
+  const refreshShareMembers = useCallback(async (): Promise<void> => {
+    if (!cloudEnabled || !isCloudCapableUid(userId)) return;
+    try {
+      const remote = await fetchVaultById(vaultDocUid);
+      if (remote && Array.isArray(remote.memberProfiles)) setVaultMembers(remote.memberProfiles);
+      if (remote?.vaultCode) setCloudVaultId(remote.vaultCode);
+    } catch {
+      /* abaikan */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloudEnabled, userId, vaultDocUid]);
+
+  const joinSharedVault = useCallback(async (code: string): Promise<{ ownerName: string | null }> => {
+    if (!cloudEnabled || !isCloudCapableUid(userId)) {
+      throw new Error('Keuangan Berdua membutuhkan akun cloud (bukan mode lokal).');
+    }
+    const clean = code.trim().toUpperCase();
+    if (!clean) throw new Error('Masukkan kode undangan pasangan.');
+    const owner = vaultOwner(currentEmail());
+    const { vault, vaultUid: sharedUid } = await joinVaultByCode(owner, clean);
+    setActiveVaultUidState(sharedUid);
+    setActiveVaultUid(userId, sharedUid);
+    setVaultMembers(Array.isArray(vault.memberProfiles) ? vault.memberProfiles : []);
+    if (vault.vaultCode) setCloudVaultId(vault.vaultCode);
+    justAppliedRef.current = true;
+    applyCloudVault(vault);
+    persistBase(vault.updatedAt || '');
+    setSyncNotice({ text: 'Terhubung ke vault pasangan. Data terbaru dimuat.', action: null });
+    return { ownerName: vault.memberProfiles?.find(p => p.uid !== userId)?.name ?? null };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloudEnabled, userId]);
+
+  const leaveSharedVault = useCallback(async (): Promise<void> => {
+    if (shareMode !== 'shared') return;
+    const owner = vaultOwner(currentEmail());
+    try {
+      await svcLeaveSharedVault(owner, vaultDocUid);
+    } catch {
+      /* tetap lanjut kembali ke pribadi */
+    }
+    setActiveVaultUidState(null);
+    setActiveVaultUid(userId, null);
+    setVaultMembers([]);
+    try {
+      const personal = await fetchVaultById(userId);
+      if (personal) {
+        justAppliedRef.current = true;
+        applyCloudVault(personal);
+        persistBase(personal.updatedAt || '');
+        if (personal.vaultCode) setCloudVaultId(personal.vaultCode);
+      }
+    } catch {
+      /* abaikan */
+    }
+    setSyncNotice({ text: 'Kembali ke vault pribadi.', action: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shareMode, userId, vaultDocUid]);
+
+  const kickSharedMember = useCallback(async (targetUid: string): Promise<void> => {
+    if (!cloudEnabled || !isCloudCapableUid(userId)) return;
+    await kickMember(vaultOwner(currentEmail()), vaultDocUid, targetUid);
+    await refreshShareMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloudEnabled, userId, vaultDocUid]);
+
+  const rotateSharedCode = useCallback(async (): Promise<string> => {
+    if (!cloudEnabled || !isCloudCapableUid(userId)) throw new Error('Butuh akun cloud.');
+    const invite = await rotateInviteCode(vaultOwner(currentEmail()), vaultDocUid);
+    setCloudVaultId(invite.code);
+    return invite.code;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloudEnabled, userId, vaultDocUid]);
 
   // Otomatis menyimpan ke cloud setiap ada data baru (debounced, pola Fuel-Traxr).
   // Aman dari freeze: payload terstruktur kecil (tanpa foto), tanpa listener realtime.
@@ -641,7 +748,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
           bills,
           billPayments,
           reminderSettings,
-        });
+        }, vaultDocUid);
         persistBase(updatedAt);
         setLastSyncedAt(Date.now());
         setSyncStatus('synced');
@@ -856,6 +963,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     const newTx: Transaction = {
       ...data,
       amount: cleanAmount,
+      authorUid: data.authorUid || userId,
+      authorName: data.authorName || authorName || undefined,
       id: `tx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -1129,6 +1238,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
       id: `tx_debt_${paymentId}`,
       type: isPayable ? 'expense' : 'income',
       amount: amount,
+      authorUid: userId,
+      authorName: authorName || undefined,
       categoryId: txCategory.id,
       categoryName: txCategory.name,
       accountId: targetAccount?.id,
@@ -1317,6 +1428,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
       id: `tx_bill_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       type: 'expense',
       amount: payment.amount,
+      authorUid: userId,
+      authorName: authorName || undefined,
       categoryId: category.id,
       categoryName: category.name,
       accountId: targetAccount?.id,
@@ -1484,6 +1597,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
         cloudVaultId,
         pushToVaultNow,
         pullFromVaultNow,
+        shareMode,
+        shareMembers: vaultMembers,
+        myInviteCode: cloudVaultId || '',
+        joinSharedVault,
+        leaveSharedVault,
+        kickSharedMember,
+        rotateSharedCode,
+        refreshShareMembers,
       }}
     >
       {children}

@@ -42,7 +42,7 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) => {
-  const { summary, transactions, debts, accounts, categories, reminderSettings, syncNotice, clearSyncNotice, syncStatus, pullFromVaultNow } = useFinance();
+  const { summary, transactions, debts, accounts, categories, reminderSettings, syncNotice, clearSyncNotice, syncStatus, pullFromVaultNow, shareMembers } = useFinance();
   const { currentUser } = useAuth();
 
   const [selectedDebtToPay, setSelectedDebtToPay] = useState<Debt | null>(null);
@@ -236,6 +236,41 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
           </div>
         </div>
       </div>
+
+      {/* Keuangan Berdua: siapa mencatat bulan ini */}
+      {shareMembers.length > 1 && (
+        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            Keuangan Berdua · {selectedMonthLabel}
+          </div>
+          <div className="grid grid-cols-2 gap-2.5 mt-2.5">
+            {shareMembers.map(m => {
+              const spent = monthlyTransactions
+                .filter(t => t.type === 'expense' && (t.authorUid === m.uid || (!t.authorUid && t.authorName === m.name)))
+                .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+              const initial = ((m.name || m.email || '?').trim()[0] || '?').toUpperCase();
+              return (
+                <div
+                  key={m.uid}
+                  className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800 flex items-center gap-2.5"
+                >
+                  <span className="w-9 h-9 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 text-white text-sm font-extrabold flex items-center justify-center shrink-0">
+                    {initial}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                      {(m.name || 'Anggota').split(' ')[0]}
+                    </div>
+                    <div className="text-[11px] font-semibold text-red-600 dark:text-red-400 tabular-nums">
+                      -{masked('kpi-all', spent)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Header Bar with Month Filter Selector */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
@@ -747,6 +782,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                           </div>
                           <div className="text-[10px] text-slate-400 truncate">
                             {formatDateIndo(tx.date)} · {tx.accountName || tx.paymentMethod}
+                            {tx.authorName && ` · ${tx.authorName.split(' ')[0]}`}
                           </div>
                         </div>
                       </div>

@@ -376,6 +376,14 @@ export const TransactionsView: React.FC = () => {
                                 <span className="font-semibold text-orange-600 dark:text-orange-400">
                                   {tx.accountName || tx.paymentMethod}
                                 </span>
+                                {tx.authorName && (
+                                  <>
+                                    <span>·</span>
+                                    <span className="font-medium text-slate-500 dark:text-slate-400">
+                                      {tx.authorName.split(' ')[0]}
+                                    </span>
+                                  </>
+                                )}
                                 {tx.description && (
                                   <>
                                     <span>·</span>

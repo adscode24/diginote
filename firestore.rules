@@ -23,8 +23,10 @@ service cloud.firestore {
     // ---------- Vault keuangan (pribadi / berdua) ----------
     // Dokumen ID == uid pemilik pertama. Pasangan bergabung via kode undangan
     // (lihat vaultInvites) lalu UID-nya masuk `members`.
+    // `resource == null`: dokumen belum ada (user baru) — izinkan baca agar
+    // pembuatan vault pertama tidak ditolak permission-denied.
     match /digiVaults/{uid} {
-      allow get: if isMember(resource.data) || isLegacyOwner(resource.data, uid);
+      allow get: if resource == null || isMember(resource.data) || isLegacyOwner(resource.data, uid);
       allow list: if false;
       allow create: if signedIn()
         && request.auth.uid == uid

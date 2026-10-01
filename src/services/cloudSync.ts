@@ -404,6 +404,15 @@ export async function publishInvite(owner: VaultOwner, vaultUid: string): Promis
       createdAt: new Date().toISOString(),
     };
     await setDoc(inviteDocRef(code), sanitizeForFirestore(invite));
+    // Verifikasi balik: pastikan dokumen undangan benar-benar tersimpan
+    // sebelum kode dibagikan (gagal diam-diam = pasangan "tidak menemukan").
+    const check = await getDoc(inviteDocRef(code));
+    if (!check.exists()) {
+      throw new CloudSyncError(
+        "Undangan gagal tersimpan di cloud. Periksa koneksi lalu coba lagi.",
+        "unknown"
+      );
+    }
     return invite;
   } catch (err) {
     if (err instanceof CloudSyncError) throw err;

@@ -187,7 +187,12 @@ const CoupleCard: React.FC = () => {
 
       {shareMode === 'personal' && (
         <>
-          {/* Kode undangan saya */}
+          <p className="-mb-1 text-[11px] text-slate-400 leading-relaxed">
+            {inviteOn
+              ? 'Undangan AKTIF — kode di bawah sudah bisa dipakai pasangan untuk gabung.'
+              : 'Tekan Nyalakan Undangan dulu — kode hanya berfungsi setelah undangan aktif.'}
+          </p>
+          {/* Kode undangan saya: hanya berfungsi setelah undangan dinyalakan */}
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800 flex items-center justify-between gap-2">
             <div>
               <div className="text-[11px] text-slate-400">Kode undangan saya</div>
@@ -198,7 +203,7 @@ const CoupleCard: React.FC = () => {
             <div className="flex items-center gap-1.5 shrink-0">
               <button
                 type="button"
-                disabled={busy || !myInviteCode}
+                disabled={busy || !myInviteCode || !inviteOn}
                 onClick={() => {
                   try {
                     navigator.clipboard.writeText(myInviteCode);
@@ -207,6 +212,7 @@ const CoupleCard: React.FC = () => {
                     /* abaikan */
                   }
                 }}
+                title={inviteOn ? 'Salin kode' : 'Nyalakan undangan dulu agar kode berfungsi'}
                 className="px-2.5 py-1.5 text-[11px] font-bold rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 transition"
               >
                 Salin

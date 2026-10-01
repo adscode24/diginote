@@ -290,14 +290,18 @@ export const SettingsView: React.FC = () => {
     updateReminderSettings,
     cloudVaultId,
     clearAllData,
+    deleteAccountData,
   } = useFinance();
 
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [notificationTestMessage, setNotificationTestMessage] = useState<string | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
-  useBodyScrollLock(showClearConfirm || isSyncModalOpen);
-  const { currentUser, mode: authMode } = useAuth();
+  useBodyScrollLock(showClearConfirm || showDeleteAccount || isSyncModalOpen);
+  const { currentUser, mode: authMode, deleteAccount, logout } = useAuth();
 
   const handleToggleReminder = async (enabled: boolean) => {
     // Toggle SELALU bisa on/off: pengingat dalam aplikasi (dashboard) tetap
@@ -355,6 +359,42 @@ export const SettingsView: React.FC = () => {
     setShowClearConfirm(false);
     setFeedbackMessage('Semua data transaksi, hutang, dan saldo berhasil dikosongkan.');
     setTimeout(() => setFeedbackMessage(null), 3500);
+  };
+
+  const deleteIdentifier = currentUser?.email || currentUser?.name || '';
+  const handleExecuteDeleteAccount = async () => {
+    if (deleteConfirmText.trim().toLowerCase() !== deleteIdentifier.trim().toLowerCase() || !deleteIdentifier) {
+      setFeedbackMessage('Ketik persis seperti yang diminta untuk melanjutkan.');
+      setTimeout(() => setFeedbackMessage(null), 3500);
+      return;
+    }
+    setDeletingAccount(true);
+    try {
+      const { warnings } = await deleteAccountData();
+      try {
+        await deleteAccount();
+      } catch (authErr: unknown) {
+        const msg = (authErr as Error)?.message || '';
+        if (msg === 'minta-login-ulang') {
+          logout();
+          setFeedbackMessage('Data dihapus. Sesi terlalu lama — silakan masuk lagi untuk menyelesaikan.');
+          setTimeout(() => setFeedbackMessage(null), 5000);
+          return;
+        }
+        throw authErr;
+      }
+      if (warnings.length > 0) {
+        setFeedbackMessage(`Akun dihapus. Catatan: ${warnings.join(' ')}`);
+      }
+      // logout() di dalam deleteAccount mengembalikan ke layar masuk
+    } catch (err: unknown) {
+      setFeedbackMessage(err instanceof Error ? err.message : 'Gagal menghapus akun.');
+      setTimeout(() => setFeedbackMessage(null), 5000);
+    } finally {
+      setDeletingAccount(false);
+      setShowDeleteAccount(false);
+      setDeleteConfirmText('');
+    }
   };
 
   return (
@@ -565,6 +605,30 @@ export const SettingsView: React.FC = () => {
         </div>
       </div>
 
+      {/* 5. Hapus Akun (database + login) */}
+      <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-red-200/80 dark:border-red-900/40 shadow-xs space-y-3">
+        <div>
+          <h3 className="text-sm font-bold text-red-700 dark:text-red-400 flex items-center gap-2">
+            <Trash2 className="w-4 h-4" />
+            <span>Hapus Akun</span>
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Hapus permanen akun login beserta seluruh datanya di database (vault cloud, direktori, undangan)
+            dan di HP ini. Tindakan ini tidak dapat dibatalkan.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setDeleteConfirmText('');
+            setShowDeleteAccount(true);
+          }}
+          className="py-2.5 px-4 rounded-xl text-xs font-bold bg-red-700 hover:bg-red-800 text-white shadow-xs transition"
+        >
+          Hapus Akun Saya
+        </button>
+      </div>
+
       {/* Confirmation Bottom Sheet for Clearing All Data */}
       {showClearConfirm && (
         <div
@@ -604,6 +668,69 @@ export const SettingsView: React.FC = () => {
                 className="flex-1 py-2.5 text-xs font-semibold rounded-xl bg-red-600 hover:bg-red-700 text-white transition shadow-xs"
               >
                 Ya, Hapus Semua
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Bottom Sheet for Deleting Account */}
+      {showDeleteAccount && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs transition-opacity flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => !deletingAccount && setShowDeleteAccount(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-t-3xl sm:rounded-2xl bg-white dark:bg-slate-900 border-t sm:border border-red-200 dark:border-red-900/60 p-6 shadow-2xl space-y-4 animate-in slide-in-from-bottom duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto -mt-2 mb-2 sm:hidden" />
+
+            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/80 text-red-600 dark:text-red-400 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+
+            <div className="text-center">
+              <h4 className="text-base font-bold text-slate-900 dark:text-white">
+                Hapus Akun Permanen?
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
+                Akun login <strong className="text-slate-700 dark:text-slate-200">{deleteIdentifier || '-'}</strong> beserta
+                vault cloud, direktori, undangan berdua, dan seluruh data di HP ini akan dihapus dari database.
+                Tindakan ini tidak dapat dibatalkan.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                Ketik <strong className="font-mono">{deleteIdentifier || '-'}</strong> untuk melanjutkan
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={e => setDeleteConfirmText(e.target.value)}
+                placeholder={deleteIdentifier || '...'}
+                disabled={deletingAccount}
+                className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-red-500 disabled:opacity-60"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                disabled={deletingAccount}
+                onClick={() => setShowDeleteAccount(false)}
+                className="flex-1 py-2.5 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition disabled:opacity-60"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={deletingAccount}
+                onClick={() => void handleExecuteDeleteAccount()}
+                className="flex-1 py-2.5 text-xs font-bold rounded-xl bg-red-700 hover:bg-red-800 disabled:opacity-60 text-white transition shadow-xs"
+              >
+                {deletingAccount ? 'Menghapus…' : 'Ya, Hapus Akun'}
               </button>
             </div>
           </div>

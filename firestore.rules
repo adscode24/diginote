@@ -49,7 +49,7 @@ service cloud.firestore {
                       'billPayments', 'reminderSettings', 'updatedAt', 'lastUpdatedBy',
                       'lastUpdatedByCode', 'schemaVersion'])
         );
-      allow delete: if false;
+      allow delete: if isDocOwner(uid);
     }
 
     // ---------- Direktori vault per email (verifikasi undangan) ----------

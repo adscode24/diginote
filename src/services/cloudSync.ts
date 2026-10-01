@@ -619,30 +619,32 @@ export async function setMyPairedUids(owner: VaultOwner, uids: string[]): Promis
 
 /** Baca vault saya + vault pasangan (bila tertaut).
  *  revoked=true bila pasangan mencabut akses (permission-denied),
- *  dibedakan dari offline/transien (diabaikan diam-diam). */
+ *  gone=true bila dokumen vault pasangan sudah tidak ada (akun dihapus),
+ *  keduanya dibedakan dari offline/transien (diabaikan diam-diam). */
 export async function readPairedVaults(
   myUid: string
-): Promise<{ mine: CloudVault | null; partner: CloudVault | null; partnerUid: string | null; revoked: boolean }> {
+): Promise<{ mine: CloudVault | null; partner: CloudVault | null; partnerUid: string | null; revoked: boolean; gone: boolean }> {
   const mine = await fetchVaultById(myUid).catch(() => null);
   const paired = (mine && Array.isArray(mine.pairedUids) ? mine.pairedUids : []).filter(u => u !== myUid);
   const partnerUid = paired[0] || null;
   let partner: CloudVault | null = null;
   let revoked = false;
+  let gone = false;
   if (partnerUid) {
     try {
       partner = await fetchVaultById(partnerUid);
+      if (!partner) gone = true;
     } catch (err) {
       const code = (err as { code?: string })?.code || "";
       if (code === "permission-denied") revoked = true;
       partner = null;
     }
   }
-  return { mine, partner, partnerUid, revoked };
+  return { mine, partner, partnerUid, revoked, gone };
 }
 
 /** Tulis payload ke vault saya + vault pasangan (best-effort sisi pasangan). */
-export async function pushPairedVaults(
-  me: VaultOwner,
+export async function pushPairedVaults(  me: VaultOwner,
   myVaultCode: string,
   partnerUid: string | null,
   payload: VaultPayload
@@ -664,5 +666,75 @@ export async function pushPairedVaults(
     }
   }
   return { updatedAt, partnerOk };
+}
+
+// =====================================================================
+// Hapus Akun: hapus seluruh data login pengguna dari database.
+// Urutan: lepas tautan berdua -> hapus undangan terkirim -> hapus direktori
+// -> hapus vault. Best-effort per langkah, kegagalan dikumpulkan.
+// =====================================================================
+
+export interface DeleteAccountResult {
+  warnings: string[];
+}
+
+/** Hapus dokumen vault milik UID ini (rules: hanya pemilik). */
+export async function deleteVaultDoc(uid: string): Promise<void> {
+  try {
+    await deleteDoc(vaultDocRef(uid));
+  } catch (err) {
+    throw toFriendlyError(err);
+  }
+}
+
+/** Hapus entri direktori email ini (rules: hanya pemilik UID tercantum). */
+export async function deleteDirectoryEntry(email: string): Promise<void> {
+  try {
+    await deleteDoc(directoryDocRef(email));
+  } catch (err) {
+    throw toFriendlyError(err);
+  }
+}
+
+export async function deleteOwnCloudData(
+  owner: VaultOwner,
+  email: string,
+  partnerUid: string | null,
+  sentInviteUids: string[]
+): Promise<DeleteAccountResult> {
+  const warnings: string[] = [];
+  // 1. Lepas tautan berdua (sisi saya) agar pasangan auto-bersih
+  if (partnerUid && partnerUid !== owner.uid) {
+    try {
+      await removePairFromMyVault(owner, partnerUid);
+    } catch {
+      warnings.push("Tautan berdua tidak terhapus di cloud.");
+    }
+  }
+  // 2. Hapus undangan yang pernah saya kirim
+  for (const toUid of sentInviteUids) {
+    try {
+      await deleteDoc(pairInviteDocRef(toUid));
+    } catch {
+      /* abaikan per item */
+    }
+  }
+  // 3. Hapus direktori email saya
+  if (email.trim()) {
+    try {
+      await deleteDirectoryEntry(email);
+    } catch {
+      warnings.push("Entri direktori tidak terhapus.");
+    }
+  }
+  // 4. Hapus vault saya
+  try {
+    await deleteVaultDoc(owner.uid);
+  } catch (err) {
+    throw err instanceof CloudSyncError
+      ? err
+      : new CloudSyncError("Vault cloud tidak terhapus: " + ((err as Error)?.message || "unknown"), "unknown");
+  }
+  return { warnings };
 }
 

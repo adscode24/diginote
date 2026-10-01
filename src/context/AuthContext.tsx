@@ -5,6 +5,7 @@ import {
   signOut,
   onAuthStateChanged,
   sendPasswordResetEmail,
+  deleteUser,
   type User,
 } from 'firebase/auth';
 import { hashPassphrase } from '../services/crypto';
@@ -27,6 +28,12 @@ interface AuthContextType {
   login: (identifier: string, password: string) => Promise<void>;
   register: (identifier: string, password: string) => Promise<AppUser>;
   logout: () => void;
+  /**
+   * Hapus akun permanen: hapus user login dari database (Auth),
+   * lalu keluar. Mode offline: hapus dari daftar pengguna lokal.
+   * Bisa melempar 'minta-login-ulang' bila sesi cloud terlalu lama.
+   */
+  deleteAccount: () => Promise<void>;
   /** Perbarui nama tampilan dan/atau foto profil (tersinkron antar perangkat). */
   updateProfileInfo: (data: { name?: string; photoURL?: string | null }) => Promise<void>;
   /** Mode online: kirim email reset password ke email akun saat ini. */
@@ -308,6 +315,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [online, localUser, fbProfile]
   );
 
+  const deleteAccount = useCallback(async (): Promise<void> => {
+    if (online) {
+      const auth = getFirebaseAuth();
+      const fb = auth?.currentUser;
+      if (!fb) throw new Error('Tidak ada pengguna aktif');
+      try {
+        await deleteUser(fb);
+      } catch (err: unknown) {
+        const code = (err as { code?: string })?.code || '';
+        if (code === 'auth/requires-recent-login') {
+          throw new Error('minta-login-ulang');
+        }
+        throw new Error(translateFirebaseError(code));
+      }
+      logout();
+      return;
+    }
+    if (!localUser) throw new Error('Tidak ada pengguna aktif');
+    persistLocalUsers(loadLocalUsers().filter(u => u.id !== localUser.id));
+    logout();
+  }, [online, localUser, logout]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -318,6 +347,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         register,
         logout,
+        deleteAccount,
         sendPasswordReset,
         changeOfflinePassword,
         updateProfileInfo,

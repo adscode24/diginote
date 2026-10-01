@@ -42,6 +42,7 @@ import {
   pushPairedVaults,
   readSentInvite,
   setMyPairedUids,
+  deleteOwnCloudData,
 } from '../services/cloudSync';
 
 interface FinanceContextType {
@@ -124,6 +125,7 @@ interface FinanceContextType {
   exportBackupFile: (passphrase: string) => Promise<void>;
   importBackupFile: (file: File, passphrase: string) => Promise<boolean>;
   clearAllData: () => void;
+  deleteAccountData: () => Promise<{ warnings: string[] }>;
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
@@ -1849,6 +1851,58 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     }
   };
 
+  const deleteAccountData = async (): Promise<{ warnings: string[] }> => {
+    let warnings: string[] = [];
+    // 1. Cloud (hanya akun cloud yang online)
+    if (cloudEnabled && isCloudCapableUid(userId) && navigator.onLine) {
+      try {
+        const res = await deleteOwnCloudData(
+          vaultOwner(currentEmail()),
+          currentEmail() || '',
+          pairPartner?.uid || null,
+          loadSentInvites()
+        );
+        warnings = res.warnings;
+      } catch (err: unknown) {
+        warnings.push((err as Error)?.message || 'Data cloud tidak terhapus.');
+      }
+    }
+    // 2. Lokal perangkat (hanya kunci milik akun ini)
+    try {
+      const keys = [
+        STORAGE_KEYS.TRANSACTIONS,
+        STORAGE_KEYS.ACCOUNTS,
+        STORAGE_KEYS.DEBTS,
+        STORAGE_KEYS.CATEGORIES,
+        STORAGE_KEYS.BILLS,
+        STORAGE_KEYS.BILL_PAYMENTS,
+        STORAGE_KEYS.REMINDERS,
+        STORAGE_KEYS.SYNC,
+        `diginote_pair_partner_${userId}`,
+        `diginote_sent_invites_${userId}`,
+      ];
+      for (const k of keys) localStorage.removeItem(k);
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(`diginote_invite_notified_${userId}_`)) localStorage.removeItem(k);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    // 3. Reset state memori
+    setTransactions([]);
+    setAccounts([]);
+    setCategories([...ALL_DEFAULT_CATEGORIES]);
+    setDebts([]);
+    setBills([]);
+    setBillPayments([]);
+    persistPartner(null);
+    setPendingInvite(null);
+    setLastUpdatedByCode(null);
+    setCloudVaultId(null);
+    return { warnings };
+  };
+
   return (
     <FinanceContext.Provider
       value={{
@@ -1888,6 +1942,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
         exportBackupFile,
         importBackupFile,
         clearAllData,
+        deleteAccountData,
         syncStatus,
         lastSyncedAt,
         syncNotice,

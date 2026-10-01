@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, updateDoc, onSnapshot, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, onSnapshot, deleteDoc, arrayUnion } from "firebase/firestore";
 import type {
   Account,
   Bill,
@@ -378,10 +378,22 @@ function profileOf(user: VaultOwner): VaultMember {
 /** Pemilik menyalakan undangan berdua (kode = vaultCode miliknya). */
 export async function publishInvite(owner: VaultOwner, vaultUid: string): Promise<VaultInvite> {
   try {
+    // Sembuhkan dulu keanggotaan sendiri (vault lama belum punya `members`)
+    try {
+      await updateDoc(vaultDocRef(vaultUid), {
+        members: arrayUnion(owner.uid),
+        memberProfiles: arrayUnion(profileOf(owner)),
+      });
+    } catch {
+      /* lanjut: gagal di sini akan terbaca sebagai permission-denied di bawah */
+    }
     const vault = await fetchVaultById(vaultUid);
     if (!vault) throw new CloudSyncError("Vault tidak ditemukan.", "unknown");
     if (!vault.members.includes(owner.uid)) {
-      throw new CloudSyncError("Hanya anggota vault yang bisa mengundang.", "permission-denied");
+      throw new CloudSyncError(
+        "Gagal mendaftarkan Anda sebagai anggota. Pastikan Rules terbaru sudah di-Publish.",
+        "permission-denied"
+      );
     }
     const code = (vault.vaultCode || "").trim().toUpperCase();
     if (!code) throw new CloudSyncError("Vault belum punya kode undangan.", "unknown");
@@ -427,8 +439,8 @@ export async function lookupInvite(code: string): Promise<VaultInvite | null> {
 }
 
 /**
- * Gabung ke vault pasangan via kode. Menambah UID sendiri ke members
- * (satu-satunya perubahan yang diizinkan rules untuk non-anggota).
+ * Gabung ke vault pasangan via kode. Menambah UID sendiri via arrayUnion
+ * (tak perlu baca vault dulu — rules memverifikasi hasil akhirnya).
  * Mengembalikan vault gabungan + ID dokumennya.
  */
 export async function joinVaultByCode(
@@ -438,24 +450,19 @@ export async function joinVaultByCode(
   try {
     const invite = await lookupInvite(code);
     if (!invite) {
-      throw new CloudSyncError("Kode undangan tidak ditemukan. Minta kode terbaru dari pasangan.", "unknown");
+      throw new CloudSyncError(
+        "Kode undangan tidak ditemukan. Pastikan pasangan sudah menekan Nyalakan Undangan lalu bagikan kode yang tampil.",
+        "unknown"
+      );
     }
     const ref = vaultDocRef(invite.vaultUid);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) throw new CloudSyncError("Vault pasangan tidak ditemukan.", "unknown");
-    const data = snap.data() as Partial<CloudVault> & { members?: string[] };
-    const members = Array.isArray(data.members) ? [...(data.members as string[])] : [];
-    const profiles = Array.isArray(data.memberProfiles)
-      ? [...(data.memberProfiles as VaultMember[])]
-      : [];
-    if (!members.includes(user.uid)) {
-      members.push(user.uid);
-      const mine = profileOf(user);
-      const idx = profiles.findIndex(p => p.uid === user.uid);
-      if (idx >= 0) profiles[idx] = mine;
-      else profiles.push(mine);
-      await updateDoc(ref, sanitizeForFirestore({ members, memberProfiles: profiles }));
-    }
+    await updateDoc(
+      ref,
+      sanitizeForFirestore({
+        members: arrayUnion(user.uid),
+        memberProfiles: arrayUnion(profileOf(user)),
+      })
+    );
     const vault = await fetchVaultById(invite.vaultUid);
     if (!vault) throw new CloudSyncError("Gagal memuat vault pasangan.", "unknown");
     return { vault, vaultUid: invite.vaultUid };

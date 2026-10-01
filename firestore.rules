@@ -32,10 +32,12 @@ service cloud.firestore {
       allow update: if isMember(resource.data)
         || isLegacyOwner(resource.data, uid)
         || (
-          // Gabung mandiri: hanya boleh menambah diri sendiri ke members/profiles
+          // Gabung via kode: hanya boleh menyentuh members/memberProfiles
+          // dan UID sendiri wajib ada di hasil akhir. Tidak perlu baca dulu
+          // (klien memakai arrayUnion), berlaku juga untuk vault lama.
           signedIn()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'memberProfiles'])
-          && request.resource.data.members.removeAll(resource.data.members) == [request.auth.uid]
+          && request.auth.uid in request.resource.data.members
         );
       allow delete: if false;
     }

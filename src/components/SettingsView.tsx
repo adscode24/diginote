@@ -42,15 +42,22 @@ const CoupleCard: React.FC = () => {
     setTimeout(() => setMsg(null), ms);
   };
 
-  // Cek apakah undangan kode saya sedang aktif (saat kartu dibuka)
+  // Cek apakah undangan kode saya sedang aktif + pastikan kode tampil
+  // (refresh bila kode masih kosong, mis. vault baru dibuat)
   useEffect(() => {
-    if (!myInviteCode) return;
     let cancelled = false;
-    lookupInvite(myInviteCode)
-      .then(inv => {
+    (async () => {
+      try {
+        if (!myInviteCode) {
+          await refreshShareMembers();
+          return;
+        }
+        const inv = await lookupInvite(myInviteCode);
         if (!cancelled) setInviteOn(!!inv);
-      })
-      .catch(() => {});
+      } catch {
+        /* abaikan */
+      }
+    })();
     return () => {
       cancelled = true;
     };

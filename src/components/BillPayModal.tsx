@@ -128,7 +128,8 @@ export const BillPayModal: React.FC<BillPayModalProps> = ({ isOpen, onClose, bil
                   Rp
                 </span>
                 <input
-                  type="text"
+                  type="tel"
+                  autoComplete="off"
                   inputMode="numeric"
                   value={amountStr ? new Intl.NumberFormat('id-ID').format(Number(amountStr)) : ''}
                   onChange={e => setAmountStr(e.target.value.replace(/[^0-9]/g, ''))}

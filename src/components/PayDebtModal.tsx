@@ -311,7 +311,8 @@ export const PayDebtModal: React.FC<PayDebtModalProps> = ({ isOpen, onClose, deb
                   Rp
                 </span>
                 <input
-                  type="text"
+                  type="tel"
+                  autoComplete="off"
                   inputMode="numeric"
                   placeholder="0"
                   value={amountStr ? new Intl.NumberFormat('id-ID').format(Number(amountStr)) : ''}

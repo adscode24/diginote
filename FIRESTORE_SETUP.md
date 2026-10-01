@@ -64,13 +64,13 @@ dan APK langsung mode Cloud setelah deploy.
 | `auth/operation-not-allowed` | Provider Email/Password belum diaktifkan |
 | Data tidak tersinkron | Periksa status di Pengaturan → Sinkronisasi Cloud |
 
-## Keuangan Berdua (1 vault untuk 2 email)
+## Keuangan Berdua (1 catatan untuk 2 email, tiap akun tetap punya kode sendiri)
 
-1. Pemilik: **Pengaturan → Keuangan Berdua → Nyalakan Undangan** (aktifkan kode `DN-XXXXXX`, Salin).
-2. Pastikan Rules terbaru (bagian 3) sudah di-Publish — tanpa ini pasangan mendapat `permission-denied`.
-3. Pasangan: **Pengaturan → Keuangan Berdua** → masukkan kode → **Gabung**. Data terbaru langsung dimuat.
-4. Setiap transaksi baru tercatat atas nama penulisnya (label nama di rincian).
-5. Mengeluarkan anggota / keluar / ganti kode tersedia di kartu yang sama.
+1. Kedua HP login dengan email masing-masing lalu buka aplikasi sekali (agar vault + direktori tercatat di cloud).
+2. HP A: **Pengaturan → Keuangan Berdua** → isi **email + kode vault B** → **Kirim Undangan**. Email + kode B tampil di bawah kartu sebagai status terkirim.
+3. HP B: dapat notifikasi sistem + banner di aplikasi → **Pengaturan → Keuangan Berdua** → **Terima Undangan** (atau **Tolak** — undangan hilang dari database).
+4. Setelah diterima: kedua akun menampilkan data yang **sama dan terbaru** (terbaru menang); tiap akun tetap punya kode vault sendiri, dan kode penulis terakhir tampil sebagai identitas.
+5. Memutus: tombol **Putuskan** di kartu; sisi pasangan mendeteksi otomatis dan kembali ke data pribadi.
 
 Batasan yang disengaja:
 

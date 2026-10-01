@@ -6,51 +6,73 @@ service cloud.firestore {
     function signedIn() {
       return request.auth != null;
     }
-    // Anggota vault (dokumen baru). Dokumen lama tanpa `members` tetap bisa
-    // diakses pemiliknya (migrasi otomatis saat tulis pertama).
+    // Anggota vault (dokumen baru).
     function isMember(vault) {
       return signedIn() && request.auth.uid in vault.members;
     }
+    // Pemilik vault lama tanpa `members` (migrasi otomatis saat tulis pertama).
     function isLegacyOwner(vault, uid) {
       return signedIn() && !('members' in vault) && request.auth.uid == uid;
     }
-    function isOwner(vaultUid) {
-      return signedIn()
-        && get(/databases/$(database)/documents/digiVaults/$(vaultUid)).data.members[0]
-          == request.auth.uid;
+    // Pemilik dokumen (ID dokumen == UID sendiri).
+    function isDocOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+    // Pasangan tertaut: UID ada di pairedUids dokumen.
+    function isPaired(vault) {
+      return signedIn() && ('pairedUids' in vault) && request.auth.uid in vault.pairedUids;
     }
 
     // ---------- Vault keuangan (pribadi / berdua) ----------
-    // Dokumen ID == uid pemilik pertama. Pasangan bergabung via kode undangan
-    // (lihat vaultInvites) lalu UID-nya masuk `members`.
-    // `resource == null`: dokumen belum ada (user baru) — izinkan baca agar
-    // pembuatan vault pertama tidak ditolak permission-denied.
+    // Dokumen ID == UID pemilik. Berdua = tautan via `pairedUids` di kedua sisi.
+    // Tulis partner hanya untuk field data + cap + identitas (tak boleh ubah
+    // pairing/kode/identitas pemilik). `resource == null` = dokumen belum ada
+    // (izinkan baca agar user/vault baru tidak permission-denied).
     match /digiVaults/{uid} {
-      allow get: if resource == null || isMember(resource.data) || isLegacyOwner(resource.data, uid);
+      allow get: if resource == null
+        || isMember(resource.data)
+        || isLegacyOwner(resource.data, uid)
+        || isDocOwner(uid)
+        || isPaired(resource.data);
       allow list: if false;
       allow create: if signedIn()
         && request.auth.uid == uid
         && request.resource.data.members == [request.auth.uid];
       allow update: if isMember(resource.data)
         || isLegacyOwner(resource.data, uid)
+        || isDocOwner(uid)
         || (
-          // Gabung via kode: hanya boleh menyentuh members/memberProfiles
-          // dan UID sendiri wajib ada di hasil akhir. Tidak perlu baca dulu
-          // (klien memakai arrayUnion), berlaku juga untuk vault lama.
           signedIn()
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'memberProfiles'])
-          && request.auth.uid in request.resource.data.members
+          && request.auth.uid in resource.data.pairedUids
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['transactions', 'categories', 'accounts', 'debts', 'bills',
+                      'billPayments', 'reminderSettings', 'updatedAt', 'lastUpdatedBy',
+                      'lastUpdatedByCode', 'schemaVersion'])
         );
       allow delete: if false;
     }
 
-    // ---------- Undangan berdua: vaultInvites/{KODE} ----------
-    // Dibaca siapa pun yang login (untuk gabung via kode), ditulis hanya pemilik vault.
-    match /vaultInvites/{code} {
-      allow get: if signedIn();
+    // ---------- Direktori vault per email (verifikasi undangan) ----------
+    // ID dokumen = email kecil. Dibaca siapa pun yang login, ditulis hanya
+    // pemilik UID yang tercantum (plus baca dokumen kosong).
+    match /vaultDirectory/{email} {
+      allow get: if resource == null || signedIn();
       allow list: if false;
-      allow create: if isOwner(request.resource.data.vaultUid);
-      allow update, delete: if isOwner(resource.data.vaultUid);
+      allow create, update: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // ---------- Undangan berdua: coupleInvites/{uidPenerima} ----------
+    // Satu undangan tertunda per penerima. Dibaca pengirim/penerima (plus
+    // dokumen kosong), dibuat pengirim, dihapus pengirim/penerima.
+    match /coupleInvites/{toUid} {
+      allow get: if resource == null
+        || (signedIn() && (request.auth.uid == toUid || request.auth.uid == resource.data.fromUid));
+      allow list: if false;
+      allow create: if signedIn() && request.resource.data.fromUid == request.auth.uid;
+      allow update: if false;
+      allow delete: if signedIn()
+        && (request.auth.uid == toUid || request.auth.uid == resource.data.fromUid);
     }
   }
 }

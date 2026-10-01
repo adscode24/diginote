@@ -42,7 +42,7 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) => {
-  const { summary, transactions, debts, accounts, categories, reminderSettings, syncNotice, clearSyncNotice, syncStatus, pullFromVaultNow, shareMembers } = useFinance();
+  const { summary, transactions, debts, accounts, categories, reminderSettings, syncNotice, clearSyncNotice, syncStatus, pullFromVaultNow, pairPartner, lastUpdatedByCode } = useFinance();
   const { currentUser } = useAuth();
 
   const [selectedDebtToPay, setSelectedDebtToPay] = useState<Debt | null>(null);
@@ -276,20 +276,33 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
       </div>
 
       {/* Keuangan Berdua: siapa mencatat bulan ini */}
-      {shareMembers.length > 1 && (
+      {pairPartner && (
         <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-            Keuangan Berdua · {selectedMonthLabel}
+          <div className="flex items-center justify-between">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              Keuangan Berdua · {selectedMonthLabel}
+            </div>
+            {lastUpdatedByCode && (
+              <div className="text-[10px] text-slate-400">
+                Terbaru: <strong className="font-mono">{lastUpdatedByCode}</strong>
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-2.5 mt-2.5">
-            {shareMembers.map(m => {
+            {[null, pairPartner].map((m, idx) => {
               const spent = monthlyTransactions
-                .filter(t => t.type === 'expense' && (t.authorUid === m.uid || (!t.authorUid && t.authorName === m.name)))
+                .filter(t =>
+                  t.type === 'expense' &&
+                  (idx === 0
+                    ? !t.authorUid || (pairPartner && t.authorUid !== pairPartner.uid)
+                    : t.authorUid === pairPartner?.uid)
+                )
                 .reduce((s, t) => s + (Number(t.amount) || 0), 0);
-              const initial = ((m.name || m.email || '?').trim()[0] || '?').toUpperCase();
+              const label = idx === 0 ? 'Saya' : (pairPartner?.name || pairPartner?.email || 'Pasangan').split(' ')[0];
+              const initial = (label.trim()[0] || '?').toUpperCase();
               return (
                 <div
-                  key={m.uid}
+                  key={idx === 0 ? 'me' : pairPartner?.uid}
                   className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800 flex items-center gap-2.5"
                 >
                   <span className="w-9 h-9 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 text-white text-sm font-extrabold flex items-center justify-center shrink-0">
@@ -297,7 +310,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                   </span>
                   <div className="min-w-0">
                     <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                      {(m.name || 'Anggota').split(' ')[0]}
+                      {label}
                     </div>
                     <div className="text-[11px] font-semibold text-red-600 dark:text-red-400 tabular-nums">
                       -{masked('kpi-all', spent)}

@@ -27,16 +27,21 @@ import {
   type CloudVault,
   type VaultPayload,
   type VaultOwner,
-  type VaultMember,
-  getActiveVaultUid,
-  setActiveVaultUid,
-  publishInvite,
-  revokeInvite,
-  joinVaultByCode,
-  leaveSharedVault as svcLeaveSharedVault,
-  kickMember,
-  rotateInviteCode,
-  touchOwnProfile,
+  type PairPartner,
+  type PairInvite,
+  upsertDirectoryEntry,
+  lookupVaultByEmail,
+  sendPairInvite,
+  readMyPairInvite,
+  cancelPairInvite,
+  acceptPairInvite,
+  declinePairInvite,
+  removePairFromMyVault,
+  rotateMyVaultCode,
+  readPairedVaults,
+  pushPairedVaults,
+  readSentInvite,
+  setMyPairedUids,
 } from '../services/cloudSync';
 
 interface FinanceContextType {
@@ -98,14 +103,17 @@ interface FinanceContextType {
   deleteBillPayment: (paymentId: string) => void;
 
   // Keuangan Berdua (1 vault untuk 2 email via kode undangan)
-  shareMode: 'personal' | 'shared';
-  shareMembers: VaultMember[];
-  myInviteCode: string;
-  joinSharedVault: (code: string) => Promise<{ ownerName: string | null }>;
-  leaveSharedVault: () => Promise<void>;
-  kickSharedMember: (targetUid: string) => Promise<void>;
-  rotateSharedCode: () => Promise<string>;
-  refreshShareMembers: () => Promise<void>;
+  // Keuangan Berdua model tautan (tiap akun tetap punya vault+kode sendiri)
+  pairPartner: PairPartner | null;
+  pendingInvite: PairInvite | null;
+  lastUpdatedByCode: string | null;
+  myVaultCode: string;
+  sendPairInviteTo: (email: string, code: string) => Promise<void>;
+  acceptPairInviteFrom: () => Promise<void>;
+  declinePairInviteFrom: () => Promise<void>;
+  unpairPartner: () => Promise<void>;
+  rotateMyCode: () => Promise<string>;
+  refreshPairing: () => Promise<void>;
 
   // Settings & Theme
   setThemeMode: (mode: ThemeMode) => void;
@@ -225,10 +233,26 @@ const LEGACY_GLOBAL_KEYS: Record<string, string> = {
 export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: string; authorName?: string }> = ({ children, userId, authorName }) => {
   const STORAGE_KEYS = buildStorageKeys(userId);
 
-  // Keuangan Berdua: dokumen vault aktif (pribadi = uid sendiri).
-  const [activeVaultUid, setActiveVaultUidState] = useState<string | null>(() => getActiveVaultUid(userId));
-  const vaultDocUid = activeVaultUid || userId;
-  const [vaultMembers, setVaultMembers] = useState<VaultMember[]>([]);
+  // Keuangan Berdua model tautan: pasangan tersimpan per akun, kode milik sendiri.
+  const [pairPartner, setPairPartner] = useState<PairPartner | null>(() => {
+    try {
+      const raw = localStorage.getItem(`diginote_pair_partner_${userId}`);
+      return raw ? (JSON.parse(raw) as PairPartner) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [pendingInvite, setPendingInvite] = useState<PairInvite | null>(null);
+  const [lastUpdatedByCode, setLastUpdatedByCode] = useState<string | null>(null);
+  const persistPartner = (pp: PairPartner | null) => {
+    setPairPartner(pp);
+    try {
+      if (pp) localStorage.setItem(`diginote_pair_partner_${userId}`, JSON.stringify(pp));
+      else localStorage.removeItem(`diginote_pair_partner_${userId}`);
+    } catch {
+      /* abaikan */
+    }
+  };
   // 1. Accounts / Sumber Dana State (kosong secara default, pengguna buat sendiri)
   const [accounts, setAccounts] = useState<Account[]>(() => {
     try {
@@ -409,7 +433,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     if (Array.isArray(vault.bills)) setBills(vault.bills);
     if (Array.isArray(vault.billPayments)) setBillPayments(vault.billPayments);
     if (vault.reminderSettings) setReminderSettings(vault.reminderSettings);
-    if (Array.isArray(vault.memberProfiles)) setVaultMembers(vault.memberProfiles);
+    if (vault.lastUpdatedByCode) setLastUpdatedByCode(vault.lastUpdatedByCode);
     setLastSyncedAt(Date.now());
   };
 
@@ -495,13 +519,123 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
         }
 
         const owner = vaultOwner(currentEmail());
-        const vault = await ensureUserVault(owner, localSnapshot, vaultDocUid);
+        const vault = await ensureUserVault(owner, localSnapshot, userId);
         if (cancelled) return;
         setCloudVaultId(vault.vaultCode || '');
-        setVaultMembers(Array.isArray(vault.memberProfiles) ? vault.memberProfiles : []);
         setLastSyncedAt(Date.now());
-        // Daftarkan profil tampilan sendiri agar pasangan melihat nama (sekali jalan, diam-diam)
-        void touchOwnProfile(owner, vaultDocUid);
+        // Daftarkan direktori agar pasangan bisa verifikasi undangan via email+kode
+        void upsertDirectoryEntry(owner, vault.vaultCode || '').catch(() => {});
+
+        // --- Keuangan Berdua: undangan masuk + vault pasangan ---
+        let partnerVault: CloudVault | null = null;
+        try {
+          if (navigator.onLine) {
+            const inv = await readMyPairInvite(userId);
+            if (inv) {
+              setPendingInvite(inv);
+              const seenKey = `diginote_invite_notified_${userId}_${inv.fromUid}_${inv.createdAt}`;
+              let seen = false;
+              try {
+                seen = !!localStorage.getItem(seenKey);
+              } catch {
+                /* abaikan */
+              }
+              if (!seen) {
+                try {
+                  localStorage.setItem(seenKey, '1');
+                } catch {
+                  /* abaikan */
+                }
+                const fromName = inv.fromName || inv.fromEmail || 'Pasangan';
+                await notifyPairEvent(
+                  'Undangan Catat Berdua',
+                  `${fromName} mengundang Anda catat berdua. Buka Pengaturan untuk menerima/menolak.`
+                );
+              }
+            } else {
+              setPendingInvite(null);
+            }
+          }
+        } catch {
+          /* abaikan: lanjut mode pribadi */
+        }
+        // Rawat undangan yang saya kirim (diterima/ditolak?)
+        try {
+          if (navigator.onLine) {
+            const sent = loadSentInvites();
+            const stillPending: string[] = [];
+            for (const toUid of sent) {
+              try {
+                const inv = await readSentInvite(toUid);
+                if (inv) {
+                  stillPending.push(toUid);
+                  continue;
+                }
+                let accepted = false;
+                try {
+                  const theirs = await fetchVaultById(toUid);
+                  accepted = !!theirs && Array.isArray(theirs.pairedUids) && theirs.pairedUids.includes(userId);
+                  if (accepted && theirs) {
+                    persistPartner({
+                      uid: toUid,
+                      email: theirs.ownerEmail || pairPartner?.email || null,
+                      name: theirs.displayName || pairPartner?.name || null,
+                      code: theirs.vaultCode || pairPartner?.code || '',
+                    });
+                    setSyncNotice({ text: 'Pasangan menerima undangan berdua!', action: null });
+                  }
+                } catch {
+                  accepted = false;
+                }
+                if (!accepted) {
+                  try {
+                    const mine0 = await fetchVaultById(userId);
+                    const minePaired = mine0 && Array.isArray(mine0.pairedUids) ? mine0.pairedUids : [];
+                    if (minePaired.includes(toUid)) {
+                      await setMyPairedUids(owner, minePaired.filter(u => u !== toUid));
+                    }
+                  } catch {
+                    /* abaikan */
+                  }
+                  if (pairPartner?.uid === toUid) persistPartner(null);
+                  setSyncNotice({ text: 'Undangan berdua ditolak/dibatalkan.', action: null });
+                }
+              } catch {
+                stillPending.push(toUid);
+              }
+            }
+            saveSentInvites(stillPending);
+          }
+        } catch {
+          /* abaikan */
+        }
+        // Baca vault pasangan (bila tertaut) + deteksi pencabutan
+        try {
+          if (navigator.onLine) {
+            const paired = await readPairedVaults(userId);
+            if (paired.revoked && paired.partnerUid) {
+              try {
+                const mine0 = await fetchVaultById(userId);
+                const minePaired = mine0 && Array.isArray(mine0.pairedUids) ? mine0.pairedUids : [];
+                if (minePaired.includes(paired.partnerUid)) {
+                  await setMyPairedUids(owner, minePaired.filter(u => u !== paired.partnerUid));
+                }
+              } catch {
+                /* abaikan */
+              }
+              if (pairPartner) persistPartner(null);
+              saveSentInvites(loadSentInvites().filter(() => false));
+              setSyncNotice({ text: 'Pasangan berhenti berbagi. Kembali ke data pribadi.', action: null });
+              await notifyPairEvent('Keuangan Berdua berakhir', 'Pasangan berhenti berbagi catatan.');
+            } else {
+              partnerVault = paired.partner;
+              const newest0 = pickNewestVault(vault, partnerVault);
+              if (newest0?.lastUpdatedByCode) setLastUpdatedByCode(newest0.lastUpdatedByCode);
+            }
+          }
+        } catch {
+          /* abaikan: lanjut dengan vault sendiri */
+        }
 
         // Sinkronisasi saat masuk aplikasi: selalu konvergen ke data terbaru.
         // - Cloud lebih baru (atau lokal kosong) -> pakai cloud, tampilkan terbaru.
@@ -513,23 +647,29 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
           localSnapshot.debts.length === 0 &&
           localSnapshot.bills.length === 0 &&
           localSnapshot.billPayments.length === 0;
+        // Kandidat cloud: vault sendiri + vault pasangan (yang terbaru menang)
+        const newestCloud = pickNewestVault(vault, partnerVault) || vault;
         const cloudHasData =
-          vault.transactions.length > 0 ||
-          vault.debts.length > 0 ||
-          vault.bills.length > 0 ||
-          vault.billPayments.length > 0;
-        const vaultTime = vault.updatedAt || '';
+          newestCloud.transactions.length > 0 ||
+          newestCloud.debts.length > 0 ||
+          newestCloud.bills.length > 0 ||
+          newestCloud.billPayments.length > 0;
+        const vaultTime = newestCloud.updatedAt || '';
+        if (newestCloud.lastUpdatedByCode) setLastUpdatedByCode(newestCloud.lastUpdatedByCode);
         if (cloudHasData && (localEmpty || (vaultTime && vaultTime > storedBase))) {
           justAppliedRef.current = true;
-          applyCloudVault(vault);
+          applyCloudVault(newestCloud);
           persistBase(vaultTime);
           if (!localEmpty) {
-            setSyncNotice({ text: 'Data terbaru dari cloud dimuat.', action: null });
+            setSyncNotice({
+              text: partnerVault && newestCloud === partnerVault ? 'Data terbaru pasangan dimuat.' : 'Data terbaru dari cloud dimuat.',
+              action: null,
+            });
           }
         } else if (!localEmpty && storedBase && (!vaultTime || storedBase > vaultTime)) {
           // Perangkat ini menyimpan perubahan yang belum ada di cloud -> kirim sekarang
           try {
-            const updatedAt = await pushVault(owner, vault.vaultCode || '', localSnapshot, vaultDocUid);
+            const { updatedAt } = await pushToBoth(localSnapshot, vault.vaultCode || '');
             persistBase(updatedAt);
             setLastSyncedAt(Date.now());
             setSyncNotice({ text: 'Perubahan offline dikirim ke cloud.', action: null });
@@ -572,7 +712,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     }
     setSyncStatus('syncing');
     try {
-      const updatedAt = await pushVault(vaultOwner(currentEmail()), cloudVaultId, {
+      const { updatedAt, partnerOk } = await pushToBoth({
         transactions,
         categories,
         accounts,
@@ -580,11 +720,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
         bills,
         billPayments,
         reminderSettings,
-      }, vaultDocUid);
+      }, cloudVaultId);
       setLastSyncedAt(Date.now());
       setSyncStatus('synced');
       setSyncErrorMsg(null);
-      setSyncNotice({ text: 'Data berhasil disinkronkan ke cloud.', action: null });
+      setSyncNotice({
+        text: partnerOk ? 'Data berhasil disinkronkan ke cloud.' : 'Tersimpan di vault Anda, tetapi gagal ke vault pasangan.',
+        action: null,
+      });
       void sendSyncNotification(true, 'Data berhasil disinkronkan ke cloud.');
       persistBase(updatedAt);
       return true;
@@ -608,14 +751,16 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     if (!cloudEnabled || !isCloudCapableUid(userId)) return false;
     setSyncStatus('syncing');
     try {
-      const remote = await fetchVaultById(vaultDocUid);
+      const { mine, partner } = await readPairedVaults(userId);
+      const remote = pickNewestVault(mine, partner);
       if (!remote) {
         setSyncStatus(navigator.onLine ? 'synced' : 'offline');
         return false;
       }
       if (remote.vaultCode) setCloudVaultId(remote.vaultCode);
-      if (Array.isArray(remote.memberProfiles)) setVaultMembers(remote.memberProfiles);
+      justAppliedRef.current = true;
       applyCloudVault(remote);
+      persistBase(remote.updatedAt || '');
       setSyncStatus(navigator.onLine ? 'synced' : 'offline');
       setSyncErrorMsg(null);
       setSyncNotice(null);
@@ -641,81 +786,198 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     return () => clearTimeout(timer);
   }, [syncNotice]);
 
-  // ---------- Keuangan Berdua ----------
-  const shareMode: 'personal' | 'shared' = activeVaultUid && activeVaultUid !== userId ? 'shared' : 'personal';
-
-  const refreshShareMembers = useCallback(async (): Promise<void> => {
-    if (!cloudEnabled || !isCloudCapableUid(userId)) return;
+  // ---------- Keuangan Berdua model tautan ----------
+  const sentInviteKey = `diginote_sent_invites_${userId}`;
+  const loadSentInvites = (): string[] => {
     try {
-      const remote = await fetchVaultById(vaultDocUid);
-      if (remote && Array.isArray(remote.memberProfiles)) setVaultMembers(remote.memberProfiles);
-      if (remote?.vaultCode) setCloudVaultId(remote.vaultCode);
+      const raw = localStorage.getItem(sentInviteKey);
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr.filter(x => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
+  };
+  const saveSentInvites = (list: string[]) => {
+    try {
+      localStorage.setItem(sentInviteKey, JSON.stringify(list));
     } catch {
       /* abaikan */
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cloudEnabled, userId, vaultDocUid]);
+  };
 
-  const joinSharedVault = useCallback(async (code: string): Promise<{ ownerName: string | null }> => {
-    if (!cloudEnabled || !isCloudCapableUid(userId)) {
-      throw new Error('Keuangan Berdua membutuhkan akun cloud (bukan mode lokal).');
-    }
-    const clean = code.trim().toUpperCase();
-    if (!clean) throw new Error('Masukkan kode undangan pasangan.');
-    const owner = vaultOwner(currentEmail());
-    const { vault, vaultUid: sharedUid } = await joinVaultByCode(owner, clean);
-    setActiveVaultUidState(sharedUid);
-    setActiveVaultUid(userId, sharedUid);
-    setVaultMembers(Array.isArray(vault.memberProfiles) ? vault.memberProfiles : []);
-    if (vault.vaultCode) setCloudVaultId(vault.vaultCode);
-    justAppliedRef.current = true;
-    applyCloudVault(vault);
-    persistBase(vault.updatedAt || '');
-    setSyncNotice({ text: 'Terhubung ke vault pasangan. Data terbaru dimuat.', action: null });
-    return { ownerName: vault.memberProfiles?.find(p => p.uid !== userId)?.name ?? null };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cloudEnabled, userId]);
+  const pickNewestVault = (a: CloudVault | null, b: CloudVault | null): CloudVault | null => {
+    if (a && b) return (b.updatedAt || '') > (a.updatedAt || '') ? b : a;
+    return a || b;
+  };
 
-  const leaveSharedVault = useCallback(async (): Promise<void> => {
-    if (shareMode !== 'shared') return;
-    const owner = vaultOwner(currentEmail());
+  const notifyPairEvent = async (title: string, body: string) => {
     try {
-      await svcLeaveSharedVault(owner, vaultDocUid);
+      const { Capacitor } = await import('@capacitor/core');
+      if (!Capacitor.isNativePlatform()) return;
+      const { LocalNotifications } = await import('@capacitor/local-notifications');
+      const perm = await LocalNotifications.checkPermissions().catch(() => null);
+      if (!perm || perm.display !== 'granted') return;
+      await LocalNotifications.schedule({
+        notifications: [{ id: 1004, title, body, schedule: { at: new Date(Date.now() + 500), allowWhileIdle: true } }],
+      });
     } catch {
-      /* tetap lanjut kembali ke pribadi */
+      /* abaikan */
     }
-    setActiveVaultUidState(null);
-    setActiveVaultUid(userId, null);
-    setVaultMembers([]);
+  };
+
+  /** Tulis ke vault sendiri + vault pasangan (best-effort). */
+  const pushToBoth = async (payload: VaultPayload, code: string): Promise<{ updatedAt: string; partnerOk: boolean }> => {
+    const owner = vaultOwner(currentEmail());
+    const updatedAt = await pushVault(owner, code, payload, userId, { byUid: userId, byCode: code });
+    let partnerOk = true;
+    const puid = pairPartner?.uid;
+    if (puid && puid !== userId) {
+      try {
+        await pushVault(owner, code, payload, puid, { byUid: userId, byCode: code, dataOnly: true });
+      } catch (err) {
+        partnerOk = false;
+        if ((err as { code?: string })?.code === 'permission-denied') {
+          await dropPairing('Pasangan mencabut akses berdua. Kembali ke data pribadi.');
+        }
+      }
+    }
+    return { updatedAt, partnerOk };
+  };
+
+  /** Bersihkan tautan lokal saat akses dicabut sisi pasangan. */
+  const dropPairing = async (reason: string) => {
     try {
-      const personal = await fetchVaultById(userId);
-      if (personal) {
-        justAppliedRef.current = true;
-        applyCloudVault(personal);
-        persistBase(personal.updatedAt || '');
-        if (personal.vaultCode) setCloudVaultId(personal.vaultCode);
+      const mine = await fetchVaultById(userId);
+      const paired = mine && Array.isArray(mine.pairedUids) ? mine.pairedUids : [];
+      const next = paired.filter(u => u !== pairPartner?.uid && u !== undefined);
+      if (mine && next.length !== paired.length) {
+        await setMyPairedUids(vaultOwner(currentEmail()), next);
       }
     } catch {
       /* abaikan */
     }
-    setSyncNotice({ text: 'Kembali ke vault pribadi.', action: null });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shareMode, userId, vaultDocUid]);
+    persistPartner(null);
+    saveSentInvites(loadSentInvites().filter(() => false));
+    setSyncNotice({ text: reason, action: null });
+    await notifyPairEvent('Keuangan Berdua berakhir', reason);
+  };
 
-  const kickSharedMember = useCallback(async (targetUid: string): Promise<void> => {
+  const refreshPairing = useCallback(async (): Promise<void> => {
     if (!cloudEnabled || !isCloudCapableUid(userId)) return;
-    await kickMember(vaultOwner(currentEmail()), vaultDocUid, targetUid);
-    await refreshShareMembers();
+    try {
+      const { mine, partner, partnerUid, revoked } = await readPairedVaults(userId);
+      if (revoked && partnerUid) {
+        await dropPairing('Pasangan berhenti berbagi. Kembali ke data pribadi.');
+        return;
+      }
+      if (mine?.vaultCode) setCloudVaultId(mine.vaultCode);
+      const newest = pickNewestVault(mine, partner);
+      if (newest?.lastUpdatedByCode) setLastUpdatedByCode(newest.lastUpdatedByCode);
+      // Segarkan profil pasangan (nama/kode) dari direktori bila email dikenal
+      if (pairPartner?.email) {
+        try {
+          const dir = await lookupVaultByEmail(pairPartner.email);
+          if (dir && dir.uid === pairPartner.uid) {
+            persistPartner({ ...pairPartner, name: dir.name || pairPartner.name, code: dir.vaultCode || pairPartner.code });
+          }
+        } catch {
+          /* abaikan */
+        }
+      }
+    } catch {
+      /* abaikan */
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cloudEnabled, userId, vaultDocUid]);
+  }, [cloudEnabled, userId]);
 
-  const rotateSharedCode = useCallback(async (): Promise<string> => {
-    if (!cloudEnabled || !isCloudCapableUid(userId)) throw new Error('Butuh akun cloud.');
-    const invite = await rotateInviteCode(vaultOwner(currentEmail()), vaultDocUid);
-    setCloudVaultId(invite.code);
-    return invite.code;
+  const sendPairInviteTo = useCallback(async (email: string, code: string): Promise<void> => {
+    if (!cloudEnabled || !isCloudCapableUid(userId)) {
+      throw new Error('Keuangan Berdua membutuhkan akun cloud (bukan mode lokal).');
+    }
+    const cleanEmail = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) throw new Error('Email pasangan tidak valid.');
+    const cleanCode = code.trim().toUpperCase();
+    if (!cleanCode) throw new Error('Masukkan kode vault pasangan.');
+    if (cleanEmail === (currentEmail() || '').toLowerCase()) throw new Error('Itu email Anda sendiri.');
+    const target = await lookupVaultByEmail(cleanEmail);
+    if (!target) {
+      throw new Error('Email belum terdaftar / belum pernah sinkron. Minta pasangan buka aplikasi sekali.');
+    }
+    if ((target.vaultCode || '').toUpperCase() !== cleanCode) {
+      throw new Error('Kode vault tidak cocok dengan email tersebut.');
+    }
+    if (target.uid === userId) throw new Error('Itu akun Anda sendiri.');
+    const owner = vaultOwner(currentEmail());
+    await sendPairInvite(owner, cloudVaultId || '', cleanEmail, target);
+    persistPartner({ uid: target.uid, email: target.email, name: target.name ?? null, code: cleanCode });
+    const sent = loadSentInvites();
+    if (!sent.includes(target.uid)) saveSentInvites([...sent, target.uid]);
+    setSyncNotice({ text: `Undangan terkirim ke ${target.email}. Menunggu pasangan menerima.`, action: null });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cloudEnabled, userId, vaultDocUid]);
+  }, [cloudEnabled, userId, cloudVaultId]);
+
+  const acceptPairInviteFrom = useCallback(async (): Promise<void> => {
+    const inv = pendingInvite;
+    if (!inv) throw new Error('Tidak ada undangan.');
+    if (!cloudEnabled || !isCloudCapableUid(userId)) throw new Error('Butuh akun cloud.');
+    const owner = vaultOwner(currentEmail());
+    await acceptPairInvite(owner, inv, cloudVaultId || '');
+    persistPartner({ uid: inv.fromUid, email: inv.fromEmail, name: inv.fromName, code: inv.fromCode });
+    setPendingInvite(null);
+    const { mine, partner } = await readPairedVaults(userId);
+    const newest = pickNewestVault(mine, partner);
+    if (newest) {
+      justAppliedRef.current = true;
+      applyCloudVault(newest);
+      persistBase(newest.updatedAt || '');
+      if (newest.lastUpdatedByCode) setLastUpdatedByCode(newest.lastUpdatedByCode);
+    }
+    setSyncNotice({ text: 'Terhubung! Data terbaru berdua dimuat.', action: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingInvite, cloudEnabled, userId, cloudVaultId]);
+
+  const declinePairInviteFrom = useCallback(async (): Promise<void> => {
+    const inv = pendingInvite;
+    if (!inv) return;
+    try {
+      await declinePairInvite(vaultOwner(currentEmail()), inv);
+    } catch {
+      /* tetap lanjut */
+    }
+    setPendingInvite(null);
+    setSyncNotice({ text: 'Undangan ditolak dan dihapus.', action: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingInvite, userId]);
+
+  const unpairPartner = useCallback(async (): Promise<void> => {
+    const puid = pairPartner?.uid;
+    if (!puid) {
+      persistPartner(null);
+      return;
+    }
+    try {
+      await removePairFromMyVault(vaultOwner(currentEmail()), puid);
+    } catch {
+      /* lanjut */
+    }
+    try {
+      await cancelPairInvite(puid);
+    } catch {
+      /* abaikan */
+    }
+    persistPartner(null);
+    saveSentInvites(loadSentInvites().filter(u => u !== puid));
+    setSyncNotice({ text: 'Tautan berdua diputus. Kembali ke data pribadi.', action: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pairPartner, userId]);
+
+  const rotateMyCode = useCallback(async (): Promise<string> => {
+    if (!cloudEnabled || !isCloudCapableUid(userId)) throw new Error('Butuh akun cloud.');
+    const code = await rotateMyVaultCode(vaultOwner(currentEmail()));
+    setCloudVaultId(code);
+    return code;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloudEnabled, userId]);
 
   // Otomatis menyimpan ke cloud setiap ada data baru (debounced, pola Fuel-Traxr).
   // Aman dari freeze: payload terstruktur kecil (tanpa foto), tanpa listener realtime.
@@ -740,7 +1002,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
       }
       setSyncStatus('syncing');
       try {
-        const updatedAt = await pushVault(vaultOwner(currentEmail()), cloudVaultId, {
+        const { updatedAt, partnerOk } = await pushToBoth({
           transactions,
           categories,
           accounts,
@@ -748,11 +1010,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
           bills,
           billPayments,
           reminderSettings,
-        }, vaultDocUid);
+        }, cloudVaultId);
         persistBase(updatedAt);
         setLastSyncedAt(Date.now());
         setSyncStatus('synced');
         setSyncErrorMsg(null);
+        if (!partnerOk) {
+          setSyncNotice({ text: 'Tersimpan di vault Anda, tetapi gagal ke vault pasangan.', action: null });
+        }
       } catch (err: unknown) {
         const msg = (err as Error)?.message || 'Gagal sinkron ke cloud.';
         if (!navigator.onLine) {
@@ -1597,14 +1862,16 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
         cloudVaultId,
         pushToVaultNow,
         pullFromVaultNow,
-        shareMode,
-        shareMembers: vaultMembers,
-        myInviteCode: cloudVaultId || '',
-        joinSharedVault,
-        leaveSharedVault,
-        kickSharedMember,
-        rotateSharedCode,
-        refreshShareMembers,
+        pairPartner,
+        pendingInvite,
+        lastUpdatedByCode,
+        myVaultCode: cloudVaultId || '',
+        sendPairInviteTo,
+        acceptPairInviteFrom,
+        declinePairInviteFrom,
+        unpairPartner,
+        rotateMyCode,
+        refreshPairing,
       }}
     >
       {children}

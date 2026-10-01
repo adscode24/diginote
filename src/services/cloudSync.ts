@@ -29,6 +29,25 @@ export interface VaultMember {
   name?: string | null;
 }
 
+export interface DirectoryEntry {
+  uid: string;
+  email: string;
+  vaultCode: string;
+  name?: string | null;
+  updatedAt: string;
+}
+
+export interface PairInvite {
+  fromUid: string;
+  fromEmail: string | null;
+  fromName: string | null;
+  fromCode: string;
+  toUid: string;
+  toEmail: string;
+  status: "pending";
+  createdAt: string;
+}
+
 export interface CloudVault extends VaultPayload {
   ownerEmail: string | null;
   displayName: string | null;
@@ -37,6 +56,9 @@ export interface CloudVault extends VaultPayload {
   schemaVersion: number;
   members: string[];
   memberProfiles: VaultMember[];
+  pairedUids: string[];
+  lastUpdatedBy?: string | null;
+  lastUpdatedByCode?: string | null;
 }
 
 /** Identitas minimal pemilik vault (dekopling dari tipe firebase User). */
@@ -106,8 +128,12 @@ function vaultDocRef(docId: string) {
   return doc(db, VAULT_COLLECTION, docId);
 }
 
-function inviteDocRef(code: string) {
-  return doc(db, "vaultInvites", code.trim().toUpperCase());
+function directoryDocRef(email: string) {
+  return doc(db, "vaultDirectory", email.trim().toLowerCase());
+}
+
+function pairInviteDocRef(toUid: string) {
+  return doc(db, "coupleInvites", toUid);
 }
 
 /** Ambil vault sekali (untuk tarik manual paksa). */
@@ -136,6 +162,9 @@ export async function fetchVaultById(docId: string): Promise<CloudVault | null> 
       schemaVersion: (data.schemaVersion as number) ?? VAULT_SCHEMA_VERSION,
       members: Array.isArray(data.members) ? (data.members as string[]) : [],
       memberProfiles: Array.isArray(data.memberProfiles) ? (data.memberProfiles as VaultMember[]) : [],
+      pairedUids: Array.isArray(data.pairedUids) ? (data.pairedUids as string[]) : [],
+      lastUpdatedBy: (data.lastUpdatedBy as string | null) ?? null,
+      lastUpdatedByCode: (data.lastUpdatedByCode as string | null) ?? null,
     };
   } catch (err) {
     throw toFriendlyError(err);
@@ -208,6 +237,9 @@ export async function ensureUserVault(
           schemaVersion: VAULT_SCHEMA_VERSION,
           members: Array.isArray(data.members) ? (data.members as string[]) : [],
           memberProfiles: Array.isArray(data.memberProfiles) ? (data.memberProfiles as VaultMember[]) : [],
+      pairedUids: Array.isArray(data.pairedUids) ? (data.pairedUids as string[]) : [],
+      lastUpdatedBy: (data.lastUpdatedBy as string | null) ?? null,
+      lastUpdatedByCode: (data.lastUpdatedByCode as string | null) ?? null,
         };
       }
       return {
@@ -225,6 +257,9 @@ export async function ensureUserVault(
         schemaVersion: VAULT_SCHEMA_VERSION,
         members: Array.isArray(data.members) ? (data.members as string[]) : [],
         memberProfiles: Array.isArray(data.memberProfiles) ? (data.memberProfiles as VaultMember[]) : [],
+      pairedUids: Array.isArray(data.pairedUids) ? (data.pairedUids as string[]) : [],
+      lastUpdatedBy: (data.lastUpdatedBy as string | null) ?? null,
+      lastUpdatedByCode: (data.lastUpdatedByCode as string | null) ?? null,
       };
     }
     // Belum ada -> buat baru, bawa data lokal HP pertama jika ada
@@ -246,6 +281,9 @@ export async function ensureUserVault(
       schemaVersion: VAULT_SCHEMA_VERSION,
       members: [user.uid],
       memberProfiles: [{ uid: user.uid, email: user.email ?? null, name: user.displayName ?? null }],
+      pairedUids: [],
+      lastUpdatedBy: user.uid,
+      lastUpdatedByCode: vaultCode,
     };
     await setDoc(ref, fresh);
     return fresh;
@@ -254,31 +292,41 @@ export async function ensureUserVault(
   }
 }
 
-/** Dorong seluruh state lokal ke cloud (last-write-wins per vault). */
+/** Dorong seluruh state lokal ke cloud (last-write-wins per vault).
+ *  dataOnly=true untuk tulis ke vault pasangan (rules hanya mengizinkan
+ *  field data + cap waktu + identitas penulis, bukan identitas pemilik). */
 export async function pushVault(
   user: VaultOwner,
   vaultCode: string,
   payload: VaultPayload,
-  docId?: string
+  docId?: string,
+  meta?: { byUid?: string | null; byCode?: string | null; dataOnly?: boolean }
 ): Promise<string> {
   try {
     const updatedAt = new Date().toISOString();
+    const base = {
+      transactions: sanitizeForFirestore(payload.transactions),
+      categories: sanitizeForFirestore(payload.categories),
+      accounts: sanitizeForFirestore(payload.accounts),
+      debts: sanitizeForFirestore(payload.debts),
+      bills: sanitizeForFirestore(payload.bills),
+      billPayments: sanitizeForFirestore(payload.billPayments),
+      reminderSettings: sanitizeForFirestore(payload.reminderSettings),
+      updatedAt,
+      lastUpdatedBy: meta?.byUid ?? user.uid,
+      lastUpdatedByCode: meta?.byCode ?? vaultCode,
+      schemaVersion: VAULT_SCHEMA_VERSION,
+    };
     await setDoc(
       vaultDocRef(docId || user.uid),
-      {
-        transactions: sanitizeForFirestore(payload.transactions),
-        categories: sanitizeForFirestore(payload.categories),
-        accounts: sanitizeForFirestore(payload.accounts),
-        debts: sanitizeForFirestore(payload.debts),
-        bills: sanitizeForFirestore(payload.bills),
-        billPayments: sanitizeForFirestore(payload.billPayments),
-        reminderSettings: sanitizeForFirestore(payload.reminderSettings),
-        ownerEmail: user.email ?? null,
-        displayName: user.displayName ?? null,
-        vaultCode,
-        updatedAt,
-        schemaVersion: VAULT_SCHEMA_VERSION,
-      },
+      meta?.dataOnly
+        ? base
+        : {
+            ...base,
+            ownerEmail: user.email ?? null,
+            displayName: user.displayName ?? null,
+            vaultCode,
+          },
       { merge: true }
     );
     return updatedAt;
@@ -322,6 +370,9 @@ export function subscribeVault(
             schemaVersion: (data.schemaVersion as number) ?? VAULT_SCHEMA_VERSION,
             members: Array.isArray(data.members) ? (data.members as string[]) : [],
             memberProfiles: Array.isArray(data.memberProfiles) ? (data.memberProfiles as VaultMember[]) : [],
+      pairedUids: Array.isArray(data.pairedUids) ? (data.pairedUids as string[]) : [],
+      lastUpdatedBy: (data.lastUpdatedBy as string | null) ?? null,
+      lastUpdatedByCode: (data.lastUpdatedByCode as string | null) ?? null,
           });
         } catch (err) {
           onError(toFriendlyError(err));
@@ -336,111 +387,54 @@ export function subscribeVault(
 }
 
 // =====================================================================
-// Keuangan Berdua: berbagi satu vault antar email via kode undangan.
-// Alur: pemilik menyalakan undangan (kode = vaultCode) -> pasangan
-// memasukkan kode -> UID pasangan masuk `members` -> kedua HP
-// baca/tulis dokumen vault yang sama. Foto struk tetap lokal per HP.
+// =====================================================================
+// Keuangan Berdua model TAUTAN (pairing): tiap akun tetap punya vault +
+// kode sendiri; data disamakan dua arah (tulis ke dua dokumen, baca yang
+// terbaru). lastUpdatedBy/Code = identitas penulis terakhir.
+// Foto struk tetap lokal per HP.
 // =====================================================================
 
-export interface VaultInvite {
+export interface PairPartner {
+  uid: string;
+  email: string | null;
+  name: string | null;
   code: string;
-  vaultUid: string;
-  ownerName: string | null;
-  createdAt: string;
 }
 
-function activeVaultKey(appUid: string): string {
-  return `diginote_active_vault_${appUid}`;
-}
-
-/** ID dokumen vault yang dipakai akun ini (pribadi = uid sendiri). */
-export function getActiveVaultUid(appUid: string): string | null {
+/** Catat/segarkan direktori vault saya (untuk verifikasi undangan pasangan). */
+export async function upsertDirectoryEntry(owner: VaultOwner, vaultCode: string): Promise<void> {
+  const email = (owner.email || "").trim().toLowerCase();
+  if (!email) return;
   try {
-    return localStorage.getItem(activeVaultKey(appUid));
-  } catch {
-    return null;
-  }
-}
-
-export function setActiveVaultUid(appUid: string, vaultUid: string | null): void {
-  try {
-    if (vaultUid) localStorage.setItem(activeVaultKey(appUid), vaultUid);
-    else localStorage.removeItem(activeVaultKey(appUid));
-  } catch {
-    /* abaikan */
-  }
-}
-
-function profileOf(user: VaultOwner): VaultMember {
-  return { uid: user.uid, email: user.email ?? null, name: user.displayName ?? null };
-}
-
-/** Pemilik menyalakan undangan berdua (kode = vaultCode miliknya). */
-export async function publishInvite(owner: VaultOwner, vaultUid: string): Promise<VaultInvite> {
-  try {
-    // Sembuhkan dulu keanggotaan sendiri (vault lama belum punya `members`)
-    try {
-      await updateDoc(vaultDocRef(vaultUid), {
-        members: arrayUnion(owner.uid),
-        memberProfiles: arrayUnion(profileOf(owner)),
-      });
-    } catch {
-      /* lanjut: gagal di sini akan terbaca sebagai permission-denied di bawah */
-    }
-    const vault = await fetchVaultById(vaultUid);
-    if (!vault) throw new CloudSyncError("Vault tidak ditemukan.", "unknown");
-    if (!vault.members.includes(owner.uid)) {
-      throw new CloudSyncError(
-        "Gagal mendaftarkan Anda sebagai anggota. Pastikan Rules terbaru sudah di-Publish.",
-        "permission-denied"
-      );
-    }
-    const code = (vault.vaultCode || "").trim().toUpperCase();
-    if (!code) throw new CloudSyncError("Vault belum punya kode undangan.", "unknown");
-    const invite: VaultInvite = {
-      code,
-      vaultUid,
-      ownerName: owner.displayName ?? owner.email ?? null,
-      createdAt: new Date().toISOString(),
-    };
-    await setDoc(inviteDocRef(code), sanitizeForFirestore(invite));
-    // Verifikasi balik: pastikan dokumen undangan benar-benar tersimpan
-    // sebelum kode dibagikan (gagal diam-diam = pasangan "tidak menemukan").
-    const check = await getDoc(inviteDocRef(code));
-    if (!check.exists()) {
-      throw new CloudSyncError(
-        "Undangan gagal tersimpan di cloud. Periksa koneksi lalu coba lagi.",
-        "unknown"
-      );
-    }
-    return invite;
-  } catch (err) {
-    if (err instanceof CloudSyncError) throw err;
-    throw toFriendlyError(err);
-  }
-}
-
-/** Pemilik mencabut undangan (kode lama tak bisa dipakai gabung lagi). */
-export async function revokeInvite(code: string): Promise<void> {
-  try {
-    await deleteDoc(inviteDocRef(code));
+    await setDoc(
+      directoryDocRef(email),
+      sanitizeForFirestore({
+        uid: owner.uid,
+        email,
+        vaultCode: (vaultCode || "").trim().toUpperCase(),
+        name: owner.displayName ?? null,
+        updatedAt: new Date().toISOString(),
+      }),
+      { merge: true }
+    );
   } catch (err) {
     throw toFriendlyError(err);
   }
 }
 
-/** Cari undangan berdasarkan kode (untuk gabung). */
-export async function lookupInvite(code: string): Promise<VaultInvite | null> {
+/** Cari vault pasangan via email + cocokkan kode (langkah verifikasi undangan). */
+export async function lookupVaultByEmail(email: string): Promise<DirectoryEntry | null> {
   try {
-    const snap = await getDoc(inviteDocRef(code));
+    const snap = await getDoc(directoryDocRef(email));
     if (!snap.exists()) return null;
-    const d = snap.data() as Partial<VaultInvite>;
-    if (!d.vaultUid) return null;
+    const d = snap.data() as Partial<DirectoryEntry>;
+    if (!d.uid) return null;
     return {
-      code: (d.code as string) || code.trim().toUpperCase(),
-      vaultUid: d.vaultUid as string,
-      ownerName: (d.ownerName as string | null) ?? null,
-      createdAt: (d.createdAt as string) ?? new Date(0).toISOString(),
+      uid: d.uid as string,
+      email: (d.email as string) || email.trim().toLowerCase(),
+      vaultCode: (d.vaultCode as string) || "",
+      name: (d.name as string | null) ?? null,
+      updatedAt: (d.updatedAt as string) ?? new Date(0).toISOString(),
     };
   } catch (err) {
     throw toFriendlyError(err);
@@ -448,123 +442,227 @@ export async function lookupInvite(code: string): Promise<VaultInvite | null> {
 }
 
 /**
- * Gabung ke vault pasangan via kode. Menambah UID sendiri via arrayUnion
- * (tak perlu baca vault dulu — rules memverifikasi hasil akhirnya).
- * Mengembalikan vault gabungan + ID dokumennya.
+ * A mengirim undangan ke B (email + kode B terverifikasi cocok).
+ * Sekaligus menautkan B di vault A (pra-otorisasi agar B bisa baca).
  */
-export async function joinVaultByCode(
-  user: VaultOwner,
-  code: string
-): Promise<{ vault: CloudVault; vaultUid: string }> {
+export async function sendPairInvite(
+  fromOwner: VaultOwner,
+  fromCode: string,
+  toEmail: string,
+  toVault: DirectoryEntry
+): Promise<void> {
   try {
-    const invite = await lookupInvite(code);
-    if (!invite) {
+    const mine = await fetchVaultById(fromOwner.uid);
+    if (!mine) {
       throw new CloudSyncError(
-        "Kode undangan tidak ditemukan. Pastikan pasangan sudah menekan Nyalakan Undangan lalu bagikan kode yang tampil.",
+        "Vault Anda belum ada di cloud. Tarik/dorong sinkron sekali dulu, lalu undang lagi.",
         "unknown"
       );
     }
-    const ref = vaultDocRef(invite.vaultUid);
-    await updateDoc(
-      ref,
+    await updateDoc(vaultDocRef(fromOwner.uid), {
+      pairedUids: arrayUnion(toVault.uid),
+    });
+    await setDoc(
+      pairInviteDocRef(toVault.uid),
       sanitizeForFirestore({
-        members: arrayUnion(user.uid),
-        memberProfiles: arrayUnion(profileOf(user)),
+        fromUid: fromOwner.uid,
+        fromEmail: fromOwner.email ?? null,
+        fromName: fromOwner.displayName ?? null,
+        fromCode: (fromCode || "").trim().toUpperCase(),
+        toUid: toVault.uid,
+        toEmail: toVault.email,
+        status: "pending",
+        createdAt: new Date().toISOString(),
       })
     );
-    const vault = await fetchVaultById(invite.vaultUid);
-    if (!vault) throw new CloudSyncError("Gagal memuat vault pasangan.", "unknown");
-    return { vault, vaultUid: invite.vaultUid };
   } catch (err) {
     if (err instanceof CloudSyncError) throw err;
     throw toFriendlyError(err);
   }
 }
 
-/** Keluar dari vault berdua (kembali ke vault pribadi, keanggotaan dihapus). */
-export async function leaveSharedVault(user: VaultOwner, sharedUid: string): Promise<void> {
+/** Baca undangan tertunda untuk saya (dipanggil saat aplikasi dibuka). */
+export async function readMyPairInvite(myUid: string): Promise<PairInvite | null> {
   try {
-    const ref = vaultDocRef(sharedUid);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) return;
-    const data = snap.data() as Partial<CloudVault> & { members?: string[] };
-    const members = (Array.isArray(data.members) ? [...(data.members as string[])] : []).filter(
-      u => u !== user.uid
-    );
-    const profiles = (Array.isArray(data.memberProfiles) ? [...(data.memberProfiles as VaultMember[])] : []).filter(
-      p => p.uid !== user.uid
-    );
-    await updateDoc(ref, sanitizeForFirestore({ members, memberProfiles: profiles }));
+    const snap = await getDoc(pairInviteDocRef(myUid));
+    if (!snap.exists()) return null;
+    const d = snap.data() as Partial<PairInvite>;
+    if (!d.fromUid || d.status !== "pending") return null;
+    return {
+      fromUid: d.fromUid as string,
+      fromEmail: (d.fromEmail as string | null) ?? null,
+      fromName: (d.fromName as string | null) ?? null,
+      fromCode: (d.fromCode as string) ?? "",
+      toUid: d.toUid as string,
+      toEmail: (d.toEmail as string) ?? "",
+      status: "pending",
+      createdAt: (d.createdAt as string) ?? new Date(0).toISOString(),
+    };
   } catch (err) {
     throw toFriendlyError(err);
   }
 }
 
-/** Keluarkan anggota (kick) dari vault. Bisa dipakai anggota mana pun. */
-export async function kickMember(requester: VaultOwner, vaultUid: string, targetUid: string): Promise<void> {
+/** Batalkan undangan yang saya kirim (pengirim). */
+export async function cancelPairInvite(toUid: string): Promise<void> {
   try {
-    if (targetUid === requester.uid) {
-      await leaveSharedVault(requester, vaultUid);
-      return;
-    }
-    const ref = vaultDocRef(vaultUid);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) throw new CloudSyncError("Vault tidak ditemukan.", "unknown");
-    const data = snap.data() as Partial<CloudVault> & { members?: string[] };
-    if (!((data.members as string[]) || []).includes(requester.uid)) {
-      throw new CloudSyncError("Anda bukan anggota vault ini.", "permission-denied");
-    }
-    const members = ((data.members as string[]) || []).filter(u => u !== targetUid);
-    const profiles = ((data.memberProfiles as VaultMember[]) || []).filter(p => p.uid !== targetUid);
-    await updateDoc(ref, sanitizeForFirestore({ members, memberProfiles: profiles }));
+    await deleteDoc(pairInviteDocRef(toUid));
   } catch (err) {
-    if (err instanceof CloudSyncError) throw err;
     throw toFriendlyError(err);
   }
 }
 
-/** Ganti kode undangan (rotasi): update vaultCode + tulis ulang dokumen invite. */
-export async function rotateInviteCode(owner: VaultOwner, vaultUid: string): Promise<VaultInvite> {
+/**
+ * Terima undangan: tautkan pengirim di vault saya + hapus undangan.
+ * Vault saya dibuat dulu bila belum ada (user baru).
+ */
+export async function acceptPairInvite(
+  me: VaultOwner,
+  invite: PairInvite,
+  myVaultCode: string
+): Promise<void> {
   try {
-    const oldVault = await fetchVaultById(vaultUid);
-    if (!oldVault) throw new CloudSyncError("Vault tidak ditemukan.", "unknown");
-    if (!oldVault.members.includes(owner.uid)) {
-      throw new CloudSyncError("Hanya anggota vault yang bisa memutar kode.", "permission-denied");
-    }
-    const newCode = generateVaultCode();
-    await updateDoc(vaultDocRef(vaultUid), { vaultCode: newCode });
-    const oldCode = (oldVault.vaultCode || "").trim().toUpperCase();
-    if (oldCode && oldCode !== newCode) {
-      try {
-        await deleteDoc(inviteDocRef(oldCode));
-      } catch {
-        /* abaikan */
+    await ensureUserVault(me);
+    await updateDoc(vaultDocRef(me.uid), { pairedUids: arrayUnion(invite.fromUid) });
+    await upsertDirectoryEntry(me, myVaultCode);
+    await deleteDoc(pairInviteDocRef(me.uid));
+  } catch (err) {
+    throw toFriendlyError(err);
+  }
+}
+
+/**
+ * Tolak undangan: putus tautan di vault sendiri + hapus undangan.
+ * Undangan nonaktif dan hilang dari database. Pengirim mendeteksi
+ * otomatis (baca vault ini ditolak -> bersih-bersih).
+ */
+export async function declinePairInvite(me: VaultOwner, invite: PairInvite): Promise<void> {
+  try {
+    await removePairFromMyVault(me, invite.fromUid);
+  } catch {
+    /* abaikan */
+  }
+  try {
+    await deleteDoc(pairInviteDocRef(me.uid));
+  } catch (err) {
+    throw toFriendlyError(err);
+  }
+}
+
+/** Putuskan tautan dari sisi saya (kick/keluar): hapus pasangan dari vault saya.
+ *  Pasangan mendeteksinya otomatis saat buka aplikasi (baca vault saya
+ *  ditolak -> bersih-bersih + notifikasi). */
+export async function removePairFromMyVault(me: VaultOwner, partnerUid: string): Promise<void> {
+  try {
+    const myRef = vaultDocRef(me.uid);
+    const mySnap = await getDoc(myRef);
+    if (mySnap.exists()) {
+      const data = mySnap.data() as Partial<CloudVault>;
+      const paired = Array.isArray(data.pairedUids) ? [...(data.pairedUids as string[])] : [];
+      const next = paired.filter(u => u !== partnerUid);
+      if (next.length !== paired.length) {
+        await updateDoc(myRef, { pairedUids: next });
       }
     }
-    return publishInvite(owner, vaultUid);
   } catch (err) {
-    if (err instanceof CloudSyncError) throw err;
+    throw toFriendlyError(err);
+  }
+  try {
+    await deleteDoc(pairInviteDocRef(partnerUid));
+  } catch {
+    /* abaikan */
+  }
+}
+
+/** Ganti kode vault saya (Acak) + segarkan direktori. */
+export async function rotateMyVaultCode(owner: VaultOwner): Promise<string> {
+  try {
+    const newCode = generateVaultCode();
+    await updateDoc(vaultDocRef(owner.uid), { vaultCode: newCode });
+    await upsertDirectoryEntry(owner, newCode);
+    return newCode;
+  } catch (err) {
     throw toFriendlyError(err);
   }
 }
 
-/** Daftarkan profil tampilan sendiri ke vault aktif (nama/avatar pasangan). */
-export async function touchOwnProfile(user: VaultOwner, vaultUid: string): Promise<void> {
+/** Baca undangan yang pernah saya kirim (untuk status Hermann/penerima). */
+export async function readSentInvite(toUid: string): Promise<PairInvite | null> {
   try {
-    const ref = vaultDocRef(vaultUid);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) return;
-    const data = snap.data() as Partial<CloudVault>;
-    const members = Array.isArray(data.members) ? (data.members as string[]) : [];
-    if (!members.includes(user.uid)) return;
-    const profiles = Array.isArray(data.memberProfiles) ? [...(data.memberProfiles as VaultMember[])] : [];
-    const mine = profileOf(user);
-    const idx = profiles.findIndex(p => p.uid === user.uid);
-    if (idx >= 0 && profiles[idx].name === mine.name) return;
-    if (idx >= 0) profiles[idx] = mine;
-    else profiles.push(mine);
-    await updateDoc(ref, sanitizeForFirestore({ memberProfiles: profiles }));
+    const snap = await getDoc(pairInviteDocRef(toUid));
+    if (!snap.exists()) return null;
+    const d = snap.data() as Partial<PairInvite>;
+    if (!d.fromUid) return null;
+    return {
+      fromUid: d.fromUid as string,
+      fromEmail: (d.fromEmail as string | null) ?? null,
+      fromName: (d.fromName as string | null) ?? null,
+      fromCode: (d.fromCode as string) ?? "",
+      toUid: d.toUid as string,
+      toEmail: (d.toEmail as string) ?? "",
+      status: "pending",
+      createdAt: (d.createdAt as string) ?? new Date(0).toISOString(),
+    };
   } catch {
-    /* abaikan: profil opsional */
+    return null;
   }
 }
+
+/** Setel daftar pasangan di vault sendiri (pemilik). */
+export async function setMyPairedUids(owner: VaultOwner, uids: string[]): Promise<void> {
+  try {
+    await updateDoc(vaultDocRef(owner.uid), { pairedUids: uids });
+  } catch (err) {
+    throw toFriendlyError(err);
+  }
+}
+
+/** Baca vault saya + vault pasangan (bila tertaut).
+ *  revoked=true bila pasangan mencabut akses (permission-denied),
+ *  dibedakan dari offline/transien (diabaikan diam-diam). */
+export async function readPairedVaults(
+  myUid: string
+): Promise<{ mine: CloudVault | null; partner: CloudVault | null; partnerUid: string | null; revoked: boolean }> {
+  const mine = await fetchVaultById(myUid).catch(() => null);
+  const paired = (mine && Array.isArray(mine.pairedUids) ? mine.pairedUids : []).filter(u => u !== myUid);
+  const partnerUid = paired[0] || null;
+  let partner: CloudVault | null = null;
+  let revoked = false;
+  if (partnerUid) {
+    try {
+      partner = await fetchVaultById(partnerUid);
+    } catch (err) {
+      const code = (err as { code?: string })?.code || "";
+      if (code === "permission-denied") revoked = true;
+      partner = null;
+    }
+  }
+  return { mine, partner, partnerUid, revoked };
+}
+
+/** Tulis payload ke vault saya + vault pasangan (best-effort sisi pasangan). */
+export async function pushPairedVaults(
+  me: VaultOwner,
+  myVaultCode: string,
+  partnerUid: string | null,
+  payload: VaultPayload
+): Promise<{ updatedAt: string; partnerOk: boolean }> {
+  const updatedAt = await pushVault(me, myVaultCode, payload, me.uid, {
+    byUid: me.uid,
+    byCode: myVaultCode,
+  });
+  let partnerOk = true;
+  if (partnerUid && partnerUid !== me.uid) {
+    try {
+      await pushVault(me, myVaultCode, payload, partnerUid, {
+        byUid: me.uid,
+        byCode: myVaultCode,
+        dataOnly: true,
+      });
+    } catch {
+      partnerOk = false;
+    }
+  }
+  return { updatedAt, partnerOk };
+}
+

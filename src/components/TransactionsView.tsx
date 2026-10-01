@@ -24,12 +24,42 @@ import { ReceiptViewerModal } from './ReceiptViewerModal';
 import { useToast } from './Toast';
 
 export const TransactionsView: React.FC = () => {
-  const { transactions, categories, deleteTransaction } = useFinance();
+  const { transactions, categories, deleteTransaction, pairPartner, lastUpdatedByCode } = useFinance();
   const { pushToast } = useToast();
 
   // Search & Type Toggle (No category, account, period, or date_desc filters as requested)
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | TransactionType>('all');
+
+  // Filter periode khusus kartu Keuangan Berdua (bulan + tahun)
+  const nowRef = useMemo(() => new Date(), []);
+  const [coYear, setCoYear] = useState(() => nowRef.getFullYear());
+  const [coMonth, setCoMonth] = useState(() => nowRef.getMonth() + 1);
+  const coMonthStr = `${coYear}-${String(coMonth).padStart(2, '0')}`;
+  const coupleStats = useMemo(() => {
+    if (!pairPartner) return null;
+    const inPeriod = transactions.filter(t => t.date && t.date.startsWith(coMonthStr));
+    const sum = (uid: string | null, type: TransactionType) =>
+      inPeriod
+        .filter(t =>
+          t.type === type &&
+          (uid === null
+            ? !t.authorUid || t.authorUid !== pairPartner.uid
+            : t.authorUid === uid)
+        )
+        .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const me = {
+      label: 'Saya',
+      income: sum(null, 'income'),
+      expense: sum(null, 'expense'),
+    };
+    const partner = {
+      label: (pairPartner.name || pairPartner.email || 'Pasangan').split(' ')[0],
+      income: sum(pairPartner.uid, 'income'),
+      expense: sum(pairPartner.uid, 'expense'),
+    };
+    return { me, partner };
+  }, [transactions, pairPartner, coMonthStr]);
 
   // Modals
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
@@ -243,6 +273,76 @@ export const TransactionsView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Kartu Keuangan Berdua: total pemasukan - pengeluaran per orang + filter periode */}
+      {pairPartner && coupleStats && (
+        <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs p-4 sm:p-5 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <h3 className="text-sm font-extrabold tracking-tight text-slate-900 dark:text-white uppercase">
+              Keuangan Berdua
+            </h3>
+            <div className="flex items-center gap-2">
+              {lastUpdatedByCode && (
+                <span className="text-[10px] text-slate-400 mr-1">
+                  Terbaru: <strong className="font-mono">{lastUpdatedByCode}</strong>
+                </span>
+              )}
+              <select
+                value={coMonth}
+                onChange={e => setCoMonth(Number(e.target.value))}
+                className="px-2 py-1.5 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 focus:outline-hidden"
+                title="Bulan periode"
+              >
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
+                  <option key={m} value={m}>
+                    {new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(new Date(2026, m - 1, 1))}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={coYear}
+                onChange={e => setCoYear(Number(e.target.value))}
+                className="px-2 py-1.5 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 focus:outline-hidden"
+                title="Tahun periode"
+              >
+                {[2024, 2025, 2026, 2027].map(y => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {[coupleStats.me, { ...coupleStats.partner }].map((p, idx) => {
+              const initial = ((p.label || '?').trim()[0] || '?').toUpperCase();
+              const net = p.income - p.expense;
+              return (
+                <div
+                  key={idx === 0 ? 'me' : pairPartner.uid}
+                  className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800 flex items-center gap-3"
+                >
+                  <span className="w-10 h-10 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 text-white text-base font-extrabold flex items-center justify-center shrink-0">
+                    {initial}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                      {p.label}
+                    </div>
+                    <div className="text-[11px] tabular-nums text-slate-500 dark:text-slate-400 mt-0.5">
+                      Masuk <span className="font-bold text-orange-600 dark:text-orange-400">+{formatRupiah(p.income)}</span>
+                      {' · '}Keluar <span className="font-bold text-red-600 dark:text-red-400">-{formatRupiah(p.expense)}</span>
+                    </div>
+                    <div className={`text-xs font-extrabold tabular-nums mt-0.5 ${net >= 0 ? 'text-slate-900 dark:text-white' : 'text-red-600 dark:text-red-400'}`}>
+                      Selisih {net >= 0 ? '+' : ''}{formatRupiah(net)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Accordion List per Bulan */}
       <div className="space-y-4">

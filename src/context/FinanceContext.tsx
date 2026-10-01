@@ -245,6 +245,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
   const [pendingInvite, setPendingInvite] = useState<PairInvite | null>(null);
   const [lastUpdatedByCode, setLastUpdatedByCode] = useState<string | null>(null);
   const persistPartner = (pp: PairPartner | null) => {
+    // Pengaman: pasangan tidak boleh diri sendiri
+    if (pp && pp.uid === userId) return;
     setPairPartner(pp);
     try {
       if (pp) localStorage.setItem(`diginote_pair_partner_${userId}`, JSON.stringify(pp));
@@ -757,7 +759,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
         setSyncStatus(navigator.onLine ? 'synced' : 'offline');
         return false;
       }
-      if (remote.vaultCode) setCloudVaultId(remote.vaultCode);
+      // Kode yang tampil SELALU kode vault sendiri (jangan tertimpa kode pasangan)
+      if (mine?.vaultCode) setCloudVaultId(mine.vaultCode);
       justAppliedRef.current = true;
       applyCloudVault(remote);
       persistBase(remote.updatedAt || '');
@@ -882,6 +885,36 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
           }
         } catch {
           /* abaikan */
+        }
+      }
+    } catch {
+      /* abaikan */
+    }
+    // Cek undangan masuk (agar muncul juga saat aplikasi dari background)
+    try {
+      if (navigator.onLine) {
+        const inv = await readMyPairInvite(userId);
+        if (inv) {
+          setPendingInvite(inv);
+          const seenKey = `diginote_invite_notified_${userId}_${inv.fromUid}_${inv.createdAt}`;
+          let seen = false;
+          try {
+            seen = !!localStorage.getItem(seenKey);
+          } catch {
+            /* abaikan */
+          }
+          if (!seen) {
+            try {
+              localStorage.setItem(seenKey, '1');
+            } catch {
+              /* abaikan */
+            }
+            const fromName = inv.fromName || inv.fromEmail || 'Pasangan';
+            await notifyPairEvent(
+              'Undangan Catat Berdua',
+              `${fromName} mengundang Anda catat berdua. Buka Pengaturan untuk menerima/menolak.`
+            );
+          }
         }
       }
     } catch {

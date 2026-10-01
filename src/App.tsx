@@ -46,7 +46,7 @@ const ThemeToggleButton: React.FC = () => {
 
 function MainApp() {
   const { currentUser } = useAuth();
-  const { pullFromVaultNow, reminderSettings } = useFinance();
+  const { pullFromVaultNow, refreshPairing, reminderSettings } = useFinance();
   const { pushToast } = useToast();
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [sharedPrefill, setSharedPrefill] = useState<SharedTransactionPrefill | null>(null);
@@ -117,6 +117,39 @@ function MainApp() {
   useEffect(() => {
     forceUnlockBodyScroll();
   }, [activeTab]);
+
+  // Kembali dari background: tarik data terbaru (berdua/pribadi) + cek undangan,
+  // agar HP yang lama terbuka tetap menampilkan data tergabung tanpa restart.
+  useEffect(() => {
+    let cancelled = false;
+    let resumeSub: { remove: () => void } | null = null;
+    const refresh = () => {
+      if (cancelled) return;
+      pullFromVaultNow().catch(() => {});
+      refreshPairing().catch(() => {});
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', onVisible);
+    (async () => {
+      try {
+        const { App } = await import('@capacitor/app');
+        if (cancelled) return;
+        resumeSub = await App.addListener('resume', () => refresh());
+      } catch {
+        /* web/tes: App plugin tidak tersedia */
+      }
+    })();
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', onVisible);
+      resumeSub?.remove();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Jadwal ulang pengingat harian native saat aplikasi dibuka
   // (jadwal sistem hilang bila aplikasi diinstal ulang / data dibersihkan).

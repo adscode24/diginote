@@ -31,7 +31,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   prefill = null,
   prefillKey = 0,
 }) => {
-  const { categories, accounts, addTransaction, updateTransaction, pairPartner } = useFinance();
+  const { categories, accounts, addTransaction, updateTransaction, pairPartner, transactions } = useFinance();
   const { currentUser } = useAuth();
   const { pushToast } = useToast();
 
@@ -53,23 +53,35 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   useBodyScrollLock(isOpen || isCategoryModalOpen || isAccountModalOpen);
 
   // Pilihan penulis dari data Keuangan Berdua (terbaca jelas oleh database):
-  // Saya (akun login) + pasangan bila tertaut. Nilai tersimpan authorUid+authorName.
-  const authorOptions = [
-    {
-      uid: currentUser?.id || '',
-      name: currentUser?.name || 'Saya',
-      label: `Saya (${currentUser?.name || 'akun ini'})`,
-    },
-    ...(pairPartner
-      ? [
-          {
-            uid: pairPartner.uid,
-            name: pairPartner.name || pairPartner.email || 'Pasangan',
-            label: pairPartner.name || pairPartner.email || 'Pasangan',
-          },
-        ]
-      : []),
-  ];
+  // Saya (akun login) + pasangan tertaut + penulis lain yang pernah tercatat
+  // (fallback bila tautan lokal satu sisi hilang — dropdown tetap lengkap di A dan B).
+  const authorOptions = (() => {
+    const opts = [
+      {
+        uid: currentUser?.id || '',
+        name: currentUser?.name || 'Saya',
+        label: `Saya (${currentUser?.name || 'akun ini'})`,
+      },
+    ];
+    const pushUnique = (uid: string, name: string, label: string) => {
+      if (!uid || opts.some(o => o.uid === uid)) return;
+      opts.push({ uid, name, label });
+    };
+    if (pairPartner) {
+      pushUnique(
+        pairPartner.uid,
+        pairPartner.name || pairPartner.email || 'Pasangan',
+        pairPartner.name || pairPartner.email || 'Pasangan'
+      );
+    }
+    for (const t of transactions || []) {
+      const uid = (t.authorUid || '').trim();
+      if (!uid || uid === currentUser?.id || opts.some(o => o.uid === uid)) continue;
+      const nm = (t.authorName || '').trim() || 'Pasangan';
+      pushUnique(uid, nm, nm);
+    }
+    return opts;
+  })();
 
   // Synchronize when opening for edit or new
   useEffect(() => {

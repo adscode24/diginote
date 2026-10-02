@@ -167,25 +167,65 @@ export function sanitizeTransactions(list: unknown): Transaction[] {
 
 /**
  * Bagi transaksi per penulis untuk kartu Keuangan Berdua.
- * - mine: authorUid persis milik saya.
- * - partner: authorUid persis milik pasangan.
- * - unattributed: tanpa authorUid (data lama sebelum pelacakan penulis).
+ * - mine: authorUid persis milik saya (atau nama saya bila uid hilang).
+ * - partner: authorUid persis milik pasangan (atau nama pasangan bila uid hilang).
+ * - unattributed: tanpa authorUid dan tanpa nama yang cocok (data lama).
  * Data lama TIDAK ditebak ke siapa pun agar total per orang jujur.
+ * Fallback nama penting agar simetris di kedua HP: bila satu sisi menyimpan
+ * uid lokal lama yang tak dikenal sisi lain, nama pencatat tetap mengatribusikan
+ * dengan benar.
  */
 export function splitTransactionsByAuthor(
   list: Transaction[],
   myUid: string | undefined,
-  partnerUid: string | undefined
+  partnerUid: string | undefined,
+  myName?: string | null,
+  partnerName?: string | null
 ): { mine: Transaction[]; partner: Transaction[]; unattributed: Transaction[] } {
+  const norm = (s: unknown) => String(s || '').trim().toLowerCase();
+  const myN = norm(myName);
+  const partnerN = norm(partnerName);
   const mine: Transaction[] = [];
   const partner: Transaction[] = [];
   const unattributed: Transaction[] = [];
   for (const t of list) {
-    if (t.authorUid && partnerUid && t.authorUid === partnerUid) partner.push(t);
-    else if (t.authorUid && myUid && t.authorUid === myUid) mine.push(t);
-    else unattributed.push(t);
+    const auid = t.authorUid || '';
+    const aname = norm(t.authorName);
+    if (auid && partnerUid && auid === partnerUid) { partner.push(t); continue; }
+    if (auid && myUid && auid === myUid) { mine.push(t); continue; }
+    if (aname && partnerN && aname === partnerN) { partner.push(t); continue; }
+    if (aname && myN && aname === myN) { mine.push(t); continue; }
+    unattributed.push(t);
   }
   return { mine, partner, unattributed };
+}
+
+/**
+ * Pasangan efektif untuk kartu/dropdown Berdua: pasangan tertaut bila ada,
+ * bila tidak, diturunkan dari penulis lain yang muncul di transaksi (agar kartu
+ * tetap muncul di kedua akun walau memori tautan lokal satu sisi hilang).
+ */
+export function getEffectivePairPartner(
+  pairPartner: { uid: string; email?: string | null; name?: string | null; code?: string } | null,
+  transactions: { authorUid?: string; authorName?: string }[],
+  myUid: string | undefined
+): { uid: string; email: string | null; name: string | null; code: string; derived: boolean } | null {
+  if (pairPartner) return { uid: pairPartner.uid, email: pairPartner.email ?? null, name: pairPartner.name ?? null, code: pairPartner.code ?? '', derived: false };
+  const counts = new Map<string, { uid: string; name: string; n: number }>();
+  for (const t of transactions) {
+    const uid = (t.authorUid || '').trim();
+    if (!uid || (myUid && uid === myUid)) continue;
+    const name = (t.authorName || '').trim() || 'Pasangan';
+    const prev = counts.get(uid);
+    if (prev) { prev.n += 1; if (!prev.name && name) prev.name = name; }
+    else counts.set(uid, { uid, name, n: 1 });
+  }
+  let best: { uid: string; name: string; n: number } | null = null;
+  for (const c of counts.values()) {
+    if (!best || c.n > best.n) best = c;
+  }
+  if (!best) return null;
+  return { uid: best.uid, email: null, name: best.name, code: '', derived: true };
 }
 
 export interface DueDateStatus {

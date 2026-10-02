@@ -894,10 +894,35 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
           } catch {
             /* gagal baca pasangan: ditangani pemeriksaan revoked di bawah */
           }
-        } else if (pairPartner && loadSentInvites().every(u => u !== pairPartner.uid)) {
-          // Cloud tak menautkan siapa pun & tak ada undangan terkirim
-          // -> tampilan lokal basi, bersihkan (offline/transien dilewati via catch)
-          persistPartner(null);
+        } else if (pairPartner) {
+          // JANGAN hapus tautan lokal hanya karena vault cloud saya (atau cache
+          // offline) sedang tidak mencantumkan pasangan. Penghapusan agresif
+          // inilah yang membuat kartu Berdua hilang di satu akun (akun A)
+          // sementara akun B tetap tampil. Coba perbaiki tautan dua arah:
+          // bila vault pasangan masih mencantumkan saya, tautkan ulang milik saya.
+          try {
+            const pv = await fetchVaultById(pairPartner.uid).catch(() => null);
+            const theyListMe =
+              !!pv && Array.isArray(pv.pairedUids) && pv.pairedUids.includes(userId);
+            if (theyListMe) {
+              try {
+                const mineRef = (await fetchVaultById(userId)) || null;
+                const minePaired = mineRef && Array.isArray(mineRef.pairedUids)
+                  ? mineRef.pairedUids.filter(u => u !== userId)
+                  : [];
+                if (!minePaired.includes(pairPartner.uid)) {
+                  await setMyPairedUids(vaultOwner(currentEmail()), [...minePaired, pairPartner.uid]);
+                }
+              } catch {
+                /* abaikan: tautan lokal tetap dipertahankan */
+              }
+            }
+            // Bila pasangan memang sudah tak menautkan saya, JANGAN bersihkan
+            // di sini: keputusan putus hanya via sinyal eksplisit (revoked/gone,
+            // kick/keluar, tolak undangan). Kartu tetap tampil dari data lokal.
+          } catch {
+            /* abaikan: pertahankan tampilan lokal */
+          }
         }
         if (mine0.vaultCode) setCloudVaultId(mine0.vaultCode);
       }

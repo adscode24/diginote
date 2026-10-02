@@ -17,7 +17,7 @@ import {
 import { Transaction, TransactionType } from '../types';
 import { useFinance } from '../context/FinanceContext';
 import { useAuth } from '../context/AuthContext';
-import { formatRupiah, formatDateIndo, formatMonthYearIndo, splitTransactionsByAuthor } from '../utils/formatters';
+import { formatRupiah, formatDateIndo, formatMonthYearIndo, splitTransactionsByAuthor, getEffectivePairPartner } from '../utils/formatters';
 import { CategoryIcon } from './CategoryIcon';
 import { TransactionModal } from './TransactionModal';
 import { CategoryManagerModal } from './CategoryManagerModal';
@@ -39,28 +39,36 @@ export const TransactionsView: React.FC = () => {
   const [coMonth, setCoMonth] = useState(() => nowRef.getMonth() + 1);
   const coMonthStr = `${coYear}-${String(coMonth).padStart(2, '0')}`;
   const coupleStats = useMemo(() => {
-    if (!pairPartner) return null;
+    // Pasangan efektif: tertaut bila ada, bila tidak diturunkan dari penulis
+    // lain di transaksi — kartu wajib muncul di akun A maupun B.
+    const eff = getEffectivePairPartner(pairPartner, transactions, currentUser?.id);
+    if (!eff) return null;
     const inPeriod = transactions.filter(t => t.date && t.date.startsWith(coMonthStr));
-    const split = splitTransactionsByAuthor(inPeriod, currentUser?.id, pairPartner.uid);
+    const myName = currentUser?.name || 'Saya';
+    const partnerFirstName = (eff.name || pairPartner?.email || 'Pasangan').split(' ')[0];
+    const split = splitTransactionsByAuthor(inPeriod, currentUser?.id, eff.uid, myName, eff.name);
     const sumType = (list: Transaction[], type: TransactionType) =>
       list.filter(t => t.type === type).reduce((s, t) => s + (Number(t.amount) || 0), 0);
     const me = {
-      label: 'Saya',
+      uid: currentUser?.id || 'me',
+      label: myName,
       income: sumType(split.mine, 'income'),
       expense: sumType(split.mine, 'expense'),
     };
     const partner = {
-      label: (pairPartner.name || pairPartner.email || 'Pasangan').split(' ')[0],
+      uid: eff.uid,
+      label: partnerFirstName,
       income: sumType(split.partner, 'income'),
       expense: sumType(split.partner, 'expense'),
     };
     const legacy = {
+      uid: 'legacy',
       label: 'Tanpa penulis',
       income: sumType(split.unattributed, 'income'),
       expense: sumType(split.unattributed, 'expense'),
     };
-    return { me, partner, legacy, hasLegacy: split.unattributed.length > 0 };
-  }, [transactions, pairPartner, coMonthStr, currentUser?.id]);
+    return { me, partner, legacy, hasLegacy: split.unattributed.length > 0, effectivePartner: eff };
+  }, [transactions, pairPartner, coMonthStr, currentUser?.id, currentUser?.name]);
 
   // Modals
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
@@ -275,8 +283,10 @@ export const TransactionsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Kartu Keuangan Berdua: total pemasukan - pengeluaran per orang + filter periode */}
-      {pairPartner && coupleStats && (
+      {/* Kartu Keuangan Berdua: total pemasukan - pengeluaran per orang + filter periode.
+          Muncul di akun A maupun B: pasangan efektif diturunkan dari data bila
+          tautan lokal satu sisi hilang. */}
+      {coupleStats && (
         <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs p-4 sm:p-5 space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <h3 className="text-sm font-extrabold tracking-tight text-slate-900 dark:text-white uppercase">
@@ -318,7 +328,7 @@ export const TransactionsView: React.FC = () => {
             {[coupleStats.me, coupleStats.partner, ...(coupleStats.hasLegacy ? [coupleStats.legacy] : [])].map((p, idx) => {
               const initial = ((p.label || '?').trim()[0] || '?').toUpperCase();
               const net = p.income - p.expense;
-              const key = idx === 0 ? 'me' : idx === 1 ? pairPartner.uid : 'legacy';
+              const key = (p as { uid?: string }).uid || String(idx);
               const sub =
                 idx === 2 ? 'Data lama tanpa penulis — catat baru selalu bernama.' : null;
               return (

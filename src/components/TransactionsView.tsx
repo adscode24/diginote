@@ -16,7 +16,8 @@ import {
 } from 'lucide-react';
 import { Transaction, TransactionType } from '../types';
 import { useFinance } from '../context/FinanceContext';
-import { formatRupiah, formatDateIndo, formatMonthYearIndo } from '../utils/formatters';
+import { useAuth } from '../context/AuthContext';
+import { formatRupiah, formatDateIndo, formatMonthYearIndo, splitTransactionsByAuthor } from '../utils/formatters';
 import { CategoryIcon } from './CategoryIcon';
 import { TransactionModal } from './TransactionModal';
 import { CategoryManagerModal } from './CategoryManagerModal';
@@ -26,6 +27,7 @@ import { useToast } from './Toast';
 export const TransactionsView: React.FC = () => {
   const { transactions, categories, deleteTransaction, pairPartner, lastUpdatedByCode } = useFinance();
   const { pushToast } = useToast();
+  const { currentUser } = useAuth();
 
   // Search & Type Toggle (No category, account, period, or date_desc filters as requested)
   const [search, setSearch] = useState('');
@@ -39,27 +41,26 @@ export const TransactionsView: React.FC = () => {
   const coupleStats = useMemo(() => {
     if (!pairPartner) return null;
     const inPeriod = transactions.filter(t => t.date && t.date.startsWith(coMonthStr));
-    const sum = (uid: string | null, type: TransactionType) =>
-      inPeriod
-        .filter(t =>
-          t.type === type &&
-          (uid === null
-            ? !t.authorUid || t.authorUid !== pairPartner.uid
-            : t.authorUid === uid)
-        )
-        .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const split = splitTransactionsByAuthor(inPeriod, currentUser?.id, pairPartner.uid);
+    const sumType = (list: Transaction[], type: TransactionType) =>
+      list.filter(t => t.type === type).reduce((s, t) => s + (Number(t.amount) || 0), 0);
     const me = {
       label: 'Saya',
-      income: sum(null, 'income'),
-      expense: sum(null, 'expense'),
+      income: sumType(split.mine, 'income'),
+      expense: sumType(split.mine, 'expense'),
     };
     const partner = {
       label: (pairPartner.name || pairPartner.email || 'Pasangan').split(' ')[0],
-      income: sum(pairPartner.uid, 'income'),
-      expense: sum(pairPartner.uid, 'expense'),
+      income: sumType(split.partner, 'income'),
+      expense: sumType(split.partner, 'expense'),
     };
-    return { me, partner };
-  }, [transactions, pairPartner, coMonthStr]);
+    const legacy = {
+      label: 'Tanpa penulis',
+      income: sumType(split.unattributed, 'income'),
+      expense: sumType(split.unattributed, 'expense'),
+    };
+    return { me, partner, legacy, hasLegacy: split.unattributed.length > 0 };
+  }, [transactions, pairPartner, coMonthStr, currentUser?.id]);
 
   // Modals
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
@@ -314,15 +315,26 @@ export const TransactionsView: React.FC = () => {
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {[coupleStats.me, { ...coupleStats.partner }].map((p, idx) => {
+            {[coupleStats.me, coupleStats.partner, ...(coupleStats.hasLegacy ? [coupleStats.legacy] : [])].map((p, idx) => {
               const initial = ((p.label || '?').trim()[0] || '?').toUpperCase();
               const net = p.income - p.expense;
+              const key = idx === 0 ? 'me' : idx === 1 ? pairPartner.uid : 'legacy';
+              const sub =
+                idx === 2 ? 'Data lama tanpa penulis — catat baru selalu bernama.' : null;
               return (
                 <div
-                  key={idx === 0 ? 'me' : pairPartner.uid}
-                  className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800 flex items-center gap-3"
+                  key={key}
+                  className={`p-3.5 rounded-xl border flex items-center gap-3 ${
+                    idx === 2
+                      ? 'bg-slate-100/70 dark:bg-slate-800/30 border-dashed border-slate-300 dark:border-slate-700'
+                      : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200/60 dark:border-slate-800'
+                  }`}
                 >
-                  <span className="w-10 h-10 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 text-white text-base font-extrabold flex items-center justify-center shrink-0">
+                  <span className={`w-10 h-10 rounded-full text-white text-base font-extrabold flex items-center justify-center shrink-0 ${
+                    idx === 2
+                      ? 'bg-slate-400 dark:bg-slate-600'
+                      : 'bg-gradient-to-tr from-orange-600 to-amber-500'
+                  }`}>
                     {initial}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -336,6 +348,7 @@ export const TransactionsView: React.FC = () => {
                     <div className={`text-xs font-extrabold tabular-nums mt-0.5 ${net >= 0 ? 'text-slate-900 dark:text-white' : 'text-red-600 dark:text-red-400'}`}>
                       Selisih {net >= 0 ? '+' : ''}{formatRupiah(net)}
                     </div>
+                    {sub && <div className="text-[10px] text-slate-400 mt-0.5">{sub}</div>}
                   </div>
                 </div>
               );

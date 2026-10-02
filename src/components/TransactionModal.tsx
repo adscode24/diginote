@@ -31,11 +31,12 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   prefill = null,
   prefillKey = 0,
 }) => {
-  const { categories, accounts, addTransaction, updateTransaction } = useFinance();
+  const { categories, accounts, addTransaction, updateTransaction, pairPartner } = useFinance();
   const { currentUser } = useAuth();
   const { pushToast } = useToast();
 
   const [type, setType] = useState<TransactionType>(initialType);
+  const [authorUid, setAuthorUid] = useState<string | undefined>(undefined);
   const [authorName, setAuthorName] = useState('');
   const [amountStr, setAmountStr] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -51,11 +52,31 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [error, setError] = useState('');
   useBodyScrollLock(isOpen || isCategoryModalOpen || isAccountModalOpen);
 
+  // Pilihan penulis dari data Keuangan Berdua (terbaca jelas oleh database):
+  // Saya (akun login) + pasangan bila tertaut. Nilai tersimpan authorUid+authorName.
+  const authorOptions = [
+    {
+      uid: currentUser?.id || '',
+      name: currentUser?.name || 'Saya',
+      label: `Saya (${currentUser?.name || 'akun ini'})`,
+    },
+    ...(pairPartner
+      ? [
+          {
+            uid: pairPartner.uid,
+            name: pairPartner.name || pairPartner.email || 'Pasangan',
+            label: pairPartner.name || pairPartner.email || 'Pasangan',
+          },
+        ]
+      : []),
+  ];
+
   // Synchronize when opening for edit or new
   useEffect(() => {
     // Setiap kali form dibuka (manual maupun dari share), saldo kembali disembunyikan
     setShowBalances(false);
     if (transactionToEdit) {
+      setAuthorUid(transactionToEdit.authorUid || currentUser?.id);
       setAuthorName(transactionToEdit.authorName || currentUser?.name || '');
       setType(transactionToEdit.type);
       setAmountStr(String(transactionToEdit.amount));
@@ -68,6 +89,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     } else if (prefill) {
       // Prefill dari hasil share gambar/teks (OCR): nominal, jenis, tanggal,
       // keterangan, dan bukti foto terisi otomatis — pengguna tinggal simpan.
+      setAuthorUid(currentUser?.id);
       setAuthorName(currentUser?.name || '');
       setType(prefill.type);
       setAmountStr(prefill.amount > 0 ? String(prefill.amount) : '');
@@ -87,6 +109,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         if (match) setCategoryId(match.id);
       }
     } else {
+      setAuthorUid(currentUser?.id);
       setAuthorName(currentUser?.name || '');
       setType(initialType);
       setAmountStr('');
@@ -185,6 +208,12 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
     const selectedAccount = accounts.find(a => a.id === accountId);
     const trimmedAuthor = authorName.trim();
+    const authorEntry =
+      authorOptions.find(o => o.uid && o.uid === authorUid) ||
+      authorOptions.find(o => o.name.toLowerCase() === trimmedAuthor.toLowerCase()) ||
+      authorOptions[0];
+    const finalAuthorUid = authorEntry?.uid || currentUser?.id;
+    const finalAuthorName = (trimmedAuthor || authorEntry?.name || '').trim() || undefined;
 
     if (transactionToEdit) {
       updateTransaction(transactionToEdit.id, {
@@ -198,8 +227,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         description: description.trim(),
         paymentMethod,
         receiptUrl: receiptImage,
-        authorUid: transactionToEdit.authorUid || currentUser?.id,
-        authorName: trimmedAuthor || undefined,
+        authorUid: finalAuthorUid,
+        authorName: finalAuthorName,
       });
     } else {
       addTransaction({
@@ -213,8 +242,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         description: description.trim(),
         paymentMethod,
         receiptUrl: receiptImage,
-        authorUid: currentUser?.id,
-        authorName: trimmedAuthor || undefined,
+        authorUid: finalAuthorUid,
+        authorName: finalAuthorName,
       });
     }
 
@@ -257,18 +286,26 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
           {/* Scrollable Form Body */}
           <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 p-6 space-y-4">
-            {/* Pencatat transaksi (otomatis dari login, bisa diubah) */}
+            {/* Pencatat transaksi (dropdown dari data Keuangan Berdua) */}
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                 Dicatat oleh
               </label>
-              <input
-                type="text"
-                value={authorName}
-                onChange={e => setAuthorName(e.target.value)}
-                placeholder={currentUser?.name || 'Nama pencatat'}
+              <select
+                value={authorUid || authorOptions[0]?.uid || ''}
+                onChange={e => {
+                  const opt = authorOptions.find(o => o.uid === e.target.value);
+                  setAuthorUid(opt?.uid);
+                  setAuthorName(opt?.name || '');
+                }}
                 className="w-full px-3.5 py-2 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
-              />
+              >
+                {authorOptions.map(o => (
+                  <option key={o.uid || o.label} value={o.uid}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Dropdown List for Transaction Type */}

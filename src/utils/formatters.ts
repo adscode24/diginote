@@ -165,6 +165,29 @@ export function sanitizeTransactions(list: unknown): Transaction[] {
   return out;
 }
 
+/**
+ * Bagi transaksi per penulis untuk kartu Keuangan Berdua.
+ * - mine: authorUid persis milik saya.
+ * - partner: authorUid persis milik pasangan.
+ * - unattributed: tanpa authorUid (data lama sebelum pelacakan penulis).
+ * Data lama TIDAK ditebak ke siapa pun agar total per orang jujur.
+ */
+export function splitTransactionsByAuthor(
+  list: Transaction[],
+  myUid: string | undefined,
+  partnerUid: string | undefined
+): { mine: Transaction[]; partner: Transaction[]; unattributed: Transaction[] } {
+  const mine: Transaction[] = [];
+  const partner: Transaction[] = [];
+  const unattributed: Transaction[] = [];
+  for (const t of list) {
+    if (t.authorUid && partnerUid && t.authorUid === partnerUid) partner.push(t);
+    else if (t.authorUid && myUid && t.authorUid === myUid) mine.push(t);
+    else unattributed.push(t);
+  }
+  return { mine, partner, unattributed };
+}
+
 export interface DueDateStatus {
   label: string;
   isOverdue: boolean;

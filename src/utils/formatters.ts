@@ -129,6 +129,11 @@ export function sanitizeDebts(list: unknown): Debt[] {
     if (typeof d.id !== 'string' || !d.id) continue;
     d.totalAmount = toRupiahInt(d.totalAmount);
     d.remainingAmount = toRupiahInt(d.remainingAmount);
+    // Sisa nol = lunas (perbaiki status macet dari data lama)
+    if (d.remainingAmount <= 0) {
+      d.remainingAmount = 0;
+      d.status = 'paid';
+    }
     if (d.monthlyInstallment !== undefined) {
       d.monthlyInstallment = toRupiahInt(d.monthlyInstallment);
     }
@@ -214,26 +219,103 @@ export function calculateDueDateStatus(dueDateStr: string): DueDateStatus {
 }
 
 /**
+ * Tanggal jatuh tempo bulanan berikutnya (murni dari string tanggal,
+ * agar bisa diuji). Sama persis dengan perilaku getNextDueDate.
+ */
+export function getNextMonthlyDate(dueDay: number, fromDateStr: string): string {
+  const [y, m, d] = fromDateStr.split('-').map(Number);
+  const base = new Date(y, (m || 1) - 1 + (d > dueDay ? 1 : 0), 1);
+  const year = base.getFullYear();
+  const month = base.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const clampedDay = Math.min(Math.max(1, Math.floor(Number(dueDay) || 1)), daysInMonth);
+  const yyyy = year;
+  const mm = String(month + 1).padStart(2, '0');
+  const dd = String(clampedDay).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/** Geser tanggal per bulan kalender dengan batas hari (mis. 31 Jan -> 28 Feb). */
+export function shiftMonthClamped(dateStr: string, deltaMonths: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const base = new Date(y, (m || 1) - 1 + deltaMonths, 1);
+  const year = base.getFullYear();
+  const month = base.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const clampedDay = Math.min(Math.max(1, d || 1), daysInMonth);
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(clampedDay).padStart(2, '0')}`;
+}
+
+/**
  * Menghitung tanggal jatuh tempo bulanan berikutnya berdasarkan angka tanggal (1-31)
  */
 export function getNextDueDate(dueDay: number): string {
-  const today = new Date();
-  let year = today.getFullYear();
-  let month = today.getMonth(); // 0-indexed
+  return getNextMonthlyDate(dueDay, getTodayString());
+}
 
-  if (today.getDate() > dueDay) {
-    month += 1;
+export interface DebtCycleStatus {
+  /** Tanggal siklus yang dinilai (bulan berjalan untuk cicilan, dueDate untuk bukan cicilan). */
+  judgedDue: string;
+  /** Tanggal ditampilkan (siklus mendatang untuk cicilan). */
+  displayDue: string;
+  /** Jatuh tempo siklus sebelumnya (batas awal jendela pembayaran). */
+  prevCycleDue: string;
+  /** Tanggal pembayaran terakhir (bila ada). */
+  lastPaymentDate: string | null;
+  /** True bila siklus ini tertutup pembayaran (atau sudah lunas). */
+  covered: boolean;
+  /** True bila lewat tempo dan belum tertutup pembayaran. */
+  overdue: boolean;
+}
+
+/**
+ * Status jatuh tempo berbasis SIKLUS + PEMBAYARAN (bukan tanggal saja).
+ *
+ * Aturan: siklus dinilai lunas (`covered`) bila ada pembayaran dengan
+ * tanggal >= jatuh tempo siklus sebelumnya (bayar di muka / tepat waktu /
+ * telat wajar). `overdue` hanya bila hari ini melewati tanggal siklus DAN
+ * tidak tertutup pembayaran. Yang berstatus lunas / sisa nol tak pernah overdue.
+ *
+ * Contoh terbukti: jatuh tempo 1 Okt, dibayar 1 Okt, dicek 2 Okt -> covered,
+ * tidak overdue. Menunggak beneran (bayar terakhir sebelum siklus lalu)
+ * -> tetap overdue.
+ */
+export function getDebtCycleStatus(
+  debt: {
+    dueDate: string;
+    dueDayOfMonth?: number;
+    status: string;
+    remainingAmount: number;
+    payments: { paymentDate: string }[];
+  },
+  todayStr: string = getTodayString()
+): DebtCycleStatus {
+  const t = /^\d{4}-\d{2}-\d{2}$/.test(todayStr) ? todayStr : getTodayString();
+  const empty = { judgedDue: '', displayDue: '', prevCycleDue: '', lastPaymentDate: null, covered: false, overdue: false };
+  const dueDay = Math.floor(Number(debt.dueDayOfMonth) || 0);
+  let judgedDue = '';
+  let displayDue = '';
+  if (dueDay >= 1 && dueDay <= 31) {
+    const [y, m] = t.split('-').map(Number);
+    const dimCurr = new Date(y, m, 0).getDate();
+    const dd = String(Math.min(Math.max(1, dueDay), dimCurr)).padStart(2, '0');
+    judgedDue = `${y}-${String(m).padStart(2, '0')}-${dd}`;
+    displayDue = getNextMonthlyDate(dueDay, t);
+  } else if (/^\d{4}-\d{2}-\d{2}$/.test(debt.dueDate || '')) {
+    judgedDue = debt.dueDate;
+    displayDue = debt.dueDate;
+  } else {
+    return empty;
   }
-
-  // Tentukan jumlah hari maksimal di bulan target (agar tanggal 31 di Februari tidak crash)
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const clampedDay = Math.min(Math.max(1, dueDay), daysInMonth);
-  const nextDate = new Date(year, month, clampedDay);
-
-  const yyyy = nextDate.getFullYear();
-  const mm = String(nextDate.getMonth() + 1).padStart(2, '0');
-  const dd = String(nextDate.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
+  const prevCycleDue = shiftMonthClamped(judgedDue, -1);
+  let last: string | null = null;
+  for (const p of debt.payments || []) {
+    if (p.paymentDate && (!last || p.paymentDate > last)) last = p.paymentDate;
+  }
+  const paidOff = debt.status === 'paid' || (Number(debt.remainingAmount) || 0) <= 0;
+  const covered = paidOff || (!!last && last >= prevCycleDue);
+  const overdue = !covered && t > judgedDue;
+  return { judgedDue, displayDue, prevCycleDue, lastPaymentDate: last, covered, overdue };
 }
 
 /**

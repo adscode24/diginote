@@ -12,7 +12,7 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
-import { formatRupiah, formatDateIndo, formatMonthYearIndo, getTodayString } from '../utils/formatters';
+import { formatRupiah, formatDateIndo, formatMonthYearIndo, getTodayString, getDebtCycleStatus } from '../utils/formatters';
 import { useAmountPrivacy } from '../hooks/useAmountPrivacy';
 import { TransactionModal } from './TransactionModal';
 import { CategoryIcon } from './CategoryIcon';
@@ -107,11 +107,22 @@ export const CalendarView: React.FC = () => {
     });
 
     debts.forEach(d => {
-      if (d.status !== 'paid' && d.dueDate) {
-        if (!daily[d.dueDate]) {
-          daily[d.dueDate] = { income: 0, expense: 0, txCount: 0, debtsDue: [] };
+      if (d.status !== 'paid' && !getDebtCycleStatus(d).covered) {
+        // Titik di tanggal jatuh tempo bulan yang ditampilkan (terjepit sesuai bulan)
+        let markDate = '';
+        if (d.dueDayOfMonth) {
+          const dim = new Date(currentYear, currentMonth, 0).getDate();
+          const dd = String(Math.min(Math.max(1, d.dueDayOfMonth), dim)).padStart(2, '0');
+          markDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${dd}`;
+        } else if (d.dueDate) {
+          markDate = d.dueDate;
         }
-        daily[d.dueDate].debtsDue.push(d);
+        if (markDate) {
+          if (!daily[markDate]) {
+            daily[markDate] = { income: 0, expense: 0, txCount: 0, debtsDue: [] };
+          }
+          daily[markDate].debtsDue.push(d);
+        }
       }
     });
 
@@ -145,7 +156,19 @@ export const CalendarView: React.FC = () => {
   }, [transactions, selectedDate]);
 
   const selectedDayDebtsDue = useMemo(() => {
-    return debts.filter(d => d.dueDate === selectedDate && d.status !== 'paid');
+    return debts.filter(d => {
+      if (d.status === 'paid' || getDebtCycleStatus(d).covered) return false;
+      if (d.dueDayOfMonth) {
+        const dim = new Date(
+          Number(selectedDate.split('-')[0]),
+          Number(selectedDate.split('-')[1]),
+          0
+        ).getDate();
+        const dd = String(Math.min(Math.max(1, d.dueDayOfMonth), dim)).padStart(2, '0');
+        return selectedDate === `${selectedDate.substring(0, 7)}-${dd}`;
+      }
+      return d.dueDate === selectedDate;
+    });
   }, [debts, selectedDate]);
 
   const selectedDayTotals = useMemo(() => {

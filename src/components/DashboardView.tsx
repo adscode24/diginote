@@ -28,6 +28,7 @@ import {
   getTodayString,
   formatMonthYearIndo,
   getNextDueDate,
+  getDebtCycleStatus,
 } from '../utils/formatters';
 import { CategoryIcon } from './CategoryIcon';
 import { TransactionModal } from './TransactionModal';
@@ -98,10 +99,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
     return monthlyTransactions.filter(t => t.type === breakdownType);
   }, [monthlyTransactions, breakdownType]);
 
-  // Upcoming / Overdue debts (limit to 3)
+  // Upcoming / Overdue debts (limit to 3). Yang sudah dibayar pada
+  // siklus berjalan tidak ikut ditagih lagi.
   const urgentDebts = useMemo(() => {
     return debts
-      .filter(d => d.status !== 'paid' && d.type === 'payable')
+      .filter(d => d.status !== 'paid' && d.type === 'payable' && !getDebtCycleStatus(d).covered)
       .map(d => {
         const effectiveDueDate = d.dueDayOfMonth ? getNextDueDate(d.dueDayOfMonth) : d.dueDate;
         const status = calculateDueDateStatus(effectiveDueDate);

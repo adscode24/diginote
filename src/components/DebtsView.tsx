@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { Debt, DebtType, DebtPayment, Bill, BillPayment } from '../types';
 import { useFinance } from '../context/FinanceContext';
-import { formatRupiah, formatDateIndo, calculateDueDateStatus, getNextDueDate } from '../utils/formatters';
+import { formatRupiah, formatDateIndo, calculateDueDateStatus, getNextDueDate, getDebtCycleStatus } from '../utils/formatters';
 import { AddDebtModal } from './AddDebtModal';
 import { PayDebtModal } from './PayDebtModal';
 import { ReceiptViewerModal } from './ReceiptViewerModal';
@@ -115,12 +115,9 @@ export const DebtsView: React.FC = () => {
 
   const overdueCount = debts.filter(d => {
     if (d.status === 'paid') return false;
-    // Pakai tanggal jatuh tempo EFEKTIF (siklus berjalan untuk cicilan),
-    // bukan dueDate awal yang sudah lewat — agar cicilan yang dibayar
-    // tepat waktu tidak terus dihitung lewat tempo.
-    const effective = d.dueDayOfMonth ? getNextDueDate(d.dueDayOfMonth) : d.dueDate;
-    const st = calculateDueDateStatus(effective);
-    return st.isOverdue;
+    // Status berbasis siklus + pembayaran (lihat getDebtCycleStatus):
+    // cicilan yang dibayar tepat waktu tak lagi dihitung lewat tempo.
+    return getDebtCycleStatus(d).overdue;
   }).length;
 
   // Rincian lewat tempo (predikat SAMA dengan penghitung di atas +
@@ -128,8 +125,7 @@ export const DebtsView: React.FC = () => {
   const overdueDebts = debts
     .filter(d => {
       if (d.status === 'paid') return false;
-      const effective = d.dueDayOfMonth ? getNextDueDate(d.dueDayOfMonth) : d.dueDate;
-      return calculateDueDateStatus(effective).isOverdue;
+      return getDebtCycleStatus(d).overdue;
     })
     .map(d => ({
       id: d.id,
@@ -547,6 +543,9 @@ export const DebtsView: React.FC = () => {
             const progressPercent = Math.min(100, Math.round((paidAmount / debt.totalAmount) * 100));
             const effectiveDueDate = debt.dueDayOfMonth ? getNextDueDate(debt.dueDayOfMonth) : debt.dueDate;
             const dueStatus = calculateDueDateStatus(effectiveDueDate);
+            // Status siklus: pembayaran pada siklus berjalan menutup status lewat tempo
+            const cycle = getDebtCycleStatus(debt);
+            const cycleDueStatus = calculateDueDateStatus(cycle.judgedDue || effectiveDueDate);
             const isExpanded = expandedDebtId === debt.id;
             const isInstallment = debt.installmentCategory && debt.installmentCategory !== 'non_installment';
 
@@ -576,9 +575,13 @@ export const DebtsView: React.FC = () => {
                           <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/60 px-2 py-0.5 rounded-md">
                             <CheckCircle2 className="w-3.5 h-3.5" /> Lunas
                           </span>
-                        ) : dueStatus.isOverdue ? (
+                        ) : cycle.covered ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/60 px-2 py-0.5 rounded-md">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Sudah Dibayar
+                          </span>
+                        ) : cycle.overdue ? (
                           <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/60 px-2 py-0.5 rounded-md">
-                            <AlertCircle className="w-3.5 h-3.5" /> {dueStatus.label}
+                            <AlertCircle className="w-3.5 h-3.5" /> {cycleDueStatus.label}
                           </span>
                         ) : dueStatus.isDueSoon ? (
                           <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md">

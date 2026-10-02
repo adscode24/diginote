@@ -564,55 +564,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
           /* abaikan: lanjut mode pribadi */
         }
         // Rawat undangan yang saya kirim (diterima/ditolak?)
-        try {
-          if (navigator.onLine) {
-            const sent = loadSentInvites();
-            const stillPending: string[] = [];
-            for (const toUid of sent) {
-              try {
-                const inv = await readSentInvite(toUid);
-                if (inv) {
-                  stillPending.push(toUid);
-                  continue;
-                }
-                let accepted = false;
-                try {
-                  const theirs = await fetchVaultById(toUid);
-                  accepted = !!theirs && Array.isArray(theirs.pairedUids) && theirs.pairedUids.includes(userId);
-                  if (accepted && theirs) {
-                    persistPartner({
-                      uid: toUid,
-                      email: theirs.ownerEmail || pairPartner?.email || null,
-                      name: theirs.displayName || pairPartner?.name || null,
-                      code: theirs.vaultCode || pairPartner?.code || '',
-                    });
-                    setSyncNotice({ text: 'Pasangan menerima undangan berdua!', action: null });
-                  }
-                } catch {
-                  accepted = false;
-                }
-                if (!accepted) {
-                  try {
-                    const mine0 = await fetchVaultById(userId);
-                    const minePaired = mine0 && Array.isArray(mine0.pairedUids) ? mine0.pairedUids : [];
-                    if (minePaired.includes(toUid)) {
-                      await setMyPairedUids(owner, minePaired.filter(u => u !== toUid));
-                    }
-                  } catch {
-                    /* abaikan */
-                  }
-                  if (pairPartner?.uid === toUid) persistPartner(null);
-                  setSyncNotice({ text: 'Undangan berdua ditolak/dibatalkan.', action: null });
-                }
-              } catch {
-                stillPending.push(toUid);
-              }
-            }
-            saveSentInvites(stillPending);
-          }
-        } catch {
-          /* abaikan */
-        }
+        await maintainSentInvites();
         // Baca vault pasangan (bila tertaut) + deteksi pencabutan
         try {
           if (navigator.onLine) {
@@ -791,6 +743,58 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     return () => clearTimeout(timer);
   }, [syncNotice]);
 
+  /** Rawat undangan terkirim: diterima (teraut) atau ditolak/dibatalkan. */
+  const maintainSentInvites = async () => {
+    try {
+      if (!navigator.onLine) return;
+      const sent = loadSentInvites();
+      const stillPending: string[] = [];
+      for (const toUid of sent) {
+        try {
+          const inv = await readSentInvite(toUid);
+          if (inv) {
+            stillPending.push(toUid);
+            continue;
+          }
+          let accepted = false;
+          try {
+            const theirs = await fetchVaultById(toUid);
+            accepted = !!theirs && Array.isArray(theirs.pairedUids) && theirs.pairedUids.includes(userId);
+            if (accepted && theirs) {
+              persistPartner({
+                uid: toUid,
+                email: theirs.ownerEmail || pairPartner?.email || null,
+                name: theirs.displayName || pairPartner?.name || null,
+                code: theirs.vaultCode || pairPartner?.code || '',
+              });
+              setSyncNotice({ text: 'Pasangan menerima undangan berdua!', action: null });
+            }
+          } catch {
+            accepted = false;
+          }
+          if (!accepted) {
+            try {
+              const mine0 = await fetchVaultById(userId);
+              const minePaired = mine0 && Array.isArray(mine0.pairedUids) ? mine0.pairedUids : [];
+              if (minePaired.includes(toUid)) {
+                await setMyPairedUids(vaultOwner(currentEmail()), minePaired.filter(u => u !== toUid));
+              }
+            } catch {
+              /* abaikan */
+            }
+            if (pairPartner?.uid === toUid) persistPartner(null);
+            setSyncNotice({ text: 'Undangan berdua ditolak/dibatalkan.', action: null });
+          }
+        } catch {
+          stillPending.push(toUid);
+        }
+      }
+      saveSentInvites(stillPending);
+    } catch {
+      /* abaikan */
+    }
+  };
+
   // ---------- Keuangan Berdua model tautan ----------
   const sentInviteKey = `diginote_sent_invites_${userId}`;
   const loadSentInvites = (): string[] => {
@@ -869,6 +873,37 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
 
   const refreshPairing = useCallback(async (): Promise<void> => {
     if (!cloudEnabled || !isCloudCapableUid(userId)) return;
+    // Hidrasi status berdua dari CLOUD (sumber kebenaran): vault sendiri yang
+    // menautkan pasangan -> tampilkan Berdua walau memori lokal hilang.
+    try {
+      const mine0 = await fetchVaultById(userId);
+      if (mine0) {
+        const minePaired = (Array.isArray(mine0.pairedUids) ? mine0.pairedUids : []).filter(u => u !== userId);
+        if (minePaired.length > 0) {
+          const puid = minePaired[0];
+          try {
+            const pv = await fetchVaultById(puid);
+            if (pv) {
+              persistPartner({
+                uid: puid,
+                email: pv.ownerEmail || pairPartner?.email || null,
+                name: pv.displayName || pairPartner?.name || null,
+                code: pv.vaultCode || pairPartner?.code || '',
+              });
+            }
+          } catch {
+            /* gagal baca pasangan: ditangani pemeriksaan revoked di bawah */
+          }
+        } else if (pairPartner && loadSentInvites().every(u => u !== pairPartner.uid)) {
+          // Cloud tak menautkan siapa pun & tak ada undangan terkirim
+          // -> tampilan lokal basi, bersihkan (offline/transien dilewati via catch)
+          persistPartner(null);
+        }
+        if (mine0.vaultCode) setCloudVaultId(mine0.vaultCode);
+      }
+    } catch {
+      /* abaikan: pertahankan tampilan lokal */
+    }
     try {
       const { mine, partner, partnerUid, revoked } = await readPairedVaults(userId);
       if (revoked && partnerUid) {
@@ -922,6 +957,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode; userId: stri
     } catch {
       /* abaikan */
     }
+    await maintainSentInvites();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cloudEnabled, userId]);
 

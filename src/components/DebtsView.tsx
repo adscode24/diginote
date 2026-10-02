@@ -102,7 +102,11 @@ export const DebtsView: React.FC = () => {
 
   const overdueCount = debts.filter(d => {
     if (d.status === 'paid') return false;
-    const st = calculateDueDateStatus(d.dueDate);
+    // Pakai tanggal jatuh tempo EFEKTIF (siklus berjalan untuk cicilan),
+    // bukan dueDate awal yang sudah lewat — agar cicilan yang dibayar
+    // tepat waktu tidak terus dihitung lewat tempo.
+    const effective = d.dueDayOfMonth ? getNextDueDate(d.dueDayOfMonth) : d.dueDate;
+    const st = calculateDueDateStatus(effective);
     return st.isOverdue;
   }).length;
 

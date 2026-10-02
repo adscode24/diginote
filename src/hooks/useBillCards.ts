@@ -26,12 +26,26 @@ export function useBillCards(): BillCard[] {
   return useMemo(() => {
     const [cy, cm] = currentMonthKey.split('-').map(Number);
     const daysInMonth = new Date(cy, cm, 0).getDate();
+    // Siklus sebelumnya (untuk mengenali bayar di muka / tepat waktu)
+    const pcm = cm === 1 ? 12 : cm - 1;
+    const pcy = cm === 1 ? cy - 1 : cy;
+    const prevDays = new Date(pcy, pcm, 0).getDate();
     return bills
       .filter(b => b.isActive !== false)
       .map(b => {
-        const paid = billPayments.some(p => p.billId === b.id && p.monthKey === currentMonthKey);
         const dueDay = Math.min(Math.max(1, b.dueDayOfMonth || 1), daysInMonth);
         const dueDateStr = `${currentMonthKey}-${String(dueDay).padStart(2, '0')}`;
+        const prevDay = Math.min(dueDay, prevDays);
+        const prevDueStr = `${pcy}-${String(pcm).padStart(2, '0')}-${String(prevDay).padStart(2, '0')}`;
+        // Lunas bila: ada pembayaran di bulan berjalan (termasuk telat di bulan
+        // yang sama) ATAU ada pembayaran sejak jatuh tempo siklus lalu sampai
+        // jatuh tempo siklus ini (bayar di muka / tepat waktu).
+        const paid = billPayments.some(
+          p =>
+            p.billId === b.id &&
+            (p.monthKey === currentMonthKey ||
+              (!!p.paymentDate && p.paymentDate >= prevDueStr && p.paymentDate <= dueDateStr))
+        );
         const current = calculateDueDateStatus(dueDateStr);
         // Sudah dibayar bulan ini -> tidak dianggap lewat; hitung mundur ke siklus depan.
         let statusInfo = current;

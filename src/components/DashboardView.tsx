@@ -232,47 +232,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
         </div>
       )}
 
-      {/* Hero sapaan ala aplikasi keluarga */}
-      <div className="p-5 rounded-3xl bg-gradient-to-br from-stone-900 via-stone-800 to-orange-950 text-cream shadow-md flex items-center justify-between gap-3 overflow-hidden relative">
-        <div
-          aria-hidden
-          className="absolute -right-12 -top-20 w-52 h-52 rounded-full bg-orange-500/20 pointer-events-none"
-        />
-        <div
-          aria-hidden
-          className="absolute -right-2 top-10 w-28 h-28 rounded-full bg-amber-400/10 pointer-events-none"
-        />
-        <div className="flex items-center gap-3 relative">
-          {currentUser?.photoURL && !currentUser.photoURL.startsWith('data:') && !currentUser.photoURL.startsWith('http') ? (
-            <div className="w-11 h-11 rounded-2xl bg-white/15 flex items-center justify-center shrink-0 text-2xl shadow-xs">
-              {currentUser.photoURL}
-            </div>
-          ) : currentUser?.photoURL ? (
-            <img
-              src={currentUser.photoURL}
-              alt="Foto profil"
-              className="w-11 h-11 rounded-2xl object-cover shrink-0 shadow-xs"
-            />
-          ) : (
-            <div className="w-11 h-11 rounded-2xl bg-white/15 flex items-center justify-center shrink-0 text-lg font-extrabold">
-              {((currentUser?.name || 'D').trim()[0] || 'D').toUpperCase()}
-            </div>
-          )}
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-widest text-orange-200/90">
-              {formatDateIndo(today)}
-            </div>
-            <h4 className="text-base font-extrabold tracking-tight">
-              {greeting}, {currentUser?.name?.split(' ')[0] || 'Pengguna'}!
-            </h4>
-            <p className="text-xs text-white/70 mt-0.5">
-              {!hasLoggedToday && reminderSettings.enabled
-                ? 'Belum ada catatan hari ini, yuk catat!'
-                : 'Arus kas tercatat rapi hari ini.'}
-            </p>
-          </div>
+      {/* Hero sapaan */}
+      <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-sand dark:border-slate-800 shadow-xs">
+        <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-orange-600 dark:text-orange-400">
+          {formatDateIndo(today)}
         </div>
-        <img src="/icon.svg" alt="" aria-hidden className="w-14 h-14 rounded-2xl shadow-lg relative shrink-0" />
+        <h4 className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white mt-1">
+          {greeting}, {currentUser?.name?.split(' ')[0] || 'Pengguna'}!
+        </h4>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          {!hasLoggedToday && reminderSettings.enabled
+            ? 'Belum ada catatan hari ini, yuk catat.'
+            : 'Arus kas tercatat rapi hari ini.'}
+        </p>
       </div>
 
       {/* Header Bar with Month Filter Selector */}

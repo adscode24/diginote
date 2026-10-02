@@ -3,6 +3,7 @@ import { X, Calendar, Settings2, Upload, Trash2, Wallet, Plus, ChevronDown, Eye,
 import { Transaction, TransactionType, PaymentMethod } from '../types';
 import { SharedTransactionPrefill } from '../services/shareIntent';
 import { useFinance } from '../context/FinanceContext';
+import { useAuth } from '../context/AuthContext';
 import { PAYMENT_METHODS } from '../utils/constants';
 import { getTodayString, formatRupiah } from '../utils/formatters';
 import { CategoryIcon } from './CategoryIcon';
@@ -31,9 +32,11 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   prefillKey = 0,
 }) => {
   const { categories, accounts, addTransaction, updateTransaction } = useFinance();
+  const { currentUser } = useAuth();
   const { pushToast } = useToast();
 
   const [type, setType] = useState<TransactionType>(initialType);
+  const [authorName, setAuthorName] = useState('');
   const [amountStr, setAmountStr] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [accountId, setAccountId] = useState('');
@@ -53,6 +56,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     // Setiap kali form dibuka (manual maupun dari share), saldo kembali disembunyikan
     setShowBalances(false);
     if (transactionToEdit) {
+      setAuthorName(transactionToEdit.authorName || currentUser?.name || '');
       setType(transactionToEdit.type);
       setAmountStr(String(transactionToEdit.amount));
       setCategoryId(transactionToEdit.categoryId);
@@ -64,6 +68,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     } else if (prefill) {
       // Prefill dari hasil share gambar/teks (OCR): nominal, jenis, tanggal,
       // keterangan, dan bukti foto terisi otomatis — pengguna tinggal simpan.
+      setAuthorName(currentUser?.name || '');
       setType(prefill.type);
       setAmountStr(prefill.amount > 0 ? String(prefill.amount) : '');
       setDate(prefill.date || initialDate || getTodayString());
@@ -82,6 +87,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         if (match) setCategoryId(match.id);
       }
     } else {
+      setAuthorName(currentUser?.name || '');
       setType(initialType);
       setAmountStr('');
       setDate(initialDate || getTodayString());
@@ -178,6 +184,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     }
 
     const selectedAccount = accounts.find(a => a.id === accountId);
+    const trimmedAuthor = authorName.trim();
 
     if (transactionToEdit) {
       updateTransaction(transactionToEdit.id, {
@@ -191,6 +198,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         description: description.trim(),
         paymentMethod,
         receiptUrl: receiptImage,
+        authorUid: transactionToEdit.authorUid || currentUser?.id,
+        authorName: trimmedAuthor || undefined,
       });
     } else {
       addTransaction({
@@ -204,6 +213,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         description: description.trim(),
         paymentMethod,
         receiptUrl: receiptImage,
+        authorUid: currentUser?.id,
+        authorName: trimmedAuthor || undefined,
       });
     }
 
@@ -246,6 +257,20 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
           {/* Scrollable Form Body */}
           <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 p-6 space-y-4">
+            {/* Pencatat transaksi (otomatis dari login, bisa diubah) */}
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                Dicatat oleh
+              </label>
+              <input
+                type="text"
+                value={authorName}
+                onChange={e => setAuthorName(e.target.value)}
+                placeholder={currentUser?.name || 'Nama pencatat'}
+                className="w-full px-3.5 py-2 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+
             {/* Dropdown List for Transaction Type */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">

@@ -20,7 +20,7 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
-import { Debt, DebtType, DebtPayment, Bill } from '../types';
+import { Debt, DebtType, DebtPayment, Bill, BillPayment } from '../types';
 import { useFinance } from '../context/FinanceContext';
 import { formatRupiah, formatDateIndo, calculateDueDateStatus, getNextDueDate } from '../utils/formatters';
 import { AddDebtModal } from './AddDebtModal';
@@ -36,7 +36,7 @@ import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 type DebtsTab = 'debts' | 'bills';
 
 export const DebtsView: React.FC = () => {
-  const { debts, deleteDebt, deleteDebtPayment, deleteBill } = useFinance();
+  const { debts, deleteDebt, deleteDebtPayment, deleteBill, billPayments, deleteBillPayment } = useFinance();
   const billCards = useBillCards();
   const { isHidden, toggleHidden, masked } = useAmountPrivacy();
   const { pushToast } = useToast();
@@ -51,6 +51,8 @@ export const DebtsView: React.FC = () => {
   const [selectedDebtForPay, setSelectedDebtForPay] = useState<Debt | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<{ url: string; title: string } | null>(null);
   const [expandedDebtId, setExpandedDebtId] = useState<string | null>(null);
+  const [expandedBillId, setExpandedBillId] = useState<string | null>(null);
+  const [showOverdueDetail, setShowOverdueDetail] = useState(false);
   const [selectedPaymentDetail, setSelectedPaymentDetail] = useState<{ debt: Debt; payment: DebtPayment } | null>(null);
   const [isBillModalOpen, setIsBillModalOpen] = useState(false);
   const [billToEdit, setBillToEdit] = useState<Bill | null>(null);
@@ -65,6 +67,17 @@ export const DebtsView: React.FC = () => {
   const handleOpenEdit = (debt: Debt) => {
     setDebtToEdit(debt);
     setIsAddModalOpen(true);
+  };
+
+  const handleDeleteBillPayment = (billName: string, payment: BillPayment) => {
+    if (
+      confirm(
+        `Hapus riwayat pembayaran ${formatRupiah(payment.amount)} untuk "${billName}"?\n\nTransaksi pengeluaran terkait di daftar transaksi akan otomatis dihapus dan saldo sumber dana dikembalikan.`
+      )
+    ) {
+      deleteBillPayment(payment.id);
+      pushToast('Data berhasil dihapus.');
+    }
   };
 
   const handleDeletePayment = (debt: Debt, payment: DebtPayment) => {
@@ -109,6 +122,31 @@ export const DebtsView: React.FC = () => {
     const st = calculateDueDateStatus(effective);
     return st.isOverdue;
   }).length;
+
+  // Rincian lewat tempo (predikat SAMA dengan penghitung di atas +
+  // tagihan yang belum lunas: yang sudah dibayar tak pernah masuk list)
+  const overdueDebts = debts
+    .filter(d => {
+      if (d.status === 'paid') return false;
+      const effective = d.dueDayOfMonth ? getNextDueDate(d.dueDayOfMonth) : d.dueDate;
+      return calculateDueDateStatus(effective).isOverdue;
+    })
+    .map(d => ({
+      id: d.id,
+      label: d.counterparty,
+      sub: d.type === 'payable' ? 'Hutang' : 'Piutang',
+      amount: d.remainingAmount,
+      due: d.dueDayOfMonth ? getNextDueDate(d.dueDayOfMonth) : d.dueDate,
+    }));
+  const overdueBills = billCards
+    .filter(b => !b.paid && b.statusInfo.isOverdue)
+    .map(b => ({
+      id: b.id,
+      label: b.name,
+      sub: `Tagihan · Tgl ${b.dueDayOfMonth}`,
+      amount: b.amount,
+      due: b.dueDateStr,
+    }));
 
   return (
     <div className="space-y-6 pb-12">
@@ -182,27 +220,84 @@ export const DebtsView: React.FC = () => {
           </p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs">
+        <button
+          type="button"
+          onClick={() => setShowOverdueDetail(v => !v)}
+          title={overdueCount > 0 ? 'Klik untuk melihat rincian' : 'Tidak ada yang lewat tempo'}
+          className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs text-left hover:border-amber-500 transition w-full"
+        >
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
               Status Jatuh Tempo
             </span>
-            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
-              overdueCount > 0
-                ? 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400'
-                : 'bg-orange-50 text-orange-600 dark:bg-orange-950/60 dark:text-orange-400'
-            }`}>
-              {overdueCount > 0 ? <AlertCircle className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+            <div className="flex items-center gap-1.5">
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                overdueCount > 0
+                  ? 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400'
+                  : 'bg-orange-50 text-orange-600 dark:bg-orange-950/60 dark:text-orange-400'
+              }`}>
+                {overdueCount > 0 ? <AlertCircle className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+              </div>
+              {showOverdueDetail ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
             </div>
           </div>
           <div className="text-xl font-bold text-slate-900 dark:text-white mt-2">
             {overdueCount > 0 ? `${overdueCount} Lewat Tempo` : 'Semua Terkontrol'}
           </div>
           <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-            Periksa tanggal jatuh tempo bulanan
+            {overdueCount > 0 ? 'Klik untuk melihat rincian' : 'Periksa tanggal jatuh tempo bulanan'}
           </p>
-        </div>
+        </button>
       </div>
+
+      {/* Rincian lewat tempo (hanya yang belum lunas) */}
+      {showOverdueDetail && (
+        <div className="rounded-2xl bg-white dark:bg-slate-900 border border-amber-200/80 dark:border-amber-900/40 shadow-xs p-4 space-y-2">
+          <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
+            Rincian Lewat Tempo ({overdueDebts.length + overdueBills.length})
+          </div>
+          {overdueDebts.length + overdueBills.length === 0 ? (
+            <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+              Tidak ada tunggakan. Semua yang sudah dibayar tidak masuk daftar ini.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {overdueDebts.map(o => (
+                <div
+                  key={`debt-${o.id}`}
+                  className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800 text-xs"
+                >
+                  <div className="min-w-0">
+                    <div className="font-bold text-slate-900 dark:text-white truncate">{o.label}</div>
+                    <div className="text-[11px] text-slate-400">
+                      {o.sub} · Jatuh tempo {formatDateIndo(o.due)}
+                    </div>
+                  </div>
+                  <div className="font-bold text-red-600 dark:text-red-400 tabular-nums shrink-0">
+                    {masked('hutang:all', o.amount)}
+                  </div>
+                </div>
+              ))}
+              {overdueBills.map(o => (
+                <div
+                  key={`bill-${o.id}`}
+                  className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800 text-xs"
+                >
+                  <div className="min-w-0">
+                    <div className="font-bold text-slate-900 dark:text-white truncate">{o.label}</div>
+                    <div className="text-[11px] text-slate-400">
+                      {o.sub} · Jatuh tempo {formatDateIndo(o.due)}
+                    </div>
+                  </div>
+                  <div className="font-bold text-red-600 dark:text-red-400 tabular-nums shrink-0">
+                    {masked('hutang:all', o.amount)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Type Switcher Tabs & Filters */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
@@ -293,11 +388,17 @@ export const DebtsView: React.FC = () => {
               </button>
             </div>
           ) : (
-            billCards.map(bill => (
+            billCards.map(bill => {
+              const history = billPayments
+                .filter(p => p.billId === bill.id)
+                .sort((a, b) => (a.paymentDate < b.paymentDate ? 1 : -1));
+              const isExpanded = expandedBillId === bill.id;
+              return (
               <div
                 key={bill.id}
-                className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between gap-3"
+                className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden"
               >
+                <div className="p-4 flex items-center justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-sm font-bold text-slate-900 dark:text-white truncate">
@@ -326,6 +427,13 @@ export const DebtsView: React.FC = () => {
                     {bill.categoryName && ` · ${bill.categoryName}`}
                     {bill.notes && ` · ${bill.notes}`}
                   </div>
+                  <button
+                    onClick={() => setExpandedBillId(isExpanded ? null : bill.id)}
+                    className="inline-flex items-center gap-1 mt-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition"
+                  >
+                    <span>Riwayat Pembayaran ({history.length})</span>
+                    {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </button>
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
@@ -358,8 +466,54 @@ export const DebtsView: React.FC = () => {
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
+                </div>
+                {isExpanded && (
+                  <div className="bg-slate-50/80 dark:bg-slate-950/60 px-4 pb-4 pt-1 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                    <div className="text-xs font-semibold text-slate-700 dark:text-slate-300 pt-2">
+                      Daftar Pembayaran Tercatat:
+                    </div>
+                    {history.length === 0 ? (
+                      <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+                        Belum ada pembayaran yang dicatat untuk tagihan ini.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {history.map(p => (
+                          <div
+                            key={p.id}
+                            className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 text-xs"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-950 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold text-[10px] shrink-0">
+                                {p.monthKey ? p.monthKey.slice(5) : '•'}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-semibold text-slate-900 dark:text-white tabular-nums">
+                                  {masked('hutang:all', p.amount)}
+                                </div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                  {formatDateIndo(p.paymentDate)} · Periode {p.monthKey || '-'}
+                                  {p.accountName && <span> · Via {p.accountName}</span>}
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteBillPayment(bill.name, p)}
+                              className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 transition shrink-0"
+                              title="Hapus Pembayaran Ini"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            ))
+              );
+            })
           )}
         </div>
       )}

@@ -190,9 +190,9 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                     Rp
                   </span>
                   <input
-                    type="tel"
+                    type="text"
                     autoComplete="off"
-                    inputMode="numeric"
+                    inputMode="numeric" pattern="[0-9]*"
                     placeholder="0"
                     value={
                       adjustedBalanceStr
@@ -259,9 +259,9 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   Nomor Rekening / No. HP E-Wallet / 4 Digit Kartu (Opsional)
                 </label>
                 <input
-                  type="tel"
+                  type="text"
                   autoComplete="off"
-                  inputMode="numeric"
+                  inputMode="numeric" pattern="[0-9]*"
                   placeholder="Contoh: 8492019482 atau 0812345678"
                   value={accountNumber}
                   onChange={e => setAccountNumber(e.target.value.replace(/[^0-9 ]/g, ''))}
@@ -280,9 +280,9 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                       Rp
                     </span>
                     <input
-                      type="tel"
+                      type="text"
                       autoComplete="off"
-                      inputMode="numeric"
+                      inputMode="numeric" pattern="[0-9]*"
                       placeholder="0"
                       value={
                         initialBalanceStr

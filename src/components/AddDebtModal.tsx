@@ -349,9 +349,9 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                 Rp
               </span>
               <input
-                type="tel"
+                type="text"
                 autoComplete="off"
-                inputMode="numeric"
+                inputMode="numeric" pattern="[0-9]*"
                 placeholder="0"
                 value={totalAmountStr ? new Intl.NumberFormat('id-ID').format(Number(totalAmountStr)) : ''}
                 onChange={handleTotalAmountChange}
@@ -414,9 +414,9 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                     Rp
                   </span>
                   <input
-                    type="tel"
+                    type="text"
                     autoComplete="off"
-                    inputMode="numeric"
+                    inputMode="numeric" pattern="[0-9]*"
                     placeholder="0"
                     value={monthlyInstallmentStr ? new Intl.NumberFormat('id-ID').format(Number(monthlyInstallmentStr)) : ''}
                     onChange={handleMonthlyInstallmentChange}
@@ -460,9 +460,9 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                   <div className="relative">
                     <Clock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
-                      type="tel"
+                      type="text"
                       autoComplete="off"
-                      inputMode="numeric"
+                      inputMode="numeric" pattern="[0-9]*"
                       placeholder="Contoh: 12 atau 60"
                       value={remainingTenorStr}
                       onChange={handleNumericTenorChange(setRemainingTenorStr)}
@@ -497,9 +497,9 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                   Total Tenor Awal (Bulan / Opsional)
                 </label>
                 <input
-                  type="tel"
+                  type="text"
                   autoComplete="off"
-                  inputMode="numeric"
+                  inputMode="numeric" pattern="[0-9]*"
                   placeholder="Contoh: 24, 36, 120 bulan"
                   value={totalTenorStr}
                   onChange={handleNumericTenorChange(setTotalTenorStr)}
@@ -570,9 +570,9 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                             <div>
                               <label className="text-[10px] text-slate-400 block mb-0.5">Durasi (Bulan)</label>
                               <input
-                                type="tel"
+                                type="text"
                                 autoComplete="off"
-                                inputMode="numeric"
+                                inputMode="numeric" pattern="[0-9]*"
                                 value={period.durationMonths}
                                 onChange={e => updateTierPeriod(idx, 'durationMonths', Number(e.target.value.replace(/[^0-9]/g, '')) || 0)}
                                 className="w-full px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-medium"
@@ -581,9 +581,9 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                             <div>
                               <label className="text-[10px] text-slate-400 block mb-0.5">Bunga (% p.a)</label>
                               <input
-                                type="tel"
+                                type="text"
                                 autoComplete="off"
-                                inputMode="decimal"
+                                inputMode="decimal" pattern="[0-9.,]*"
                                 value={period.interestRate ?? ''}
                                 onChange={e => updateTierPeriod(idx, 'interestRate', Number(e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0)}
                                 placeholder="3.75"
@@ -593,9 +593,9 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                             <div>
                               <label className="text-[10px] text-slate-400 block mb-0.5">Cicilan / Bln (Rp)</label>
                               <input
-                                type="tel"
+                                type="text"
                                 autoComplete="off"
-                                inputMode="numeric"
+                                inputMode="numeric" pattern="[0-9]*"
                                 value={period.monthlyAmount ? new Intl.NumberFormat('id-ID').format(Number(String(period.monthlyAmount).replace(/[^0-9]/g, '')) || 0) : ''}
                                 onChange={e => updateTierPeriod(idx, 'monthlyAmount', Number(e.target.value.replace(/[^0-9]/g, '')) || 0)}
                                 placeholder="0"

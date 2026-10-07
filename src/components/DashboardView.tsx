@@ -429,10 +429,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
         )}
       </div>
 
-      {/* Filter periode: di bawah carousel, menempel kartu ringkasan (ala inspirasi) */}
-      <div className="flex items-center justify-end gap-2 px-1 -mb-4">
-        <span className="text-xs font-semibold text-slate-400">Periode:</span>
-        <div className="flex items-center gap-1 p-1 pl-2.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xs">
+      {/* Filter periode: baris sendiri di atas kartu ringkasan (simetris, tidak menempel) */}
+      <div className="flex items-center justify-between gap-2 px-1">
+        <span className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Periode Laporan</span>
+        <div className="flex items-center gap-1 p-1 pl-2.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xs shrink-0">
           <Calendar className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400 shrink-0" />
           <select
             value={selectedMonth}
@@ -464,39 +464,39 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
         </div>
       </div>
 
-      {/* Ringkasan: hero gelap + grid 2x2 (ala inspirasi) */}
-      <div className="rounded-3xl bg-[#161C30] border border-white/5 shadow-lg p-4 sm:p-5 space-y-4">
+      {/* Ringkasan: hero + grid 2x2 (navy di gelap ala inspirasi, putih bersih di terang) */}
+      <div className="rounded-3xl bg-white dark:bg-[#161C30] border border-slate-200/80 dark:border-white/5 shadow-xs p-4 sm:p-5 space-y-4">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-orange-500/20 text-orange-300 flex items-center justify-center shrink-0">
+          <div className="w-11 h-11 rounded-2xl bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-300 flex items-center justify-center shrink-0">
             <Wallet className="w-5 h-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="text-base font-extrabold tracking-tight text-white leading-tight">
+            <h3 className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight">
               {isAllMonths ? 'Ringkasan Keseluruhan' : 'Ringkasan Bulan Ini'}
             </h3>
-            <p className="text-[11px] text-white/50">
+            <p className="text-[11px] text-slate-500 dark:text-white/50">
               {isAllMonths ? 'Total akumulasi seluruh periode' : `Total akumulasi ${selectedMonthLabel}`}
             </p>
           </div>
-          <EyeToggle id="kpi-all" dark />
+          <EyeToggle id="kpi-all" />
         </div>
 
         {/* Hero: total sumber dana tersedia (di luar kartu kredit) */}
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-start justify-between gap-3">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/5 p-4 flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-xs text-white/60">Total Sumber Dana Tersedia</div>
-            <div className="text-2xl sm:text-[28px] font-extrabold tabular-nums text-white mt-1 break-words">
+            <div className="text-xs text-slate-500 dark:text-white/60">Total Sumber Dana Tersedia</div>
+            <div className="text-2xl sm:text-[28px] font-extrabold tabular-nums text-slate-900 dark:text-white mt-1 break-words">
               {masked('kpi-all', fundAvailable.total)}
             </div>
-            <div className="text-[11px] text-white/40 mt-1">
+            <div className="text-[11px] text-slate-400 dark:text-white/40 mt-1">
               Selain kartu kredit · {fundAvailable.count} sumber dana
             </div>
           </div>
           <div className="text-right shrink-0">
-            <div className="text-sm font-extrabold tabular-nums text-white">
-              {monthlyTransactions.length} <span className="font-semibold text-white/60">total transaksi</span>
+            <div className="text-sm font-extrabold tabular-nums text-slate-900 dark:text-white">
+              {monthlyTransactions.length} <span className="font-semibold text-slate-400 dark:text-white/60">total transaksi</span>
             </div>
-            <div className="text-[11px] text-white/40 mt-1">{selectedMonthLabel}</div>
+            <div className="text-[11px] text-slate-400 dark:text-white/40 mt-1">{selectedMonthLabel}</div>
           </div>
         </div>
 
@@ -504,17 +504,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
         {/* Monthly Income Card (Clickable to view details) */}
         <div
           onClick={() => setBreakdownType('income')}
-          className="rounded-2xl border border-orange-400/20 bg-orange-500/10 p-3.5 cursor-pointer hover:bg-orange-500/15 transition"
+          className="rounded-2xl border border-orange-200 bg-orange-50 dark:border-orange-400/20 dark:bg-orange-500/10 p-3.5 cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-500/15 transition"
           title="Klik untuk melihat rincian pemasukan"
         >
-          <div className="flex items-center gap-1.5 text-orange-300">
+          <div className="flex items-center gap-1.5 text-orange-600 dark:text-orange-300">
             <ArrowDownLeft className="w-4 h-4 shrink-0" />
             <span className="text-xs font-bold truncate">Total Pemasukan</span>
           </div>
-          <div className="text-lg font-extrabold tabular-nums text-white mt-2 break-words">
+          <div className="text-lg font-extrabold tabular-nums text-slate-900 dark:text-white mt-2 break-words">
             +{masked('kpi-all', filteredIncome)}
           </div>
-          <div className="text-[11px] text-white/50 mt-1">
+          <div className="text-[11px] text-slate-500 dark:text-white/50 mt-1">
             {monthlyTransactions.filter(t => t.type === 'income').length}x pemasukan
           </div>
         </div>
@@ -522,37 +522,37 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
         {/* Monthly Expense Card (Clickable to view details) */}
         <div
           onClick={() => setBreakdownType('expense')}
-          className="rounded-2xl border border-red-400/20 bg-red-500/10 p-3.5 cursor-pointer hover:bg-red-500/15 transition"
+          className="rounded-2xl border border-red-200 bg-red-50 dark:border-red-400/20 dark:bg-red-500/10 p-3.5 cursor-pointer hover:bg-red-100 dark:hover:bg-red-500/15 transition"
           title="Klik untuk melihat rincian pengeluaran"
         >
-          <div className="flex items-center gap-1.5 text-red-300">
+          <div className="flex items-center gap-1.5 text-red-600 dark:text-red-300">
             <ArrowUpRight className="w-4 h-4 shrink-0" />
             <span className="text-xs font-bold truncate">Total Pengeluaran</span>
           </div>
-          <div className="text-lg font-extrabold tabular-nums text-white mt-2 break-words">
+          <div className="text-lg font-extrabold tabular-nums text-slate-900 dark:text-white mt-2 break-words">
             -{masked('kpi-all', filteredExpense)}
           </div>
-          <div className="text-[11px] text-white/50 mt-1">
+          <div className="text-[11px] text-slate-500 dark:text-white/50 mt-1">
             {monthlyTransactions.filter(t => t.type === 'expense').length}x pengeluaran
           </div>
         </div>
 
         <div
           onClick={() => setShowDebtRemainSheet(true)}
-          className="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-3.5 cursor-pointer hover:bg-amber-500/15 transition"
+          className="rounded-2xl border border-amber-200 bg-amber-50 dark:border-amber-400/20 dark:bg-amber-500/10 p-3.5 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-500/15 transition"
           title="Klik untuk rincian sisa hutang"
         >
-          <div className="flex items-center gap-1.5 text-amber-300">
+          <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-300">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span className="text-xs font-bold truncate">Sisa Hutang Berjalan</span>
           </div>
-          <div className="text-lg font-extrabold tabular-nums text-white mt-2 break-words">
+          <div className="text-lg font-extrabold tabular-nums text-slate-900 dark:text-white mt-2 break-words">
             {masked('kpi-all', summary.totalPayableDebt)}
           </div>
-          <div className="text-[11px] text-white/50 mt-1">
+          <div className="text-[11px] text-slate-500 dark:text-white/50 mt-1">
             {dueDebts.length} hutang berjalan
           </div>
-          <div className="text-[10px] text-white/40 mt-0.5">
+          <div className="text-[10px] text-slate-400 dark:text-white/40 mt-0.5">
             Piutang: {masked('kpi-all', summary.totalReceivableDebt)}
           </div>
         </div>
@@ -560,17 +560,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
         {/* Mini: Dana di Kartu Kredit */}
         <div
           onClick={() => setShowCcSheet(true)}
-          className="rounded-2xl border border-sky-400/20 bg-sky-500/10 p-3.5 cursor-pointer hover:bg-sky-500/15 transition"
+          className="rounded-2xl border border-sky-200 bg-sky-50 dark:border-sky-400/20 dark:bg-sky-500/10 p-3.5 cursor-pointer hover:bg-sky-100 dark:hover:bg-sky-500/15 transition"
           title="Klik untuk rincian kartu kredit"
         >
-          <div className="flex items-center gap-1.5 text-sky-300">
+          <div className="flex items-center gap-1.5 text-sky-600 dark:text-sky-300">
             <CreditCard className="w-4 h-4 shrink-0" />
             <span className="text-xs font-bold truncate">Dana Kartu Kredit</span>
           </div>
-          <div className="text-lg font-extrabold tabular-nums text-white mt-2 break-words">
+          <div className="text-lg font-extrabold tabular-nums text-slate-900 dark:text-white mt-2 break-words">
             {masked('kpi-all', fundCredit.total)}
           </div>
-          <div className="text-[11px] text-white/50 mt-1">
+          <div className="text-[11px] text-slate-500 dark:text-white/50 mt-1">
             {fundCredit.count}x kartu kredit
           </div>
         </div>

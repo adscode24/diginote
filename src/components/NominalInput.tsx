@@ -14,6 +14,19 @@ import { AmountKeypad, evaluateExpression, hasCalcOps } from './AmountKeypad';
  * Catatan: jangan tambahkan atribut `pattern` — browser memblokir submit
  * saat tampilan mengandung titik ribuan ("please match the format").
  */
+/** Desktop (PWA laptop/PC): tidak pakai keypad kustom — cukup ketik langsung
+ * dengan keyboard fisik, tampilan tetap terformat. */
+function isDesktopWeb(): boolean {
+  try {
+    return (
+      typeof window !== 'undefined' &&
+      window.matchMedia('(min-width: 1024px) and (hover: hover) and (pointer: fine)').matches
+    );
+  } catch {
+    return false;
+  }
+}
+
 interface NominalInputProps
   extends Omit<
     React.InputHTMLAttributes<HTMLInputElement>,
@@ -57,29 +70,53 @@ export const NominalInput: React.FC<NominalInputProps> = ({
     value = new Intl.NumberFormat('id-ID').format(Number(digits.replace(/[^0-9-]/g, '')));
   }
 
+  const useKeypad = !isDesktopWeb();
+
+  const onDesktopChange = (raw: string) => {
+    // Desktop: ketik langsung angka; format ribuan ditangani di state.
+    if (decimal) onDigits(raw.replace(/[^0-9.,]/g, ''));
+    else if (allowNegative) onDigits(raw.replace(/[^0-9-]/g, ''));
+    else onDigits(raw.replace(/[^0-9]/g, ''));
+  };
+
   return (
     <>
-      <input
-        type="text"
-        readOnly
-        autoComplete="off"
-        inputMode="none"
-        value={value}
-        placeholder={placeholder}
-        onClick={() => setOpen(true)}
-        onFocus={() => setOpen(true)}
-        className={`${className || ''} cursor-pointer caret-transparent`}
-        {...rest}
-      />
-      <AmountKeypad
-        open={open}
-        digits={digits}
-        onDigits={onDigits}
-        onClose={() => setOpen(false)}
-        decimal={decimal}
-        allowNegative={allowNegative}
-        title={padTitle || 'Masukkan Nominal'}
-      />
+      {useKeypad ? (
+        <>
+          <input
+            type="text"
+            readOnly
+            autoComplete="off"
+            inputMode="none"
+            value={value}
+            placeholder={placeholder}
+            onClick={() => setOpen(true)}
+            onFocus={() => setOpen(true)}
+            className={`${className || ''} cursor-pointer caret-transparent`}
+            {...rest}
+          />
+          <AmountKeypad
+            open={open}
+            digits={digits}
+            onDigits={onDigits}
+            onClose={() => setOpen(false)}
+            decimal={decimal}
+            allowNegative={allowNegative}
+            title={padTitle || 'Masukkan Nominal'}
+          />
+        </>
+      ) : (
+        <input
+          type="text"
+          autoComplete="off"
+          inputMode={decimal ? 'decimal' : 'numeric'}
+          value={value}
+          placeholder={placeholder}
+          onChange={e => onDesktopChange(e.target.value)}
+          className={className}
+          {...rest}
+        />
+      )}
     </>
   );
 };

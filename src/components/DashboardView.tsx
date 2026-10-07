@@ -17,6 +17,8 @@ import {
   Eye,
   EyeOff,
   Plus,
+  Wallet,
+  CreditCard,
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { useAuth } from '../context/AuthContext';
@@ -62,21 +64,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
   // Bottom Sheet for Pemasukan / Pengeluaran breakdown
   const [breakdownType, setBreakdownType] = useState<TransactionType | null>(null);
 
+  // Bottom Sheet ringkas: Tagihan Rutin & Jatuh Tempo (kartu hanya tampilkan total)
+  const [showBillsSheet, setShowBillsSheet] = useState(false);
+  const [showDebtsSheet, setShowDebtsSheet] = useState(false);
+
   // Kunci scroll halaman belakang saat bottom sheet / modal terbuka
   useBodyScrollLock(
-    breakdownType !== null || selectedDebtToPay !== null || billToPay !== null || txModal.open
+    breakdownType !== null || showBillsSheet || showDebtsSheet || selectedDebtToPay !== null || billToPay !== null || txModal.open
   );
 
   const selectedMonthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
-  const selectedMonthLabel = formatMonthYearIndo(selectedYear, selectedMonth);
+  // Periode 0 = Semua Bulan (akumulasi seluruh data, seperti inspirasi desain)
+  const isAllMonths = selectedMonth === 0;
+  const selectedMonthLabel = isAllMonths ? 'Semua Bulan' : formatMonthYearIndo(selectedYear, selectedMonth);
 
   // Check if today has transactions
   const hasLoggedToday = transactions.some(t => t.date === today);
 
-  // Filtered transactions for selected month
+  // Filtered transactions for selected month (atau seluruh data bila Semua Bulan)
   const monthlyTransactions = useMemo(() => {
+    if (isAllMonths) return [...transactions];
     return transactions.filter(t => t.date && t.date.startsWith(selectedMonthStr));
-  }, [transactions, selectedMonthStr]);
+  }, [transactions, selectedMonthStr, isAllMonths]);
 
   const filteredIncome = useMemo(() => {
     return monthlyTransactions
@@ -99,9 +108,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
     return monthlyTransactions.filter(t => t.type === breakdownType);
   }, [monthlyTransactions, breakdownType]);
 
-  // Upcoming / Overdue debts (limit to 3). Yang sudah dibayar pada
-  // siklus berjalan tidak ikut ditagih lagi.
-  const urgentDebts = useMemo(() => {
+  // Hutang berjalan yang belum tertutup siklus (untuk kartu total + sheet rincian).
+  // Diurut jatuh tempo terdekat dulu; tanpa batas 3 (kartu hanya tampilkan total).
+  const dueDebts = useMemo(() => {
     return debts
       .filter(d => d.status !== 'paid' && d.type === 'payable' && !getDebtCycleStatus(d).covered)
       .map(d => {
@@ -113,9 +122,39 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
           statusInfo: status,
         };
       })
-      .sort((a, b) => a.statusInfo.daysRemaining - b.statusInfo.daysRemaining)
-      .slice(0, 3);
+      .sort((a, b) => a.statusInfo.daysRemaining - b.statusInfo.daysRemaining);
   }, [debts]);
+  const dueDebtsRemaining = useMemo(
+    () => dueDebts.reduce((s, d) => s + (Number(d.remainingAmount) || 0), 0),
+    [dueDebts]
+  );
+
+  // Total sumber dana tersedia (semua kecuali kartu kredit) + total dana di kartu kredit
+  const fundAvailable = useMemo(() => {
+    const list = accounts.filter(a => a.type !== 'credit_card');
+    return {
+      total: list.reduce((s, a) => s + (Number(a.balance) || 0), 0),
+      count: list.length,
+    };
+  }, [accounts]);
+  const fundCredit = useMemo(() => {
+    const list = accounts.filter(a => a.type === 'credit_card');
+    return {
+      total: list.reduce((s, a) => s + (Number(a.balance) || 0), 0),
+      count: list.length,
+    };
+  }, [accounts]);
+
+  // 3 transaksi terakhir berdasar tanggal transaksi (lalu waktu catat)
+  const latestThree = useMemo(() => {
+    return [...transactions]
+      .sort((a, b) => {
+        const dateDiff = b.date.localeCompare(a.date);
+        if (dateDiff !== 0) return dateDiff;
+        return (b.createdAt || 0) - (a.createdAt || 0);
+      })
+      .slice(0, 3);
+  }, [transactions]);
 
   // Privasi angka: 1 eye-toggle untuk seluruh kartu KPI + eye per kartu carousel
   // (default tertutup; carousel otomatis menutup lagi saat digeser).
@@ -168,41 +207,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
     if (clean.length <= 4) return '•••• ' + clean;
     return clean.slice(0, 2) + '•• •••• ' + clean.slice(-2);
   };
-  const recentTransactions = useMemo(() => {
-    return [...transactions]
-      .sort((a, b) => {
-        const dateDiff = b.date.localeCompare(a.date);
-        if (dateDiff !== 0) return dateDiff;
-        return (b.createdAt || 0) - (a.createdAt || 0);
-      })
-      .slice(0, 12);
-  }, [transactions]);
-
-  // Kelompokkan transaksi terbaru per hari (gaya daftar keluarga) + total harian
-  const recentByDay = useMemo(() => {
-    const groups: { date: string; items: Transaction[]; net: number }[] = [];
-    for (const tx of recentTransactions) {
-      const g = groups.find(x => x.date === tx.date);
-      if (g) {
-        g.items.push(tx);
-        g.net += tx.type === 'income' ? tx.amount : -tx.amount;
-      } else {
-        groups.push({
-          date: tx.date,
-          items: [tx],
-          net: tx.type === 'income' ? tx.amount : -tx.amount,
-        });
-      }
-    }
-    return groups.slice(0, 4);
-  }, [recentTransactions]);
-
   const hourNow = new Date().getHours();
   const greeting =
     hourNow < 11 ? 'Selamat pagi' : hourNow < 15 ? 'Selamat siang' : hourNow < 19 ? 'Selamat sore' : 'Selamat malam';
 
   // Tagihan rutin bulan berjalan (read-only di Beranda; kelola di tab Hutang)
   const billCards = useBillCards();
+
+  // Total tagihan rutin tercatat (aktif) + akumulasi nominal per bulan
+  const billsActiveTotal = useMemo(
+    () => billCards.reduce((s, b) => s + (Number(b.amount) || 0), 0),
+    [billCards]
+  );
 
   return (
     <div className="space-y-6 pb-6">
@@ -247,47 +263,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
             ? 'Belum ada catatan hari ini, yuk catat.'
             : 'Arus kas tercatat rapi hari ini.'}
         </p>
-      </div>
-
-      {/* Header Bar with Month Filter Selector */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
-        <div>
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-            Periode Laporan Beranda
-          </span>
-          <h2 className="text-base font-bold text-slate-900 dark:text-white">
-            Ringkasan Keuangan {selectedMonthLabel}
-          </h2>
-        </div>
-
-        {/* Month & Year Select Dropdowns */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 p-1 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800">
-            <Calendar className="w-4 h-4 text-orange-600 dark:text-orange-400 ml-1.5 shrink-0" />
-            <select
-              value={selectedMonth}
-              onChange={e => setSelectedMonth(Number(e.target.value))}
-              className="px-2 py-1 text-xs font-bold bg-transparent text-slate-800 dark:text-slate-200 focus:outline-hidden"
-            >
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
-                <option key={m} value={m}>
-                  {new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(new Date(2026, m - 1, 1))}
-                </option>
-              ))}
-            </select>
-            <select
-              value={selectedYear}
-              onChange={e => setSelectedYear(Number(e.target.value))}
-              className="px-2 py-1 text-xs font-bold bg-transparent text-slate-800 dark:text-slate-200 focus:outline-hidden"
-            >
-              {[2024, 2025, 2026, 2027].map(y => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
       </div>
 
       {/* Kartu Dana ala Mobile Banking (carousel geser + eye per kartu) */}
@@ -436,123 +411,232 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
         )}
       </div>
 
-      {/* Main KPI Summary Cards: 1 eye-toggle membuka semua kartu */}
-      <div className="flex items-center justify-between px-1">
-        <h3 className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white">
-          Ringkasan Bulan Ini
-        </h3>
-        <button
-          onClick={() => toggleHide('kpi-all')}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-orange-600 dark:hover:text-orange-400 hover:border-orange-500 text-[11px] font-bold transition"
-          title={isHidden('kpi-all') ? 'Tampilkan semua angka' : 'Sembunyikan semua angka'}
-        >
-          {isHidden('kpi-all') ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-          <span>{isHidden('kpi-all') ? 'Tampilkan' : 'Sembunyikan'}</span>
-        </button>
+      {/* Filter periode: di bawah carousel, menempel kartu ringkasan (ala inspirasi) */}
+      <div className="flex items-center justify-end gap-2 px-1 -mb-4">
+        <span className="text-xs font-semibold text-slate-400">Periode:</span>
+        <div className="flex items-center gap-1 p-1 pl-2.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xs">
+          <Calendar className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400 shrink-0" />
+          <select
+            value={selectedMonth}
+            onChange={e => setSelectedMonth(Number(e.target.value))}
+            className="px-1.5 py-1 text-xs font-bold bg-transparent text-slate-800 dark:text-slate-200 focus:outline-hidden"
+            title="Bulan periode"
+          >
+            <option value={0}>Semua Bulan (Total)</option>
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
+              <option key={m} value={m}>
+                {new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(new Date(2026, m - 1, 1))}
+              </option>
+            ))}
+          </select>
+          {!isAllMonths && (
+            <select
+              value={selectedYear}
+              onChange={e => setSelectedYear(Number(e.target.value))}
+              className="px-1.5 py-1 text-xs font-bold bg-transparent border-l border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus:outline-hidden"
+              title="Tahun periode"
+            >
+              {[2024, 2025, 2026, 2027].map(y => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
 
+      {/* Ringkasan: hero gelap + grid 2x2 (ala inspirasi) */}
+      <div className="rounded-3xl bg-[#161C30] border border-white/5 shadow-lg p-4 sm:p-5 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-2xl bg-orange-500/20 text-orange-300 flex items-center justify-center shrink-0">
+            <Wallet className="w-5 h-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base font-extrabold tracking-tight text-white leading-tight">
+              {isAllMonths ? 'Ringkasan Keseluruhan' : 'Ringkasan Bulan Ini'}
+            </h3>
+            <p className="text-[11px] text-white/50">
+              {isAllMonths ? 'Total akumulasi seluruh periode' : `Total akumulasi ${selectedMonthLabel}`}
+            </p>
+          </div>
+          <EyeToggle id="kpi-all" dark />
+        </div>
+
+        {/* Hero: total sumber dana tersedia (di luar kartu kredit) */}
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-xs text-white/60">Total Sumber Dana Tersedia</div>
+            <div className="text-2xl sm:text-[28px] font-extrabold tabular-nums text-white mt-1 break-words">
+              {masked('kpi-all', fundAvailable.total)}
+            </div>
+            <div className="text-[11px] text-white/40 mt-1">
+              Selain kartu kredit · {fundAvailable.count} sumber dana
+            </div>
+          </div>
+          <div className="text-right shrink-0">
+            <div className="text-sm font-extrabold tabular-nums text-white">
+              {monthlyTransactions.length} <span className="font-semibold text-white/60">total transaksi</span>
+            </div>
+            <div className="text-[11px] text-white/40 mt-1">{selectedMonthLabel}</div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
         {/* Monthly Income Card (Clickable to view details) */}
         <div
           onClick={() => setBreakdownType('income')}
-          className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between cursor-pointer hover:border-orange-500 hover:ring-2 hover:ring-orange-500/20 transition group"
-          title="Klik untuk melihat daftar rincian pemasukan bulan ini"
+          className="rounded-2xl border border-orange-400/20 bg-orange-500/10 p-3.5 cursor-pointer hover:bg-orange-500/15 transition"
+          title="Klik untuk melihat rincian pemasukan"
         >
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition flex items-center gap-1">
-                <span>Pemasukan ({new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(new Date(selectedYear, selectedMonth - 1, 1))})</span>
-                <span className="text-[10px] text-orange-600 font-bold bg-orange-50 dark:bg-orange-950/60 px-1 rounded">Rincian ↗</span>
-              </span>
-              <div className="flex items-center gap-1">
-                <div className="w-8 h-8 rounded-xl bg-orange-50 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 flex items-center justify-center">
-                  <ArrowDownLeft className="w-4 h-4" />
-                </div>
-              </div>
-            </div>
-            <div className="text-2xl font-bold text-orange-600 dark:text-orange-400 tabular-nums mt-3">
-              +{masked('kpi-all', filteredIncome)}
-            </div>
+          <div className="flex items-center gap-1.5 text-orange-300">
+            <ArrowDownLeft className="w-4 h-4 shrink-0" />
+            <span className="text-xs font-bold truncate">Total Pemasukan</span>
           </div>
-          <div className="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
-            <span>{monthlyTransactions.filter(t => t.type === 'income').length} Transaksi Masuk</span>
-            <span className="text-orange-600 font-medium">Lihat Rincian</span>
+          <div className="text-lg font-extrabold tabular-nums text-white mt-2 break-words">
+            +{masked('kpi-all', filteredIncome)}
+          </div>
+          <div className="text-[11px] text-white/50 mt-1">
+            {monthlyTransactions.filter(t => t.type === 'income').length}x pemasukan
           </div>
         </div>
 
         {/* Monthly Expense Card (Clickable to view details) */}
         <div
           onClick={() => setBreakdownType('expense')}
-          className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between cursor-pointer hover:border-red-500 hover:ring-2 hover:ring-red-500/20 transition group"
-          title="Klik untuk melihat daftar rincian pengeluaran bulan ini"
+          className="rounded-2xl border border-red-400/20 bg-red-500/10 p-3.5 cursor-pointer hover:bg-red-500/15 transition"
+          title="Klik untuk melihat rincian pengeluaran"
         >
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-red-600 dark:group-hover:text-red-400 transition flex items-center gap-1">
-                <span>Pengeluaran ({new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(new Date(selectedYear, selectedMonth - 1, 1))})</span>
-                <span className="text-[10px] text-red-600 font-bold bg-red-50 dark:bg-red-950/60 px-1 rounded">Rincian ↗</span>
-              </span>
-              <div className="flex items-center gap-1">
-                <div className="w-8 h-8 rounded-xl bg-red-50 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center">
-                  <ArrowUpRight className="w-4 h-4" />
-                </div>
-              </div>
-            </div>
-            <div className="text-2xl font-bold text-red-600 dark:text-red-400 tabular-nums mt-3">
-              -{masked('kpi-all', filteredExpense)}
-            </div>
+          <div className="flex items-center gap-1.5 text-red-300">
+            <ArrowUpRight className="w-4 h-4 shrink-0" />
+            <span className="text-xs font-bold truncate">Total Pengeluaran</span>
           </div>
-          <div className="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
-            <span>{monthlyTransactions.filter(t => t.type === 'expense').length} Transaksi Keluar</span>
-            <span className="text-red-600 font-medium">Lihat Rincian</span>
+          <div className="text-lg font-extrabold tabular-nums text-white mt-2 break-words">
+            -{masked('kpi-all', filteredExpense)}
+          </div>
+          <div className="text-[11px] text-white/50 mt-1">
+            {monthlyTransactions.filter(t => t.type === 'expense').length}x pengeluaran
           </div>
         </div>
 
-        {/* Remaining Debt Payable */}
         <div
           onClick={() => onNavigateTab('debts')}
-          className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between cursor-pointer hover:border-amber-500 transition group"
+          className="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-3.5 cursor-pointer hover:bg-amber-500/15 transition"
+          title="Lihat hutang di halaman Hutang"
         >
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-amber-600 transition">
-                Sisa Hutang Berjalan
-              </span>
-              <div className="flex items-center gap-1">
-                <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                  <AlertCircle className="w-4 h-4" />
-                </div>
-              </div>
-            </div>
-            <div className="text-2xl font-bold text-amber-600 dark:text-amber-400 tabular-nums mt-3">
-              {masked('kpi-all', summary.totalPayableDebt)}
-            </div>
+          <div className="flex items-center gap-1.5 text-amber-300">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span className="text-xs font-bold truncate">Sisa Hutang Berjalan</span>
           </div>
-          <div className="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
-            <span>Piutang: {masked('kpi-all', summary.totalReceivableDebt)}</span>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition" />
+          <div className="text-lg font-extrabold tabular-nums text-white mt-2 break-words">
+            {masked('kpi-all', summary.totalPayableDebt)}
           </div>
+          <div className="text-[11px] text-white/50 mt-1">
+            {dueDebts.length} hutang berjalan
+          </div>
+          <div className="text-[10px] text-white/40 mt-0.5">
+            Piutang: {masked('kpi-all', summary.totalReceivableDebt)}
+          </div>
+        </div>
+
+        {/* Mini: Dana di Kartu Kredit */}
+        <div
+          onClick={() => onNavigateTab('accounts')}
+          className="rounded-2xl border border-sky-400/20 bg-sky-500/10 p-3.5 cursor-pointer hover:bg-sky-500/15 transition"
+          title="Lihat kartu kredit di halaman Dana"
+        >
+          <div className="flex items-center gap-1.5 text-sky-300">
+            <CreditCard className="w-4 h-4 shrink-0" />
+            <span className="text-xs font-bold truncate">Dana Kartu Kredit</span>
+          </div>
+          <div className="text-lg font-extrabold tabular-nums text-white mt-2 break-words">
+            {masked('kpi-all', fundCredit.total)}
+          </div>
+          <div className="text-[11px] text-white/50 mt-1">
+            {fundCredit.count}x kartu kredit
+          </div>
+        </div>
         </div>
       </div>
 
-      {/* Tagihan Rutin (read-only: kelola di tab Hutang > Tagihan Rutin) */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <BellRing className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-            <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-              Tagihan Rutin
-            </h3>
+      {/* Kartu Total: Tagihan Rutin & Jatuh Tempo (total saja, klik = bottom sheet rincian) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <button
+          onClick={() => setShowBillsSheet(true)}
+          className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center gap-3 text-left hover:border-orange-500 transition group"
+        >
+          <div className="w-11 h-11 rounded-2xl bg-orange-100 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
+            <BellRing className="w-5 h-5" />
           </div>
-          <button
-            onClick={() => onNavigateTab('debts')}
-            className="text-xs font-semibold text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-0.5"
-          >
-            <span>Kelola Tagihan</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              Total Tagihan Rutin Tercatat
+            </div>
+            <div className="text-xl font-extrabold tabular-nums text-slate-900 dark:text-white mt-0.5">
+              {billCards.length} <span className="text-xs font-bold text-slate-400">tagihan</span>
+            </div>
+            <div className="text-[11px] tabular-nums text-slate-500 dark:text-slate-400 mt-0.5">
+              {masked('kpi-all', billsActiveTotal)} / bulan · klik untuk rincian
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:translate-x-0.5 group-hover:text-orange-500 transition shrink-0" />
+        </button>
 
+        <button
+          onClick={() => setShowDebtsSheet(true)}
+          className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center gap-3 text-left hover:border-amber-500 transition group"
+        >
+          <div className="w-11 h-11 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+            <Clock className="w-5 h-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              Total Jatuh Tempo Terdekat
+            </div>
+            <div className="text-xl font-extrabold tabular-nums text-slate-900 dark:text-white mt-0.5">
+              {dueDebts.length} <span className="text-xs font-bold text-slate-400">jatuh tempo</span>
+            </div>
+            <div className="text-[11px] tabular-nums text-slate-500 dark:text-slate-400 mt-0.5">
+              Sisa {masked('kpi-all', dueDebtsRemaining)} · klik untuk rincian
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:translate-x-0.5 group-hover:text-amber-500 transition shrink-0" />
+        </button>
+      </div>
+
+      {/* Bottom Sheet: Rincian Tagihan Rutin (logika + tombol Bayar sama) */}
+      {showBillsSheet && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs transition-opacity flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => setShowBillsSheet(false)}
+        >
+          <div
+            className="w-full max-w-xl max-h-[85vh] flex flex-col rounded-t-3xl sm:rounded-2xl bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mt-3 mb-1 sm:hidden shrink-0" />
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-orange-600 text-white flex items-center justify-center shrink-0">
+                  <BellRing className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    Rincian Tagihan Rutin
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {billCards.length} tagihan · {formatRupiah(billsActiveTotal)} / bulan
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowBillsSheet(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-6 space-y-2">
         {billCards.length === 0 ? (
           <p className="text-xs text-slate-400 text-center py-4">
             Belum ada tagihan rutin. Tambahkan di halaman Hutang tab Tagihan Rutin.
@@ -586,7 +670,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                 </div>
 
                 <button
-                  onClick={() => setBillToPay(bill)}
+                  onClick={() => {
+                    setShowBillsSheet(false);
+                    setBillToPay(bill);
+                  }}
                   className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-orange-600 hover:bg-orange-700 text-white transition shadow-xs shrink-0"
                 >
                   Bayar
@@ -595,37 +682,58 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
             ))}
           </div>
         )}
-      </div>
-
-      {/* Two Column Layout: Urgent Debts on Left, Recent Transactions on Right */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Column: Urgent Debts */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-amber-500" />
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                  Jatuh Tempo Hutang Terdekat
-                </h3>
-              </div>
+            </div>
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 shrink-0 text-center">
               <button
-                onClick={() => onNavigateTab('debts')}
-                className="text-xs font-semibold text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-0.5"
+                onClick={() => setShowBillsSheet(false)}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 transition"
               >
-                <span>Lihat Semua</span>
-                <ChevronRight className="w-3.5 h-3.5" />
+                Tutup
               </button>
             </div>
-
-            <div className="mt-4 space-y-3">
-              {urgentDebts.length === 0 ? (
+          </div>
+        </div>
+      )}
+      {/* Bottom Sheet: Rincian Jatuh Tempo (logika + tombol Bayar sama) */}
+      {showDebtsSheet && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs transition-opacity flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => setShowDebtsSheet(false)}
+        >
+          <div
+            className="w-full max-w-xl max-h-[85vh] flex flex-col rounded-t-3xl sm:rounded-2xl bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mt-3 mb-1 sm:hidden shrink-0" />
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    Rincian Jatuh Tempo
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {dueDebts.length} hutang · Sisa {formatRupiah(dueDebtsRemaining)}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDebtsSheet(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-6 space-y-3">
+              {dueDebts.length === 0 ? (
                 <div className="p-6 text-center text-xs text-slate-400">
                   <CheckCircle2 className="w-8 h-8 text-orange-500 mx-auto mb-2" />
                   <p>Tidak ada hutang yang mendekati tanggal jatuh tempo.</p>
                 </div>
               ) : (
-                urgentDebts.map(debt => {
+                dueDebts.map(debt => {
                   const status = debt.statusInfo || calculateDueDateStatus(debt.effectiveDueDate || debt.dueDate);
                   const isInstallment = debt.installmentCategory && debt.installmentCategory !== 'non_installment';
                   const lastPay = [...(debt.payments || [])].sort((a, b) =>
@@ -691,7 +799,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
 
                       {showPay && (
                         <button
-                          onClick={() => setSelectedDebtToPay(debt)}
+                          onClick={() => {
+                            setShowDebtsSheet(false);
+                            setSelectedDebtToPay(debt);
+                          }}
                           className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-orange-600 hover:bg-orange-700 text-white transition shadow-xs shrink-0"
                         >
                           Bayar
@@ -702,21 +813,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                 })
               )}
             </div>
-          </div>
-
-          <div className="pt-3 mt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-            <span>Saat dibayar, nominal langsung memotong saldo sumber dana dan sisa hutang.</span>
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 shrink-0 text-center">
+              <button
+                onClick={() => setShowDebtsSheet(false)}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 transition"
+              >
+                Tutup
+              </button>
+            </div>
           </div>
         </div>
+      )}
 
-        {/* Right Column: Recent Transactions */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+      {/* Transaksi Terakhir */}
+      <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <Receipt className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                  Transaksi Terbaru
+                  Transaksi Terakhir
                 </h3>
               </div>
               <button
@@ -728,74 +844,52 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
               </button>
             </div>
 
-            <div className="mt-4 space-y-4">
-              {recentByDay.length === 0 ? (
+            <div className="mt-4 space-y-2">
+              {latestThree.length === 0 ? (
                 <div className="p-6 text-center text-xs text-slate-400">
                   Belum ada transaksi yang dicatat.
                 </div>
               ) : (
-                recentByDay.map(day => (
-                  <div key={day.date}>
-                    <div className="flex items-center justify-between px-1 mb-1.5">
-                      <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                        {formatDateIndo(day.date)}
-                      </span>
-                      <span
-                        className={`text-[11px] font-bold tabular-nums ${
-                          day.net >= 0
-                            ? 'text-orange-600 dark:text-orange-400'
-                            : 'text-slate-700 dark:text-slate-300'
+                latestThree.map(tx => {
+                  const cat = categories.find(c => c.id === tx.categoryId);
+                  const isIncome = tx.type === 'income';
+
+                  return (
+                    <div
+                      key={tx.id}
+                      className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition text-xs"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0"
+                          style={{ backgroundColor: cat?.color || (isIncome ? '#10B981' : '#EF4444') }}
+                        >
+                          <CategoryIcon
+                            name={cat?.icon || (isIncome ? 'ArrowDownLeft' : 'ArrowUpRight')}
+                            className="w-4 h-4"
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-semibold text-slate-900 dark:text-white truncate">
+                            {tx.categoryName}
+                          </div>
+                          <div className="text-[10px] text-slate-400 truncate">
+                            {formatDateIndo(tx.date)} · {tx.accountName || tx.paymentMethod}
+                            {tx.authorName && ` · ${tx.authorName.split(' ')[0]}`}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div
+                        className={`font-bold tabular-nums shrink-0 ml-2 ${
+                          isIncome ? 'text-orange-600 dark:text-orange-400' : 'text-slate-900 dark:text-white'
                         }`}
                       >
-                        {day.net >= 0 ? '+' : '-'}
-                        {formatRupiah(day.net)}
-                      </span>
+                        {isIncome ? '+' : '-'}{formatRupiah(tx.amount)}
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      {day.items.map(tx => {
-                        const cat = categories.find(c => c.id === tx.categoryId);
-                        const isIncome = tx.type === 'income';
-
-                        return (
-                          <div
-                            key={tx.id}
-                            className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition text-xs"
-                          >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div
-                                className="w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0"
-                                style={{ backgroundColor: cat?.color || (isIncome ? '#10B981' : '#EF4444') }}
-                              >
-                                <CategoryIcon
-                                  name={cat?.icon || (isIncome ? 'ArrowDownLeft' : 'ArrowUpRight')}
-                                  className="w-4 h-4"
-                                />
-                              </div>
-                              <div className="min-w-0">
-                                <div className="font-semibold text-slate-900 dark:text-white truncate">
-                                  {tx.categoryName}
-                                </div>
-                                <div className="text-[10px] text-slate-400 truncate">
-                                  {tx.accountName || tx.paymentMethod}
-                                  {tx.authorName && ` · ${tx.authorName.split(' ')[0]}`}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div
-                              className={`font-bold tabular-nums shrink-0 ml-2 ${
-                                isIncome ? 'text-orange-600 dark:text-orange-400' : 'text-slate-900 dark:text-white'
-                              }`}
-                            >
-                              {isIncome ? '+' : '-'}{formatRupiah(tx.amount)}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -805,11 +899,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
               onClick={() => onNavigateTab('transactions')}
               className="text-xs font-semibold text-orange-600 dark:text-orange-400 hover:underline"
             >
-              Lihat Riwayat Seluruh Transaksi
+              Lihat Data Transaksi Selengkapnya
             </button>
           </div>
         </div>
-      </div>
 
       {/* Bottom Sheet for Pemasukan / Pengeluaran Breakdown */}
       {breakdownType && (

@@ -42,6 +42,18 @@ export const BillPayModal: React.FC<BillPayModalProps> = ({ isOpen, onClose, bil
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bill, isOpen]);
 
+  // Cancel = data harus hilang: kolom kembali kosong saat modal ditutup.
+  useEffect(() => {
+    if (!isOpen) {
+      setAmountStr('');
+      setAccountId('');
+      setCategoryId('');
+      setPaymentDate(getTodayString());
+      setError('');
+      setSuccess(false);
+    }
+  }, [isOpen]);
+
   if (!isOpen || !bill) return null;
 
   const handleSubmit = (e: React.FormEvent) => {

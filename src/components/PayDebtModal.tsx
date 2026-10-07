@@ -49,6 +49,19 @@ export const PayDebtModal: React.FC<PayDebtModalProps> = ({ isOpen, onClose, deb
     }
   }, [debt, isOpen, accounts]);
 
+  // Cancel = data harus hilang: kolom kembali kosong saat modal ditutup.
+  React.useEffect(() => {
+    if (!isOpen) {
+      setAmountStr('');
+      setPaymentDate(getTodayString());
+      setSelectedAccountId('');
+      setNotes('');
+      setReceiptImage(undefined);
+      setError('');
+      setSuccessInfo(null);
+    }
+  }, [isOpen]);
+
   if (!isOpen || !debt) return null;
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {

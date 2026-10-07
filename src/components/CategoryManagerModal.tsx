@@ -29,6 +29,17 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
 
   useBodyScrollLock(isOpen);
 
+  // Cancel = data harus hilang: field tambah-kategori kosong saat modal ditutup.
+  React.useEffect(() => {
+    if (!isOpen) {
+      setEditingId(null);
+      setName('');
+      setSelectedIcon('Tag');
+      setSelectedColor(COLOR_PALETTE[0]);
+      setError('');
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const filteredCategories = categories.filter(c => c.type === activeType);

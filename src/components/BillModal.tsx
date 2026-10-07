@@ -48,6 +48,19 @@ export const BillModal: React.FC<BillModalProps> = ({ isOpen, onClose, billToEdi
     setError('');
   }, [isOpen, billToEdit]);
 
+  // Cancel = data harus hilang: kolom kembali kosong saat modal ditutup.
+  useEffect(() => {
+    if (!isOpen) {
+      setName('');
+      setAmountStr('');
+      setDueDay(10);
+      setCategoryId('');
+      setAccountId('');
+      setNotes('');
+      setError('');
+    }
+  }, [isOpen]);
+
   // Default kategori "Tagihan & Utilitas" bila ada
   useEffect(() => {
     if (!categoryId) {

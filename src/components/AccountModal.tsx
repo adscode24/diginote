@@ -67,6 +67,20 @@ export const AccountModal: React.FC<AccountModalProps> = ({
     setError('');
   }, [accountToEdit, isOpen, defaultType]);
 
+  // Cancel = data harus hilang: kolom kembali kosong saat modal ditutup.
+  useEffect(() => {
+    if (!isOpen) {
+      setName('');
+      setType(defaultType);
+      setAccountNumber('');
+      setInitialBalanceStr('0');
+      setAdjustedBalanceStr('0');
+      setSelectedColor(COLOR_PALETTE[0]);
+      setSelectedIcon(getDefaultIconForType(defaultType));
+      setError('');
+    }
+  }, [isOpen, defaultType]);
+
   // Update default icon when type changes
   const handleTypeChange = (newType: AccountType) => {
     setType(newType);

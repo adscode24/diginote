@@ -83,6 +83,25 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
     setError('');
   }, [isOpen, debtToEdit, defaultType]);
 
+  // Cancel = data harus hilang: kolom kembali kosong saat modal ditutup.
+  useEffect(() => {
+    if (!isOpen) {
+      setInstallmentCategory('non_installment');
+      setType(defaultType);
+      setCounterparty('');
+      setTotalAmountStr('');
+      setMonthlyInstallmentStr('');
+      setStartDate(getTodayString());
+      setDueDate('');
+      setDueDayOfMonth(10);
+      setRemainingTenorStr('');
+      setTotalTenorStr('');
+      setNotes('');
+      setTieredPeriods([]);
+      setError('');
+    }
+  }, [isOpen, defaultType]);
+
   if (!isOpen) return null;
 
   const handleTotalAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {

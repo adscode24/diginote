@@ -135,6 +135,26 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     setError('');
   }, [transactionToEdit, prefill, prefillKey, initialType, initialDate, isOpen, accounts]);
 
+  // Cancel = data harus hilang: kolom kembali kosong saat modal ditutup
+  // (termasuk bila cancel saat edit/prefill, sehingga buka-baru berikutnya kosong).
+  useEffect(() => {
+    if (!isOpen) {
+      setAuthorUid(currentUser?.id);
+      setAuthorName(currentUser?.name || '');
+      setType(initialType);
+      setAmountStr('');
+      setCategoryId('');
+      setAccountId('');
+      setDate(initialDate || getTodayString());
+      setDescription('');
+      setPaymentMethod('transfer');
+      setReceiptImage(undefined);
+      setShowBalances(false);
+      setError('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
   // Dynamically filter categories matching the selected transaction type
   const availableCategories = categories.filter(c => c.type === type);
   useEffect(() => {

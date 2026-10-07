@@ -41,6 +41,16 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose 
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   useBodyScrollLock(isOpen);
 
+  // Cancel = data harus hilang: passphrase/pesan kembali kosong saat modal ditutup.
+  React.useEffect(() => {
+    if (!isOpen) {
+      setBackupPassphrase('');
+      setCopied(false);
+      setBusy(false);
+      setStatusMessage(null);
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleCopyVaultId = () => {

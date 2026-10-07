@@ -192,7 +192,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   <input
                     type="text"
                     autoComplete="off"
-                    inputMode="numeric" pattern="[0-9]*"
+                    inputMode="numeric"
                     placeholder="0"
                     value={
                       adjustedBalanceStr
@@ -261,7 +261,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 <input
                   type="text"
                   autoComplete="off"
-                  inputMode="numeric" pattern="[0-9]*"
+                  inputMode="numeric"
                   placeholder="Contoh: 8492019482 atau 0812345678"
                   value={accountNumber}
                   onChange={e => setAccountNumber(e.target.value.replace(/[^0-9 ]/g, ''))}
@@ -282,7 +282,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                     <input
                       type="text"
                       autoComplete="off"
-                      inputMode="numeric" pattern="[0-9]*"
+                      inputMode="numeric"
                       placeholder="0"
                       value={
                         initialBalanceStr

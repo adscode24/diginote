@@ -429,7 +429,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 <input
                   type="text"
                   autoComplete="off"
-                  inputMode="numeric" pattern="[0-9]*"
+                  inputMode="numeric"
                   placeholder="0"
                   value={amountStr ? new Intl.NumberFormat('id-ID').format(Number(amountStr)) : ''}
                   onChange={handleAmountChange}

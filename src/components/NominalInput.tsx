@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AmountKeypad } from './AmountKeypad';
+import { AmountKeypad, evaluateExpression, hasCalcOps } from './AmountKeypad';
 
 /**
  * Input nominal dengan keypad angka kustom (AmountKeypad).
@@ -46,8 +46,10 @@ export const NominalInput: React.FC<NominalInputProps> = ({
   let value: string;
   if (!digits) {
     value = '';
+  } else if (hasCalcOps(digits)) {
+    const r = evaluateExpression(digits);
+    value = r !== null ? new Intl.NumberFormat('id-ID').format(Number(r)) : '0';
   } else if (decimal) {
-    // Desimal ditampilkan apa adanya (pisah koma/titik), tanpa grouping
     value = digits;
   } else if (digits === '-') {
     value = '-';

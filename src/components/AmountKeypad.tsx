@@ -17,6 +17,35 @@ interface AmountKeypadProps {
   title?: string;
 }
 
+/** Evaluasi ekspresi sederhana "50000+25000-10000" (dukung koma desimal). */
+export function evaluateExpression(expr: string): string | null {
+  if (!expr) return null;
+  const norm = expr.replace(/,/g, '.').replace(/[^0-9+\-.]/g, '');
+  if (!norm || !/\d/.test(norm)) return null;
+  const parts = norm.split(/([+-])/).filter(Boolean);
+  let result: number | null = null;
+  let sign = 1;
+  for (const p of parts) {
+    if (p === '+') sign = 1;
+    else if (p === '-') sign = -1;
+    else {
+      const n = Number(p);
+      if (!Number.isFinite(n)) return null;
+      if (result === null) result = n * sign;
+      else result += n * sign;
+      sign = 1;
+    }
+  }
+  if (result === null || !Number.isFinite(result)) return null;
+  // Bulatkan agar tidak ada artefak float (mis. 0.1+0.2)
+  return String(Math.round(result * 100) / 100);
+}
+
+/** Apakah string mengandung operator kalkulator (abaikan minus di depan). */
+export function hasCalcOps(digits: string): boolean {
+  return /[+-]/.test(digits.replace(/^-/, ''));
+}
+
 export const AmountKeypad: React.FC<AmountKeypadProps> = ({
   open,
   digits,
@@ -29,24 +58,48 @@ export const AmountKeypad: React.FC<AmountKeypadProps> = ({
   useBodyScrollLock(open);
   if (!open) return null;
 
-  const hasSep = /[.,]/.test(digits);
+  const calcOpen = hasCalcOps(digits);
+  const lastSegment = digits.split(/([+-])/).pop() || '';
+  const lastHasSep = /[.,]/.test(lastSegment);
+
+  const closeAndCollapse = () => {
+    if (calcOpen) {
+      const r = evaluateExpression(digits);
+      if (r !== null) onDigits(r);
+    }
+    onClose();
+  };
 
   const typeDigit = (d: string) => {
-    if (decimal && hasSep) {
-      const sepIdx = digits.search(/[.,]/);
-      if (digits.length - sepIdx > 2) return; // maks 2 desimal
+    if (decimal && lastHasSep) {
+      const sepIdx = lastSegment.search(/[.,]/);
+      if (lastSegment.length - sepIdx > 2) return; // maks 2 desimal per segmen
     }
-    onDigits(digits === '0' ? d : digits + d);
+    // Hindari "00" ganda di awal segmen
+    if (lastSegment === '0' && !lastHasSep && d !== '0') onDigits(digits.slice(0, -1) + d);
+    else if (lastSegment === '0' && d === '0') onDigits(digits);
+    else onDigits(digits + d);
   };
 
   const typeSep = () => {
-    if (!decimal || hasSep) return;
-    onDigits(digits === '' || digits === '-' ? digits + '0,' : digits + ',');
+    if (!decimal || lastHasSep) return;
+    onDigits(lastSegment === '' ? digits + '0,' : digits + ',');
   };
 
   const typeTripleZero = () => {
-    if (digits === '' || digits === '-' || digits === '0') return;
+    if (lastSegment === '' || lastSegment === '0') return;
     onDigits(digits + '000');
+  };
+
+  const typeOp = (op: '+' | '-') => {
+    if (!digits) return;
+    const last = digits[digits.length - 1];
+    if (/[0-9,.]/.test(last)) onDigits(digits + op);
+  };
+
+  const equals = () => {
+    const r = evaluateExpression(digits);
+    if (r !== null) onDigits(r);
   };
 
   const backspace = () => {
@@ -58,9 +111,12 @@ export const AmountKeypad: React.FC<AmountKeypadProps> = ({
     onDigits(digits.startsWith('-') ? digits.slice(1) : digits ? '-' + digits : '-');
   };
 
-  // Tampilan format ribuan; desimal tetap apa adanya (pisah koma/titik)
+  // Tampilan: bila ada operator, tampilkan ekspresi + hasil kecil; bila tidak, grouping
   let display = '';
+  const liveResult = calcOpen ? evaluateExpression(digits) : null;
   if (digits === '' || digits === '-') {
+    display = digits;
+  } else if (calcOpen) {
     display = digits;
   } else if (decimal) {
     const [intPart, decPart] = digits.split(/[.,]/);
@@ -91,7 +147,7 @@ export const AmountKeypad: React.FC<AmountKeypadProps> = ({
   return (
     <div
       className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
-      onClick={onClose}
+      onClick={closeAndCollapse}
     >
       <div
         className="w-full max-w-sm rounded-t-3xl sm:rounded-3xl bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden p-5 space-y-4 animate-in slide-in-from-bottom duration-200"
@@ -102,7 +158,7 @@ export const AmountKeypad: React.FC<AmountKeypadProps> = ({
           <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">{title}</h3>
           <button
             type="button"
-            onClick={onClose}
+            onClick={closeAndCollapse}
             className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <X className="w-4 h-4" />
@@ -143,9 +199,21 @@ export const AmountKeypad: React.FC<AmountKeypadProps> = ({
           </button>
         </div>
 
+        <div className="grid grid-cols-3 gap-2">
+          <Key label="+" onPress={() => typeOp('+')} accent />
+          <Key label="-" onPress={() => typeOp('-')} accent />
+          <Key label="=" onPress={equals} accent />
+        </div>
+
+        {calcOpen && (
+          <div className="text-center text-xs text-slate-500 dark:text-slate-400">
+            = {liveResult !== null ? new Intl.NumberFormat('id-ID').format(Number(liveResult)) : '…'}
+          </div>
+        )}
+
         <button
           type="button"
-          onClick={onClose}
+          onClick={closeAndCollapse}
           className="w-full py-3 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-extrabold transition"
         >
           Selesai

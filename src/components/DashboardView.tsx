@@ -67,10 +67,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
   // Bottom Sheet ringkas: Tagihan Rutin & Jatuh Tempo (kartu hanya tampilkan total)
   const [showBillsSheet, setShowBillsSheet] = useState(false);
   const [showDebtsSheet, setShowDebtsSheet] = useState(false);
+  // Bottom Sheet mini ringkasan: Sisa Hutang & Dana Kartu Kredit (tidak pindah halaman)
+  const [showDebtRemainSheet, setShowDebtRemainSheet] = useState(false);
+  const [showCcSheet, setShowCcSheet] = useState(false);
 
   // Kunci scroll halaman belakang saat bottom sheet / modal terbuka
   useBodyScrollLock(
-    breakdownType !== null || showBillsSheet || showDebtsSheet || selectedDebtToPay !== null || billToPay !== null || txModal.open
+    breakdownType !== null || showBillsSheet || showDebtsSheet || showDebtRemainSheet || showCcSheet || selectedDebtToPay !== null || billToPay !== null || txModal.open
   );
 
   const selectedMonthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
@@ -128,6 +131,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
     () => dueDebts.reduce((s, d) => s + (Number(d.remainingAmount) || 0), 0),
     [dueDebts]
   );
+
+  // Rincian sisa hutang: semua hutang berjalan bersisa (bukan hanya yang jatuh tempo)
+  const debtRemainList = useMemo(() => {
+    return debts
+      .filter(d => d.type === 'payable' && d.status !== 'paid' && (Number(d.remainingAmount) || 0) > 0)
+      .map(d => {
+        const effectiveDueDate = d.dueDayOfMonth ? getNextDueDate(d.dueDayOfMonth) : d.dueDate;
+        const status = calculateDueDateStatus(effectiveDueDate);
+        return { ...d, effectiveDueDate, statusInfo: status };
+      })
+      .sort((a, b) => a.statusInfo.daysRemaining - b.statusInfo.daysRemaining);
+  }, [debts]);
+
+  // Daftar kartu kredit untuk sheet rincian
+  const ccAccounts = useMemo(() => accounts.filter(a => a.type === 'credit_card'), [accounts]);
 
   // Total sumber dana tersedia (semua kecuali kartu kredit) + total dana di kartu kredit
   const fundAvailable = useMemo(() => {
@@ -419,12 +437,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
           <select
             value={selectedMonth}
             onChange={e => setSelectedMonth(Number(e.target.value))}
-            className="px-1.5 py-1 text-xs font-bold bg-transparent text-slate-800 dark:text-slate-200 focus:outline-hidden"
+            className="px-1.5 py-1 text-xs font-bold bg-transparent text-slate-800 dark:text-slate-200 focus:outline-hidden [color-scheme:light] dark:[color-scheme:dark]"
             title="Bulan periode"
           >
-            <option value={0}>Semua Bulan (Total)</option>
+            <option value={0} className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">Semua Bulan (Total)</option>
             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
-              <option key={m} value={m}>
+              <option key={m} value={m} className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
                 {new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(new Date(2026, m - 1, 1))}
               </option>
             ))}
@@ -433,11 +451,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
             <select
               value={selectedYear}
               onChange={e => setSelectedYear(Number(e.target.value))}
-              className="px-1.5 py-1 text-xs font-bold bg-transparent border-l border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus:outline-hidden"
+              className="px-1.5 py-1 text-xs font-bold bg-transparent border-l border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus:outline-hidden [color-scheme:light] dark:[color-scheme:dark]"
               title="Tahun periode"
             >
               {[2024, 2025, 2026, 2027].map(y => (
-                <option key={y} value={y}>
+                <option key={y} value={y} className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
                   {y}
                 </option>
               ))}
@@ -520,9 +538,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
         </div>
 
         <div
-          onClick={() => onNavigateTab('debts')}
+          onClick={() => setShowDebtRemainSheet(true)}
           className="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-3.5 cursor-pointer hover:bg-amber-500/15 transition"
-          title="Lihat hutang di halaman Hutang"
+          title="Klik untuk rincian sisa hutang"
         >
           <div className="flex items-center gap-1.5 text-amber-300">
             <AlertCircle className="w-4 h-4 shrink-0" />
@@ -541,9 +559,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
 
         {/* Mini: Dana di Kartu Kredit */}
         <div
-          onClick={() => onNavigateTab('accounts')}
+          onClick={() => setShowCcSheet(true)}
           className="rounded-2xl border border-sky-400/20 bg-sky-500/10 p-3.5 cursor-pointer hover:bg-sky-500/15 transition"
-          title="Lihat kartu kredit di halaman Dana"
+          title="Klik untuk rincian kartu kredit"
         >
           <div className="flex items-center gap-1.5 text-sky-300">
             <CreditCard className="w-4 h-4 shrink-0" />
@@ -816,6 +834,167 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
             <div className="p-4 border-t border-slate-100 dark:border-slate-800 shrink-0 text-center">
               <button
                 onClick={() => setShowDebtsSheet(false)}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 transition"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Bottom Sheet: Rincian Sisa Hutang Berjalan */}
+      {showDebtRemainSheet && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs transition-opacity flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => setShowDebtRemainSheet(false)}
+        >
+          <div
+            className="w-full max-w-xl max-h-[85vh] flex flex-col rounded-t-3xl sm:rounded-2xl bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mt-3 mb-1 sm:hidden shrink-0" />
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0">
+                  <AlertCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    Rincian Sisa Hutang
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {debtRemainList.length} hutang berjalan · Sisa {formatRupiah(summary.totalPayableDebt)}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDebtRemainSheet(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-6 space-y-2">
+              {debtRemainList.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-400">
+                  <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-orange-500" />
+                  <p>Tidak ada sisa hutang berjalan.</p>
+                </div>
+              ) : (
+                debtRemainList.map(d => (
+                  <div
+                    key={d.id}
+                    className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 text-xs"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-slate-900 dark:text-white truncate">
+                        {d.counterparty}
+                      </div>
+                      <div className="text-[11px] tabular-nums text-slate-500 dark:text-slate-400 mt-0.5">
+                        Sisa <strong className="text-red-600 dark:text-red-400">{formatRupiah(d.remainingAmount)}</strong>
+                        <span className="text-slate-400"> dari {formatRupiah(d.totalAmount)}</span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        {d.statusInfo.label}
+                        {d.dueDayOfMonth ? ` · Siklus tgl ${d.dueDayOfMonth}` : d.dueDate ? ` · ${formatDateIndo(d.dueDate)}` : ''}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowDebtRemainSheet(false);
+                        setSelectedDebtToPay(d);
+                      }}
+                      className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-orange-600 hover:bg-orange-700 text-white transition shadow-xs shrink-0"
+                    >
+                      Bayar
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 shrink-0 text-center">
+              <button
+                onClick={() => setShowDebtRemainSheet(false)}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 transition"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom Sheet: Rincian Dana Kartu Kredit */}
+      {showCcSheet && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs transition-opacity flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => setShowCcSheet(false)}
+        >
+          <div
+            className="w-full max-w-xl max-h-[85vh] flex flex-col rounded-t-3xl sm:rounded-2xl bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mt-3 mb-1 sm:hidden shrink-0" />
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-sky-500 text-white flex items-center justify-center shrink-0">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    Rincian Kartu Kredit
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {fundCredit.count} kartu · Total {formatRupiah(fundCredit.total)}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCcSheet(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-6 space-y-2">
+              {ccAccounts.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-400">
+                  <CreditCard className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-700" />
+                  <p>Belum ada kartu kredit. Tambahkan di halaman Sumber Dana.</p>
+                </div>
+              ) : (
+                ccAccounts.map(a => (
+                  <div
+                    key={a.id}
+                    className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 text-xs"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-slate-900 dark:text-white truncate">
+                        {a.name}
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        Kartu Kredit{a.accountNumber ? ` · ${maskAccountNumber(a.accountNumber)}` : ''}
+                      </div>
+                    </div>
+                    <div className="font-bold tabular-nums text-slate-900 dark:text-white shrink-0">
+                      {masked('kpi-all', a.balance)}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 shrink-0 text-center space-y-2">
+              <button
+                onClick={() => {
+                  setShowCcSheet(false);
+                  onNavigateTab('accounts');
+                }}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white transition"
+              >
+                Kelola Sumber Dana
+              </button>
+              <button
+                onClick={() => setShowCcSheet(false)}
                 className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 transition"
               >
                 Tutup

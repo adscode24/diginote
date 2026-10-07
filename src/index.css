@@ -27,6 +27,18 @@
   .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
+
+  /* Input nominal native (type=number di APK): sembunyikan spinner
+     browser desktop agar tampil seperti input teks biasa */
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
 }
 
 /* Custom subtle scrollbar */

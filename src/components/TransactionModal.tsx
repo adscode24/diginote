@@ -3,6 +3,7 @@ import { X, Calendar, Settings2, Upload, Trash2, Wallet, Plus, ChevronDown, Eye,
 import { Transaction, TransactionType, PaymentMethod } from '../types';
 import { SharedTransactionPrefill } from '../services/shareIntent';
 import { useFinance } from '../context/FinanceContext';
+import { NominalInput } from './NominalInput';
 import { useAuth } from '../context/AuthContext';
 import { PAYMENT_METHODS } from '../utils/constants';
 import { getTodayString, formatRupiah } from '../utils/formatters';
@@ -426,13 +427,11 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">
                   Rp
                 </span>
-                <input
-                  type="text"
+                <NominalInput
                   autoComplete="off"
-                  inputMode="numeric"
                   placeholder="0"
-                  value={amountStr ? new Intl.NumberFormat('id-ID').format(Number(amountStr)) : ''}
-                  onChange={handleAmountChange}
+                  digits={amountStr}
+                  onDigits={setAmountStr}
                   className="w-full pl-11 pr-4 py-2.5 text-lg font-bold tabular-nums rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 />
               </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Building2, CreditCard, Smartphone, Banknote, TrendingUp, Wallet, Check, AlertCircle } from 'lucide-react';
 import { Account, AccountType } from '../types';
 import { useFinance } from '../context/FinanceContext';
+import { NominalInput } from './NominalInput';
 import { ACCOUNT_TYPES, COLOR_PALETTE } from '../utils/constants';
 import { CategoryIcon } from './CategoryIcon';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
@@ -189,17 +190,12 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
                     Rp
                   </span>
-                  <input
-                    type="text"
+                  <NominalInput
                     autoComplete="off"
-                    inputMode="numeric"
                     placeholder="0"
-                    value={
-                      adjustedBalanceStr
-                        ? new Intl.NumberFormat('id-ID').format(Number(adjustedBalanceStr.replace(/[^0-9-]/g, '')))
-                        : ''
-                    }
-                    onChange={e => setAdjustedBalanceStr(e.target.value.replace(/[^0-9-]/g, ''))}
+                    digits={adjustedBalanceStr}
+                    onDigits={setAdjustedBalanceStr}
+                    allowNegative
                     className="w-full pl-10 pr-3.5 py-2.5 text-base font-bold tabular-nums rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                   />
                 </div>
@@ -279,17 +275,12 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
                       Rp
                     </span>
-                    <input
-                      type="text"
+                    <NominalInput
                       autoComplete="off"
-                      inputMode="numeric"
                       placeholder="0"
-                      value={
-                        initialBalanceStr
-                          ? new Intl.NumberFormat('id-ID').format(Number(initialBalanceStr.replace(/[^0-9-]/g, '')))
-                          : ''
-                      }
-                      onChange={e => setInitialBalanceStr(e.target.value.replace(/[^0-9-]/g, ''))}
+                      digits={initialBalanceStr}
+                      onDigits={setInitialBalanceStr}
+                      allowNegative
                       className="w-full pl-10 pr-3.5 py-2 text-sm font-bold tabular-nums rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                     />
                   </div>

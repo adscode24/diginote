@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, CheckCircle2, Upload, Trash2, ArrowUpRight, AlertCircle, Calendar, Wallet, Percent } from 'lucide-react';
 import { Debt } from '../types';
 import { useFinance } from '../context/FinanceContext';
+import { NominalInput } from './NominalInput';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { formatRupiah, getTodayString, getActiveTierRate, calculateTieredPayment } from '../utils/formatters';
 
@@ -310,13 +311,11 @@ export const PayDebtModal: React.FC<PayDebtModalProps> = ({ isOpen, onClose, deb
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">
                   Rp
                 </span>
-                <input
-                  type="text"
+                <NominalInput
                   autoComplete="off"
-                  inputMode="numeric"
                   placeholder="0"
-                  value={amountStr ? new Intl.NumberFormat('id-ID').format(Number(amountStr)) : ''}
-                  onChange={handleAmountChange}
+                  digits={amountStr}
+                  onDigits={setAmountStr}
                   className="w-full pl-11 pr-4 py-2.5 text-base font-bold tabular-nums rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 />
               </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, AlertCircle, Calendar, Wallet, CheckCircle2, Tags } from 'lucide-react';
 import { Bill } from '../types';
 import { useFinance } from '../context/FinanceContext';
+import { NominalInput } from './NominalInput';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { formatRupiah, getTodayString } from '../utils/formatters';
 
@@ -127,12 +128,10 @@ export const BillPayModal: React.FC<BillPayModalProps> = ({ isOpen, onClose, bil
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">
                   Rp
                 </span>
-                <input
-                  type="text"
+                <NominalInput
                   autoComplete="off"
-                  inputMode="numeric"
-                  value={amountStr ? new Intl.NumberFormat('id-ID').format(Number(amountStr)) : ''}
-                  onChange={e => setAmountStr(e.target.value.replace(/[^0-9]/g, ''))}
+                  digits={amountStr}
+                  onDigits={setAmountStr}
                   placeholder="0"
                   className="w-full pl-11 pr-4 py-2.5 text-base font-bold tabular-nums rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 />

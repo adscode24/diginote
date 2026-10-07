@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Debt, DebtType, InstallmentCategory, TieredPeriod } from '../types';
 import { useFinance } from '../context/FinanceContext';
+import { NominalInput } from './NominalInput';
 import { useToast } from './Toast';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { formatRupiah, getTodayString, calculatePayoffDate, getNextDueDate } from '../utils/formatters';
@@ -348,13 +349,11 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
                 Rp
               </span>
-              <input
-                type="text"
+              <NominalInput
                 autoComplete="off"
-                inputMode="numeric"
                 placeholder="0"
-                value={totalAmountStr ? new Intl.NumberFormat('id-ID').format(Number(totalAmountStr)) : ''}
-                onChange={handleTotalAmountChange}
+                digits={totalAmountStr}
+                onDigits={setTotalAmountStr}
                 className="w-full pl-10 pr-3.5 py-2.5 text-sm font-bold tabular-nums rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
               />
             </div>
@@ -413,13 +412,11 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
                     Rp
                   </span>
-                  <input
-                    type="text"
+                  <NominalInput
                     autoComplete="off"
-                    inputMode="numeric"
                     placeholder="0"
-                    value={monthlyInstallmentStr ? new Intl.NumberFormat('id-ID').format(Number(monthlyInstallmentStr)) : ''}
-                    onChange={handleMonthlyInstallmentChange}
+                    digits={monthlyInstallmentStr}
+                    onDigits={setMonthlyInstallmentStr}
                     className="w-full pl-10 pr-3.5 py-2.5 text-sm font-bold tabular-nums rounded-xl border border-orange-300 dark:border-orange-800 bg-orange-50/30 dark:bg-orange-950/20 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                   />
                 </div>
@@ -459,13 +456,11 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                   </label>
                   <div className="relative">
                     <Clock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
+                    <NominalInput
                       autoComplete="off"
-                      inputMode="numeric"
                       placeholder="Contoh: 12 atau 60"
-                      value={remainingTenorStr}
-                      onChange={handleNumericTenorChange(setRemainingTenorStr)}
+                      digits={remainingTenorStr}
+                      onDigits={setRemainingTenorStr}
                       className="w-full pl-9 pr-3.5 py-2 text-xs font-bold tabular-nums rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                     />
                   </div>
@@ -496,13 +491,11 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                   Total Tenor Awal (Bulan / Opsional)
                 </label>
-                <input
-                  type="text"
+                <NominalInput
                   autoComplete="off"
-                  inputMode="numeric"
                   placeholder="Contoh: 24, 36, 120 bulan"
-                  value={totalTenorStr}
-                  onChange={handleNumericTenorChange(setTotalTenorStr)}
+                  digits={totalTenorStr}
+                  onDigits={setTotalTenorStr}
                   className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 />
               </div>
@@ -569,35 +562,30 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
                           <div className="grid grid-cols-3 gap-2">
                             <div>
                               <label className="text-[10px] text-slate-400 block mb-0.5">Durasi (Bulan)</label>
-                              <input
-                                type="text"
+                              <NominalInput
                                 autoComplete="off"
-                                inputMode="numeric"
-                                value={period.durationMonths}
-                                onChange={e => updateTierPeriod(idx, 'durationMonths', Number(e.target.value.replace(/[^0-9]/g, '')) || 0)}
+                                digits={String(period.durationMonths ?? '')}
+                                onDigits={v => updateTierPeriod(idx, 'durationMonths', Number(v) || 0)}
                                 className="w-full px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-medium"
                               />
                             </div>
                             <div>
                               <label className="text-[10px] text-slate-400 block mb-0.5">Bunga (% p.a)</label>
-                              <input
-                                type="text"
+                              <NominalInput
                                 autoComplete="off"
-                                inputMode="decimal"
-                                value={period.interestRate ?? ''}
-                                onChange={e => updateTierPeriod(idx, 'interestRate', Number(e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0)}
+                                decimal
+                                digits={String(period.interestRate ?? '')}
+                                onDigits={v => updateTierPeriod(idx, 'interestRate', Number(v.replace(',', '.')) || 0)}
                                 placeholder="3.75"
                                 className="w-full px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-medium"
                               />
                             </div>
                             <div>
                               <label className="text-[10px] text-slate-400 block mb-0.5">Cicilan / Bln (Rp)</label>
-                              <input
-                                type="text"
+                              <NominalInput
                                 autoComplete="off"
-                                inputMode="numeric"
-                                value={period.monthlyAmount ? new Intl.NumberFormat('id-ID').format(Number(String(period.monthlyAmount).replace(/[^0-9]/g, '')) || 0) : ''}
-                                onChange={e => updateTierPeriod(idx, 'monthlyAmount', Number(e.target.value.replace(/[^0-9]/g, '')) || 0)}
+                                digits={period.monthlyAmount ? String(period.monthlyAmount).replace(/[^0-9]/g, '') : ''}
+                                onDigits={v => updateTierPeriod(idx, 'monthlyAmount', Number(v) || 0)}
                                 placeholder="0"
                                 className="w-full px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold"
                               />
